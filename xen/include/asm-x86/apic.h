@@ -149,6 +149,16 @@ static __inline bool_t apic_isr_read(u8 vector)
             (vector & 0x1f)) & 1;
 }
 
+static inline bool apic_tmr_read(u8 vector)
+{
+    return apic_read(APIC_TMR + ((vector & ~0x1f) >> 1)) >> (vector & 0x1f);
+}
+
+static inline bool apic_irr_read(u8 vector)
+{
+    return apic_read(APIC_IRR + ((vector & ~0x1f) >> 1)) >> (vector & 0x1f);
+}
+
 static __inline u32 get_apic_id(void) /* Get the physical APIC id */
 {
     u32 id = apic_read(APIC_ID);
@@ -161,8 +171,12 @@ int get_physical_broadcast(void);
 
 static inline void ack_APIC_irq(void)
 {
+    peoi_debug_apic(PEOI_ACK_PRE);
+
 	/* Docs say use 0 for future compatibility */
 	apic_write(APIC_EOI, 0);
+
+    peoi_debug_apic(PEOI_ACK_POST);
 }
 
 extern int get_maxlvt(void);

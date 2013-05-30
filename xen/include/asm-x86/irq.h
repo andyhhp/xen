@@ -27,6 +27,43 @@ typedef struct {
     DECLARE_BITMAP(_bits,NR_VECTORS);
 } vmask_t;
 
+struct peoi_dbg_record
+{
+    unsigned int seq;
+
+    enum peoi_dbg_type {
+        PEOI_PUSH,
+        PEOI_SETREADY,
+        PEOI_FLUSH,
+        PEOI_POP,
+
+        PEOI_IDLE,
+        PEOI_WAKE,
+        PEOI_ACK_PRE,
+        PEOI_ACK_POST,
+    } action;
+
+    union {
+        struct peoi_dbg_stack {
+            unsigned int sp, irq, vector;
+        } stack;
+
+        struct peoi_dbg_apic {
+            DECLARE_BITMAP(irr, NR_VECTORS);
+            DECLARE_BITMAP(isr, NR_VECTORS);
+            unsigned int ppr;
+        } apic;
+    };
+};
+
+#define NR_PEOI_RECORDS 32
+DECLARE_PER_CPU(struct peoi_dbg_record, peoi_dbg[NR_PEOI_RECORDS]);
+DECLARE_PER_CPU(unsigned int, peoi_dbg_idx);
+
+void peoi_debug_stack(enum peoi_dbg_type action, unsigned int sp,
+                      unsigned int irq, unsigned int vector);
+void peoi_debug_apic(enum peoi_dbg_type action);
+
 struct irq_desc;
 
 struct arch_irq_desc {

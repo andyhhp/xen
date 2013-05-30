@@ -420,6 +420,8 @@ void mwait_idle_with_hints(unsigned int eax, unsigned int ecx)
     {
         struct cpu_info *info = get_cpu_info();
 
+        peoi_debug_apic(PEOI_IDLE);
+
         cpumask_set_cpu(cpu, &cpuidle_mwait_flags);
 
         spec_ctrl_enter_idle(info);
@@ -427,6 +429,8 @@ void mwait_idle_with_hints(unsigned int eax, unsigned int ecx)
         spec_ctrl_exit_idle(info);
 
         cpumask_clear_cpu(cpu, &cpuidle_mwait_flags);
+
+        peoi_debug_apic(PEOI_WAKE);
     }
 
     if ( expires <= NOW() && expires > 0 )

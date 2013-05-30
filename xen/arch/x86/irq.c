@@ -1148,6 +1148,141 @@ static void irq_guest_eoi_timer_fn(void *data)
     spin_unlock_irqrestore(&desc->lock, flags);
 }
 
+DEFINE_PER_CPU(struct peoi_dbg_record, peoi_dbg[NR_PEOI_RECORDS]);
+DEFINE_PER_CPU(unsigned int, peoi_dbg_idx);
+
+void peoi_debug_stack(enum peoi_dbg_type action, unsigned int sp,
+                      unsigned int irq, unsigned int vector)
+{
+    unsigned int *idx = &this_cpu(peoi_dbg_idx);
+    struct peoi_dbg_record *rec =
+        &this_cpu(peoi_dbg)[*idx & (NR_PEOI_RECORDS - 1)];
+    struct peoi_dbg_stack *stack = &rec->stack;
+
+    rec->seq    = *idx;
+    rec->action = action;
+
+    stack->sp = sp;
+    stack->irq = irq;
+    stack->vector = vector;
+
+    (*idx)++;
+}
+
+void peoi_debug_apic(enum peoi_dbg_type action)
+{
+    unsigned int i, *idx = &this_cpu(peoi_dbg_idx);
+    struct peoi_dbg_record *rec =
+        &this_cpu(peoi_dbg)[*idx & (NR_PEOI_RECORDS - 1)];
+    struct peoi_dbg_apic *apic = &rec->apic;
+    uint32_t *irr = _p(apic->irr);
+    uint32_t *isr = _p(apic->isr);
+
+    rec->seq    = *idx;
+    rec->action = action;
+
+    for ( i = 0; i < APIC_ISR_NR; i++ )
+    {
+        irr[i] = apic_read(APIC_IRR + i * 0x10);
+        isr[i] = apic_read(APIC_ISR + i * 0x10);
+    }
+
+    apic->ppr = apic_read(APIC_PROCPRI);
+
+    (*idx)++;
+}
+
+static void dump_peoi_record(const struct peoi_dbg_record *r)
+{
+    const struct peoi_dbg_stack *s = &r->stack;
+    const struct peoi_dbg_apic  *a = &r->apic;
+
+    switch ( r->action )
+    {
+    case PEOI_PUSH:
+        printk("  [%5u] PUSH     {sp %2d, irq %3d, vec 0x%02x}\n",
+               r->seq, s->sp, s->irq, s->vector);
+        break;
+
+    case PEOI_SETREADY:
+        printk("  [%5u] READY    {sp %2d, irq %3d, vec 0x%02x}\n",
+               r->seq, s->sp, s->irq, s->vector);
+        break;
+
+    case PEOI_FLUSH:
+        printk("  [%5u] FLUSH    %d -> 0\n", r->seq, s->sp);
+        break;
+
+    case PEOI_POP:
+        printk("  [%5u] POP      {sp %2d, irq %3d, vec 0x%02x}\n",
+               r->seq, s->sp, s->irq, s->vector);
+        break;
+
+    case PEOI_IDLE:
+        printk("  [%5u] IDLE     PPR 0x%08x\n", r->seq, a->ppr);
+
+    dump_apic_bitmaps:
+        printk("                   IRR %*phN\n"
+               "                   ISR %*phN\n",
+               (int)sizeof(a->irr), a->irr, (int)sizeof(a->isr), a->isr);
+        break;
+
+    case PEOI_WAKE:
+        printk("  [%5u] WAKE     PPR 0x%08x\n", r->seq, a->ppr);
+        goto dump_apic_bitmaps;
+
+    case PEOI_ACK_PRE:
+        printk("  [%5u] ACK_PRE  PPR 0x%08x\n", r->seq, a->ppr);
+        goto dump_apic_bitmaps;
+
+    case PEOI_ACK_POST:
+        printk("  [%5u] ACK_POST PPR 0x%08x\n", r->seq, a->ppr);
+        goto dump_apic_bitmaps;
+
+    default:
+        printk("  [%5u] ??? %d\n", r->seq, r->action);
+        break;
+    }
+}
+
+static void dump_peoi_records(void)
+{
+    unsigned int i, idx = this_cpu(peoi_dbg_idx);
+    struct peoi_dbg_record *rec = this_cpu(peoi_dbg);
+
+    printk("Peoi stack trace records:\n");
+    for ( i = 0; i < NR_PEOI_RECORDS; ++i )
+        dump_peoi_record(&rec[(idx + i) & (NR_PEOI_RECORDS - 1)]);
+}
+
+static void dump_lapic(void)
+{
+    unsigned int i;
+
+    printk("All LAPIC state:\n");
+    printk("  [vector] %8s %8s %8s\n", "ISR", "TMR", "IRR");
+    for ( i = 0; i < APIC_ISR_NR; ++i )
+        printk("  [%02x:%02x]  %08"PRIx32" %08"PRIx32" %08"PRIx32"\n",
+               (i * 32) + 31, i * 32,
+               apic_read(APIC_ISR + i * 0x10),
+               apic_read(APIC_TMR + i * 0x10),
+               apic_read(APIC_IRR + i * 0x10));
+}
+
+static void dump_peoi_stack(int sp)
+{
+    struct pending_eoi *peoi = this_cpu(pending_eoi);
+    int i;
+
+    printk("Peoi stack: sp %d\n", sp);
+    for ( i = sp - 1; i >= 0; --i )
+        printk("  [%2d] irq %3d, vec 0x%02x, ready %u, ISR %u, TMR %u, IRR %u\n",
+               i, peoi[i].irq, peoi[i].vector, peoi[i].ready,
+               apic_isr_read(peoi[i].vector),
+               apic_tmr_read(peoi[i].vector),
+               apic_irr_read(peoi[i].vector));
+}
+
 static void __do_IRQ_guest(int irq)
 {
     struct irq_desc         *desc = irq_to_desc(irq);
@@ -1170,13 +1305,29 @@ static void __do_IRQ_guest(int irq)
     if ( action->ack_type == ACKTYPE_EOI )
     {
         sp = pending_eoi_sp(peoi);
-        ASSERT((sp == 0) || (peoi[sp-1].vector < vector));
+        if ( !((sp == 0) || (peoi[sp-1].vector < vector)) )
+        {
+            printk("*** Pending EOI error ***\n");
+            printk("  cpu #%u, irq %d, vector 0x%x, sp %d\n",
+                   smp_processor_id(), irq, vector, sp);
+
+            dump_peoi_stack(sp);
+            dump_peoi_records();
+            dump_lapic();
+
+            spin_unlock(&desc->lock);
+
+            assert_failed("(sp == 0) || (peoi[sp-1].vector < vector)");
+        }
+
         ASSERT(sp < (NR_DYNAMIC_VECTORS-1));
         peoi[sp].irq = irq;
         peoi[sp].vector = vector;
         peoi[sp].ready = 0;
         pending_eoi_sp(peoi) = sp+1;
         cpumask_set_cpu(smp_processor_id(), action->cpu_eoi_map);
+
+        peoi_debug_stack(PEOI_PUSH, sp, irq, peoi[sp].vector);
     }
 
     for ( i = 0; i < action->nr_guests; i++ )
@@ -1383,6 +1534,8 @@ static void flush_ready_eoi(void)
         if ( desc->handler->end )
             desc->handler->end(desc, peoi[sp].vector);
         spin_unlock(&desc->lock);
+
+        peoi_debug_stack(PEOI_POP, sp + 1, irq, peoi[sp].vector);
     }
 
     pending_eoi_sp(peoi) = sp+1;
@@ -1409,6 +1562,8 @@ static void __set_eoi_ready(struct irq_desc *desc)
     } while ( peoi[--sp].irq != irq );
     ASSERT(!peoi[sp].ready);
     peoi[sp].ready = 1;
+
+    peoi_debug_stack(PEOI_SETREADY, sp + 1, irq, desc->arch.vector);
 }
 
 /* Mark specified IRQ as ready-for-EOI (if it really is) and attempt to EOI. */
@@ -2448,6 +2603,9 @@ void fixup_eoi(void)
 
     /* Flush the interrupt EOI stack. */
     peoi = this_cpu(pending_eoi);
+
+    peoi_debug_stack(PEOI_FLUSH, pending_eoi_sp(peoi), -1, -1);
+
     for ( sp = 0; sp < pending_eoi_sp(peoi); sp++ )
         peoi[sp].ready = 1;
     flush_ready_eoi();
