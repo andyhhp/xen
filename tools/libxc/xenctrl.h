@@ -1119,8 +1119,57 @@ typedef uint64_t xc_node_to_memfree_t;
 typedef uint32_t xc_node_to_node_dist_t;
 
 int xc_physinfo(xc_interface *xch, xc_physinfo_t *info);
+
+/* Query Xen for the cpu topology information.  The caller is responsible for
+ * ensuring correct hypercall buffering. */
 int xc_topologyinfo(xc_interface *xch, xc_topologyinfo_t *info);
+
+/**
+ * Query Xen for the cpu topology information.  The library shall ensure
+ * correct bounce buffering is performed.
+ *
+ * The following parameters behave exactly as described in Xen's public
+ * sysctl.h.  Arrays may be NULL if the information is not wanted.
+ *
+ * Each array should have (max_cpu_index + 1) elements.
+ *
+ * @param [in/out] max_cpu_index
+ * @param [out] cpu_to_core
+ * @param [out] cpu_to_socket
+ * @param [out] cpu_to_node
+ * @returns 0 on success, -1 and sets errno on error.
+ */
+int xc_topologyinfo_bounced(xc_interface *xch,
+                            uint32_t *max_cpu_index,
+                            uint32_t *cpu_to_core,
+                            uint32_t *cpu_to_socket,
+                            uint32_t *cpu_to_node);
+
+/* Query Xen for the memory NUMA information.  The caller is responsible for
+ * ensuring correct hypercall buffering. */
 int xc_numainfo(xc_interface *xch, xc_numainfo_t *info);
+
+/**
+ * Query Xen for the memory NUMA information.  The library shall ensure
+ * correct bounce buffering is performed.
+ *
+ * The following parameters behave exactly as described in Xen's public
+ * sysctl.h.  Arrays may be NULL if the information is not wanted.
+ *
+ * node_to_mem{size,free} should have (max_node_index + 1) elements
+ * node_to_node_distance should have (max_node_index + 1)^2 elements
+ *
+ * @param [in/out] max_node_index
+ * @param [out] node_to_memsize
+ * @param [out] node_to_memfree
+ * @param [out] node_to_node_distance
+ * @returns 0 on success, -1 and sets errno on error.
+ */
+int xc_numainfo_bounced(xc_interface *xch,
+                        uint32_t *max_node_index,
+                        uint64_t *node_to_memsize,
+                        uint64_t *node_to_memfree,
+                        uint32_t *node_to_node_distance);
 
 int xc_sched_id(xc_interface *xch,
                 int *sched_id);
