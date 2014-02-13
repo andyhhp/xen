@@ -633,6 +633,13 @@ typedef struct xen_sysctl_coverage_op xen_sysctl_coverage_op_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_coverage_op_t);
 
 
+struct xen_sysctl_cpuid {
+    uint32_t cpu; /* IN - Pcpu to execute on */
+    uint32_t eax, ebx, ecx, edx; /* IN/OUT - Parameters to `cpuid` */
+};
+typedef struct xen_sysctl_cpuid xen_sysctl_cpuid_t;
+DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpuid_t);
+
 struct xen_sysctl {
     uint32_t cmd;
 #define XEN_SYSCTL_readconsole                    1
@@ -654,6 +661,7 @@ struct xen_sysctl {
 #define XEN_SYSCTL_cpupool_op                    18
 #define XEN_SYSCTL_scheduler_op                  19
 #define XEN_SYSCTL_coverage_op                   20
+#define XEN_SYSCTL_cpuid                       1000
     uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
     union {
         struct xen_sysctl_readconsole       readconsole;
@@ -675,6 +683,7 @@ struct xen_sysctl {
         struct xen_sysctl_cpupool_op        cpupool_op;
         struct xen_sysctl_scheduler_op      scheduler_op;
         struct xen_sysctl_coverage_op       coverage_op;
+        struct xen_sysctl_cpuid             cpuid;
         uint8_t                             pad[128];
     } u;
 };

@@ -774,6 +774,31 @@ int xc_hvm_inject_trap(
     return rc;
 }
 
+int xc_xen_cpuid(xc_interface *xch, uint32_t cpu, uint32_t *eax,
+                 uint32_t *ebx, uint32_t *ecx, uint32_t *edx)
+{
+    int ret;
+    DECLARE_SYSCTL;
+
+    sysctl.cmd = XEN_SYSCTL_cpuid;
+    sysctl.u.cpuid.cpu = cpu;
+    sysctl.u.cpuid.eax = *eax;
+    sysctl.u.cpuid.ebx = *ebx;
+    sysctl.u.cpuid.ecx = *ecx;
+    sysctl.u.cpuid.edx = *edx;
+
+    ret = do_sysctl(xch, &sysctl);
+    if ( ret )
+        return ret;
+
+    *eax = sysctl.u.cpuid.eax;
+    *ebx = sysctl.u.cpuid.ebx;
+    *ecx = sysctl.u.cpuid.ecx;
+    *edx = sysctl.u.cpuid.edx;
+
+    return 0;
+}
+
 /*
  * Local variables:
  * mode: C

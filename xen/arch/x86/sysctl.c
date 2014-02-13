@@ -66,6 +66,18 @@ void arch_do_physinfo(xen_sysctl_physinfo_t *pi)
         pi->capabilities |= XEN_SYSCTL_PHYSCAP_hvm_directio;
 }
 
+void sysctl_cpuid_helper(void *data)
+{
+    struct xen_sysctl_cpuid *cpuid = data;
+
+    ASSERT(smp_processor_id() == cpuid->cpu);
+    asm volatile ("cpuid"
+                  : "=a" (cpuid->eax), "=b" (cpuid->ebx),
+                    "=c" (cpuid->ecx), "=d" (cpuid->edx)
+                  : "a" (cpuid->eax), "b" (cpuid->ebx),
+                    "c" (cpuid->ecx), "d" (cpuid->edx) );
+}
+
 long arch_do_sysctl(
     struct xen_sysctl *sysctl, XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
 {
@@ -98,6 +110,24 @@ long arch_do_sysctl(
             ret = -EINVAL;
             break;
         }
+    }
+    break;
+
+    case XEN_SYSCTL_cpuid:
+    {
+        int cpu = sysctl->u.cpuid.cpu;
+
+        if ( cpu == smp_processor_id() )
+            sysctl_cpuid_helper(&sysctl->u.cpuid);
+        else if ( cpu >= nr_cpu_ids || !cpu_online(cpu) )
+            ret = -EINVAL;
+        else
+            on_selected_cpus(cpumask_of(cpu),
+                             sysctl_cpuid_helper,
+                             &sysctl->u.cpuid, 1);
+
+        if ( !ret && __copy_to_guest(u_sysctl, sysctl, 1) )
+            ret = -EFAULT;
     }
     break;
 

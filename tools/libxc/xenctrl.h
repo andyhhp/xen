@@ -1801,6 +1801,13 @@ int xc_hvm_inject_trap(
     uint64_t cr2);
 
 /*
+ * Run the cpuid instruction on a specificied physical cpu with the given
+ * parameters.
+ */
+int xc_xen_cpuid(xc_interface *xch, uint32_t cpu, uint32_t *eax,
+                 uint32_t *ebx, uint32_t *ecx, uint32_t *edx);
+
+/*
  *  LOGGING AND ERROR REPORTING
  */
 
