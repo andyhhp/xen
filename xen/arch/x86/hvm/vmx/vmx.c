@@ -1790,6 +1790,36 @@ static void vmx_inject_event(const struct x86_event *event)
         write_debugreg(6, merge_dr6(read_debugreg(6), event->pending_dbg,
                                     curr->domain->arch.cpuid->feat.rtm));
 
+        /*
+         * Work around SS/STI vmentry bug.
+         *
+         * If kernel code is single stepping itself and executes an STI
+         * instruction resulting in an STI shadow, a vmexit occurs due to #DB
+         * interception, but the vmentry fails due to a failed consistency
+         * check.  (Hardware comes to the conclusion that there should be a
+         * pending debug exception, but doesn't account for the pending #DB in
+         * VMENTRY_INTR_INFO.)
+         *
+         * Manually adjust the pending debug exception field to mark BS as
+         * pending, which satisfies the consistency check and allows the
+         * vmentry to succeed.
+         */
+        if ( unlikely(regs->eflags & X86_EFLAGS_TF) )
+        {
+            unsigned long int_info;
+
+            __vmread(GUEST_INTERRUPTIBILITY_INFO, &int_info);
+
+            if ( int_info & VMX_INTR_SHADOW_STI )
+            {
+                unsigned long pending_dbg;
+
+                __vmread(GUEST_PENDING_DBG_EXCEPTIONS, &pending_dbg);
+                __vmwrite(GUEST_PENDING_DBG_EXCEPTIONS,
+                          pending_dbg | X86_DR6_BS);
+            }
+        }
+
         if ( !nestedhvm_vcpu_in_guestmode(curr) ||
              !nvmx_intercepts_exception(curr, TRAP_debug, _event.error_code) )
         {
