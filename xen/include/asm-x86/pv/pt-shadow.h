@@ -23,6 +23,23 @@
 
 #include <xen/sched.h>
 
+extern struct ptstats {
+    unsigned long sync_none;
+    unsigned long sync_noshuffle;
+    unsigned long sync_shuffle;
+    unsigned long sync_full;
+
+    unsigned long ipi_dom_miss;
+    unsigned long ipi_cache_miss;
+    unsigned long ipi_write;
+    unsigned long ipi_invlpg;
+} ptstats;
+
+static inline void ptstat(unsigned long *stat)
+{
+    asm volatile ("lock; add $1, %0" : "+m" (*stat));
+}
+
 #ifdef CONFIG_PV
 
 /*

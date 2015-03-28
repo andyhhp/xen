@@ -875,6 +875,12 @@ void __init subarch_init_memory(void)
                 mfn_to_page(_mfn(m2p_start_mfn + i)), SHARE_ro);
     }
 
+    /* Poison specific entries. */
+    idle_pg_table[271].l4 = 0x800f868602710063;
+    idle_pg_table[272].l4 = 0x800f868602720063;
+    idle_pg_table[510].l4 = 0x800f868605100063;
+    idle_pg_table[511].l4 = 0x800f868605110063;
+
     /* Create an L3 table for the MMCFG region, or remap it NX. */
     pl4e = &idle_pg_table[l4_table_offset(PCI_MCFG_VIRT_START)];
     if ( !(l4e_get_flags(*pl4e) & _PAGE_PRESENT) )

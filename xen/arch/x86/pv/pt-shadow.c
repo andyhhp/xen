@@ -28,6 +28,8 @@
 #undef page_to_mfn
 #define page_to_mfn(pg) _mfn(__page_to_mfn(pg))
 
+struct ptstats ptstats;
+
 /*
  * To use percpu linear ranges, we require that no two pcpus have %cr3
  * pointing at the same L4 pagetable at the same time.
@@ -224,7 +226,10 @@ unsigned long pt_maybe_shadow(struct vcpu *v)
 
     /* No shadowing necessary? Run on the intended pagetable. */
     if ( !pt_need_shadow(v->domain) )
+    {
+        ptstat(&ptstats.sync_none);
         return new_cr3;
+    }
 
     ptsh->domain = v->domain;
 
@@ -259,6 +264,11 @@ unsigned long pt_maybe_shadow(struct vcpu *v)
             }
         }
         local_irq_restore(flags);
+
+        if ( cache_idx )
+            ptstat(&ptstats.sync_shuffle);
+        else
+            ptstat(&ptstats.sync_noshuffle);
     }
     else
     {
@@ -293,6 +303,7 @@ unsigned long pt_maybe_shadow(struct vcpu *v)
                sizeof(*l4t) * (L4_PAGETABLE_ENTRIES - (slot + 1)));
 
         unmap_domain_page(vcpu_l4t);
+        ptstat(&ptstats.sync_full);
     }
 
     ASSERT(ptsh->cache[0].cr3_mfn == (new_cr3 >> PAGE_SHIFT));
@@ -320,13 +331,19 @@ static void _pt_shadow_ipi(void *arg)
 
     /* No longer shadowing state from this domain?  Nothing to do. */
     if ( info->d != ptsh->domain )
+    {
+        ptstat(&ptstats.ipi_dom_miss);
         return;
+    }
 
     ent = pt_cache_lookup(ptsh, page_to_maddr(info->pg));
 
     /* Not shadowing this frame?  Nothing to do. */
     if ( ent == NULL )
+    {
+        ptstat(&ptstats.ipi_cache_miss);
         return;
+    }
 
     switch ( info->op )
     {
@@ -340,6 +357,7 @@ static void _pt_shadow_ipi(void *arg)
         l4t[info->slot] = vcpu_l4t[info->slot];
 
         unmap_domain_page(vcpu_l4t);
+        ptstat(&ptstats.ipi_write);
         break;
 
     case PTSH_IPI_INVLPG:
@@ -357,6 +375,7 @@ static void _pt_shadow_ipi(void *arg)
         case 2: ptsh->cache[2] = ptsh->cache[3];
         case 3: ptsh->cache[3] = (pt_cache_entry_t){ shadow_idx };
         }
+        ptstat(&ptstats.ipi_invlpg);
         break;
 
     default:

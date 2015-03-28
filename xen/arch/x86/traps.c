@@ -978,6 +978,7 @@ void cpuid_hypervisor_leaves(const struct vcpu *v, uint32_t leaf,
             break;
 
         res->b = flsl(get_upper_mfn_bound()) + PAGE_SHIFT;
+        res->c = v->vcpu_id;
         break;
 
     default:
@@ -2123,6 +2124,204 @@ void asm_domain_crash_synchronous(unsigned long addr)
 
     __domain_crash_synchronous();
 }
+
+#include <xen/keyhandler.h>
+#include <asm/pv/pt-shadow.h>
+
+const char *memory_type_to_str(unsigned int x);
+static void decode_intpte(unsigned int level, unsigned int slot, intpte_t pte)
+{
+    unsigned int pat_idx = ((pte >> 3) & 3) |
+        ((pte >> ((level > 1 && (pte & _PAGE_PSE)) ? 10 : 5)) & 4);
+
+    unsigned int mem_type = (host_pat >> (pat_idx << 3)) & 0xff;
+
+    printk("%*sL%u[%03u] %"PRIpte" %*s%s %s%s%s%s%s%s\n",
+           (4 - level) * 2, "",
+           level, slot, pte,
+           (level - 1) * 2, "",
+
+           memory_type_to_str(mem_type),
+
+           pte & 0x8000000000000000ULL    ? " Nx" : "",
+           pte & _PAGE_GLOBAL             ? " G"  : "",
+           (level > 1 && pte & _PAGE_PSE) ? " +"  : "",
+           pte & _PAGE_USER               ? " U"  : "",
+           pte & _PAGE_RW                 ? " W"  : "",
+           pte & _PAGE_PRESENT            ? " P"  : "");
+}
+
+static bool is_poison(intpte_t pte)
+{
+    return (pte & ~0xfff0000) == 0x800f868600000063;
+}
+
+static void dump_l3t(l3_pgentry_t *l3t, bool decend)
+{
+    unsigned int l3i, l2i, l1i;
+    l2_pgentry_t *l2;
+    l1_pgentry_t *l1;
+
+    for ( l3i = 0; l3i < 512; ++l3i )
+    {
+        if ( !(l3t[l3i].l3 & _PAGE_PRESENT) )
+            continue;
+
+        decode_intpte(3, l3i, l3t[l3i].l3);
+
+        if ( is_poison(l3t[l3i].l3) )
+            continue;
+
+        if ( l3t[l3i].l3 & _PAGE_PSE )
+            continue;
+
+        if ( !decend )
+            continue;
+
+        l2 = l3e_to_l2e(l3t[l3i]);
+        for ( l2i = 0; l2i < 512; ++l2i )
+        {
+            if ( !(l2[l2i].l2 & _PAGE_PRESENT) )
+                continue;
+
+            decode_intpte(2, l2i, l2[l2i].l2);
+
+            if ( is_poison(l2[l2i].l2) )
+                continue;
+
+            if ( l2[l2i].l2 & _PAGE_PSE )
+                continue;
+
+            l1 = l2e_to_l1e(l2[l2i]);
+            for ( l1i = 0; l1i < 512; ++l1i )
+            {
+                if ( !(l1[l1i].l1 & _PAGE_PRESENT) )
+                    continue;
+
+                decode_intpte(1, l1i, l1[l1i].l1);
+            }
+
+            process_pending_softirqs();
+        }
+
+        process_pending_softirqs();
+    }
+
+}
+
+static void dump_l4t(l4_pgentry_t *l4t, bool decend)
+{
+    unsigned int l4i;
+
+    for ( l4i = 0; l4i < 512; ++l4i )
+    {
+        if ( !(l4t[l4i].l4 & _PAGE_PRESENT) )
+            continue;
+
+        decode_intpte(4, l4i, l4t[l4i].l4);
+
+        if ( is_poison(l4t[l4i].l4) )
+            continue;
+
+        if ( decend &&
+             l4i != l4_table_offset(LINEAR_PT_VIRT_START) &&
+             l4i != l4_table_offset(SH_LINEAR_PT_VIRT_START) )
+            dump_l3t(l4e_to_l3e(l4t[l4i]), true);
+    }
+}
+
+static void do_extreme_debug(unsigned char key)
+{
+    unsigned int cpu;
+
+    printk("'%c' pressed -> Extreme debugging in progress...\n", key);
+
+    watchdog_disable();
+    console_start_log_everything();
+
+    switch ( key )
+    {
+    case '1':
+        dump_l4t(idle_pg_table, true);
+        break;
+
+    case '2':
+        printk("idle_pg_table[]\n");
+        dump_l4t(idle_pg_table, false);
+
+        for_each_online_cpu ( cpu )
+        {
+            paddr_t l4 = per_cpu(percpu_idle_pt, cpu);
+            l4_pgentry_t mappings = per_cpu(percpu_mappings, cpu);
+            l4_pgentry_t *l4t;
+            l3_pgentry_t *l3t;
+
+            printk("CPU #%u per-pcpu l4 %"PRIpaddr", mappings %"PRIpte"\n",
+                   cpu, l4, mappings.l4);
+
+            if ( !l4 )
+            {
+                printk("  BAD l4\n");
+                continue;
+            }
+            if ( !mappings.l4 )
+            {
+                printk("  Bad mappings\n");
+                continue;
+            }
+
+            printk("Dumping L4:\n");
+            l4t = map_domain_page(_mfn(paddr_to_pfn(l4)));
+            dump_l4t(l4t, false);
+            unmap_domain_page(l4t);
+
+            printk("Dumping L3:\n");
+            l3t = map_domain_page(l4e_get_mfn(mappings));
+            dump_l3t(l3t, true);
+            unmap_domain_page(l3t);
+        }
+        break;
+
+    case '3':
+        printk("pt_shadow() stats:\n"
+               "  sync_none:      %20lu\n"
+               "  sync_noshuffle: %20lu\n"
+               "  sync_shuffle:   %20lu\n"
+               "  sync_full:      %20lu\n"
+               "  ipi_dom_miss:   %20lu\n"
+               "  ipi_cache_miss: %20lu\n"
+               "  ipi_ipi_write:  %20lu\n"
+               "  ipi_ipi_invlpg: %20lu\n",
+               ptstats.sync_none, ptstats.sync_noshuffle,
+               ptstats.sync_shuffle, ptstats.sync_full,
+               ptstats.ipi_dom_miss, ptstats.ipi_cache_miss,
+               ptstats.ipi_write, ptstats.ipi_invlpg);
+        break;
+    }
+
+    console_end_log_everything();
+    watchdog_enable();
+}
+
+static struct timer stats;
+static void stats_fn(void *unused)
+{
+    do_extreme_debug('3');
+    set_timer(&stats, NOW() + SECONDS(10));
+}
+
+static int __init extreme_debug_keyhandler_init(void)
+{
+    register_keyhandler('1', &do_extreme_debug, "Extreme debugging 1", 0);
+    register_keyhandler('2', &do_extreme_debug, "Extreme debugging 2", 0);
+    register_keyhandler('3', &do_extreme_debug, "Extreme debugging 3", 0);
+
+    init_timer(&stats, stats_fn, NULL, 0);
+    /* set_timer(&stats, NOW() + SECONDS(10)); */
+
+    return 0;
+}
+__initcall(extreme_debug_keyhandler_init);
 
 /*
  * Local variables:

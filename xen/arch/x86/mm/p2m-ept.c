@@ -1289,7 +1289,7 @@ void ept_p2m_uninit(struct p2m_domain *p2m)
     free_cpumask_var(ept->invalidate);
 }
 
-static const char *memory_type_to_str(unsigned int x)
+const char *memory_type_to_str(unsigned int x)
 {
     static const char memory_types[8][3] = {
         [MTRR_TYPE_UNCACHABLE]     = "UC",
@@ -1297,7 +1297,8 @@ static const char *memory_type_to_str(unsigned int x)
         [MTRR_TYPE_WRTHROUGH]      = "WT",
         [MTRR_TYPE_WRPROT]         = "WP",
         [MTRR_TYPE_WRBACK]         = "WB",
-        [MTRR_NUM_TYPES]           = "??"
+        [PAT_TYPE_UC_MINUS]        = "U-",
+        /* [MTRR_NUM_TYPES]           = "??", */
     };
 
     ASSERT(x < ARRAY_SIZE(memory_types));
