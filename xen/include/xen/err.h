@@ -15,19 +15,28 @@
  */
 #define MAX_ERRNO	4095
 
+/*
+ * Individual architectures may wish to slide the error region away from its
+ * default position at the very top of virtual address space.  (e.g. if Xen
+ * doesn't own the range).
+ */
+#ifndef ARCH_ERR_PTR_SLIDE
+#define ARCH_ERR_PTR_SLIDE 0
+#endif
+
 static inline bool IS_ERR_VALUE(unsigned long x)
 {
-	return x >= (unsigned long)-MAX_ERRNO;
+	return (x + ARCH_ERR_PTR_SLIDE) >= (unsigned long)-MAX_ERRNO;
 }
 
 static inline void *__must_check ERR_PTR(long error)
 {
-	return (void *)error;
+	return (void *)((unsigned long)error - ARCH_ERR_PTR_SLIDE);
 }
 
 static inline long __must_check PTR_ERR(const void *ptr)
 {
-	return (long)ptr;
+	return (long)((unsigned long)ptr + ARCH_ERR_PTR_SLIDE);
 }
 
 static inline bool __must_check IS_ERR(const void *ptr)
