@@ -89,6 +89,24 @@ config TBOOT
 	  Technology (TXT)
 
 	  If unsure, say Y.
+
+config UNSAFE_ERRPTR
+       def_bool n
+       prompt "Unsafe ERR_PTR() constants" if EXPERT = "y"
+       ---help---
+         The ERR_PTR() infrastructure by default uses the top of virtual
+         address space for error information, but with 64bit PV guests, this
+         range belongs to the guest kernel.
+
+         Xen by default slides the error range elsewhere in virtual address
+         space, but this comes at the expense of a few extra instructions of
+         calculations.
+
+         If that overhead is too much, this option is safe to enable if no
+         64bit PV guests are in use, or all 64bit PV guests are fully trusted.
+
+         If unsure, say N.
+
 endmenu
 
 source "common/Kconfig"

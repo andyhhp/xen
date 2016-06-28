@@ -87,6 +87,14 @@
 #define LIST_POISON1  ((void *)0x0100100100100100UL)
 #define LIST_POISON2  ((void *)0x0200200200200200UL)
 
+#if !defined(NDEBUG) || !defined(CONFIG_UNSAFE_ERRPTR)
+/*
+ * Always use safe pointers in debug builds.  Use safe pointers in release
+ * builds unless the user explicitly opts out.
+ */
+#define ARCH_ERR_PTR_SLIDE (-(unsigned long)0xbad0eee100000000ull)
+#endif
+
 #ifndef __ASSEMBLY__
 extern unsigned long trampoline_phys;
 #define bootsym_phys(sym)                                 \
