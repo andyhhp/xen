@@ -1670,6 +1670,7 @@ void hvm_hlt(unsigned int eflags)
     HVMTRACE_1D(HLT, /* pending = */ vcpu_runnable(curr));
 }
 
+void svm_vmcb_dump(const char *from, struct vmcb_struct *vmcb);
 void hvm_triple_fault(void)
 {
     struct vcpu *v = current;
@@ -1679,6 +1680,12 @@ void hvm_triple_fault(void)
     gprintk(XENLOG_ERR,
             "Triple fault - invoking HVM shutdown action %d\n",
             reason);
+
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+        vmcs_dump_vcpu(v);
+    else
+        svm_vmcb_dump(__func__, v->arch.hvm.svm.vmcb);
+
     vcpu_show_execution_state(v);
     domain_shutdown(d, reason);
 }
