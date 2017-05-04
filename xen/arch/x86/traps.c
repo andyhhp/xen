@@ -2061,29 +2061,6 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
     return 0;
 }
 
-void asm_domain_crash_synchronous(unsigned long addr)
-{
-    /*
-     * We need clear AC bit here because in entry.S AC is set
-     * by ASM_STAC to temporarily allow accesses to user pages
-     * which is prevented by SMAP by default.
-     *
-     * For some code paths, where this function is called, clac()
-     * is not needed, but adding clac() here instead of each place
-     * asm_domain_crash_synchronous() is called can reduce the code
-     * redundancy, and it is harmless as well.
-     */
-    clac();
-
-    if ( addr == 0 )
-        addr = this_cpu(last_extable_addr);
-
-    printk("domain_crash_sync called from entry.S: fault at %p %pS\n",
-           _p(addr), _p(addr));
-
-    __domain_crash_synchronous();
-}
-
 /*
  * Local variables:
  * mode: C

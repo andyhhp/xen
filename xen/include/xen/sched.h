@@ -633,13 +633,6 @@ void noreturn __domain_crash_synchronous(void);
     __domain_crash_synchronous();                                         \
 } while (0)
 
-/*
- * Called from assembly code, with an optional address to help indicate why
- * the crash occured.  If addr is 0, look up address from last extable
- * redirection.
- */
-void noreturn asm_domain_crash_synchronous(unsigned long addr);
-
 #define set_current_state(_s) do { current->state = (_s); } while (0)
 void scheduler_init(void);
 int  sched_init_vcpu(struct vcpu *v, unsigned int processor);

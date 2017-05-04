@@ -53,7 +53,7 @@ compat_test_guest_events:
         movl  VCPU_event_sel(%rbx),%eax
         movw  %ax,TRAPBOUNCE_cs(%rdx)
         movb  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
-        call  compat_create_bounce_frame
+        call  pv_create_exception_frame
         jmp   compat_test_all_events
 
         ALIGN
@@ -97,7 +97,7 @@ compat_process_nmi:
         /* FALLTHROUGH */
 compat_process_trap:
         leaq  VCPU_trap_bounce(%rbx),%rdx
-        call  compat_create_bounce_frame
+        call  pv_create_exception_frame
         jmp   compat_test_all_events
 
 /* %rbx: struct vcpu, interrupts disabled */
@@ -183,8 +183,7 @@ ENTRY(compat_post_handle_exception)
         testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%rdx)
         jz    compat_test_all_events
 .Lcompat_bounce_exception:
-        call  compat_create_bounce_frame
-        movb  $0,TRAPBOUNCE_flags(%rdx)
+        call  pv_create_exception_frame
         jmp   compat_test_all_events
 
 /* See lstar_enter for entry register state. */
@@ -236,115 +235,10 @@ ENTRY(compat_sysenter)
         movl  $FLAT_COMPAT_USER_SS,UREGS_ss(%rsp)
         cmovzl %ecx,%eax
         movw  %ax,TRAPBOUNCE_cs(%rdx)
-        call  compat_create_bounce_frame
+        call  pv_create_exception_frame
         jmp   compat_test_all_events
 
 ENTRY(compat_int80_direct_trap)
         CR4_PV32_RESTORE
-        call  compat_create_bounce_frame
+        call  pv_create_exception_frame
         jmp   compat_test_all_events
-
-/* CREATE A BASIC EXCEPTION FRAME ON GUEST OS (RING-1) STACK:            */
-/*   {[ERRCODE,] EIP, CS, EFLAGS, [ESP, SS]}                             */
-/* %rdx: trap_bounce, %rbx: struct vcpu                                  */
-/* On return only %rbx and %rdx are guaranteed non-clobbered.            */
-compat_create_bounce_frame:
-        ASSERT_INTERRUPTS_ENABLED
-        mov   %fs,%edi
-        ASM_STAC
-        testb $2,UREGS_cs+8(%rsp)
-        jz    1f
-        /* Push new frame at registered guest-OS stack base. */
-        movl  VCPU_kernel_sp(%rbx),%esi
-.Lft1:  mov   VCPU_kernel_ss(%rbx),%fs
-        subl  $2*4,%esi
-        movl  UREGS_rsp+8(%rsp),%eax
-.Lft2:  movl  %eax,%fs:(%rsi)
-        movl  UREGS_ss+8(%rsp),%eax
-.Lft3:  movl  %eax,%fs:4(%rsi)
-        jmp   2f
-1:      /* In kernel context already: push new frame at existing %rsp. */
-        movl  UREGS_rsp+8(%rsp),%esi
-.Lft4:  mov   UREGS_ss+8(%rsp),%fs
-2:
-        movq  VCPU_domain(%rbx),%r8
-        subl  $3*4,%esi
-        movq  VCPU_vcpu_info(%rbx),%rax
-        pushq COMPAT_VCPUINFO_upcall_mask(%rax)
-        testb $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
-        setnz %ch                       # TBF_INTERRUPT -> set upcall mask
-        orb   %ch,COMPAT_VCPUINFO_upcall_mask(%rax)
-        popq  %rax
-        shll  $16,%eax                  # Bits 16-23: saved_upcall_mask
-        movw  UREGS_cs+8(%rsp),%ax      # Bits  0-15: CS
-.Lft5:  movl  %eax,%fs:4(%rsi)          # CS / saved_upcall_mask
-        shrl  $16,%eax
-        testb %al,%al                   # Bits 0-7: saved_upcall_mask
-        setz  %ch                       # %ch == !saved_upcall_mask
-        movl  UREGS_eflags+8(%rsp),%eax
-        andl  $~(X86_EFLAGS_IF|X86_EFLAGS_IOPL),%eax
-        addb  %ch,%ch                   # Bit 9 (EFLAGS.IF)
-        orb   %ch,%ah                   # Fold EFLAGS.IF into %eax
-        xorl  %ecx,%ecx                 # if ( VM_ASSIST(v->domain, architectural_iopl) )
-        testb $1 << VMASST_TYPE_architectural_iopl,DOMAIN_vm_assist(%r8)
-        cmovnzl VCPU_iopl(%rbx),%ecx    # Bits 13:12 (EFLAGS.IOPL)
-        orl   %ecx,%eax                 # Fold EFLAGS.IOPL into %eax
-.Lft6:  movl  %eax,%fs:2*4(%rsi)        # EFLAGS
-        movl  UREGS_rip+8(%rsp),%eax
-.Lft7:  movl  %eax,%fs:(%rsi)           # EIP
-        testb $TBF_EXCEPTION_ERRCODE,TRAPBOUNCE_flags(%rdx)
-        jz    1f
-        subl  $4,%esi
-        movl  TRAPBOUNCE_error_code(%rdx),%eax
-.Lft8:  movl  %eax,%fs:(%rsi)           # ERROR CODE
-1:
-        ASM_CLAC
-        /* Rewrite our stack frame and return to guest-OS mode. */
-        /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
-        andl  $~(X86_EFLAGS_VM|X86_EFLAGS_RF|\
-                 X86_EFLAGS_NT|X86_EFLAGS_TF),UREGS_eflags+8(%rsp)
-        mov   %fs,UREGS_ss+8(%rsp)
-        movl  %esi,UREGS_rsp+8(%rsp)
-.Lft13: mov   %edi,%fs
-        movzwl TRAPBOUNCE_cs(%rdx),%eax
-        /* Null selectors (0-3) are not allowed. */
-        testl $~3,%eax
-UNLIKELY_START(z, compat_bounce_null_selector)
-        lea   UNLIKELY_DISPATCH_LABEL(compat_bounce_null_selector)(%rip), %rdi
-        jmp   asm_domain_crash_synchronous  /* Does not return */
-__UNLIKELY_END(compat_bounce_null_selector)
-        movl  %eax,UREGS_cs+8(%rsp)
-        movl  TRAPBOUNCE_eip(%rdx),%eax
-        movl  %eax,UREGS_rip+8(%rsp)
-        ret
-.section .fixup,"ax"
-.Lfx13:
-        xorl  %edi,%edi
-        jmp   .Lft13
-.previous
-        _ASM_EXTABLE(.Lft1,  dom_crash_sync_extable)
-        _ASM_EXTABLE(.Lft2,  compat_crash_page_fault)
-        _ASM_EXTABLE(.Lft3,  compat_crash_page_fault_4)
-        _ASM_EXTABLE(.Lft4,  dom_crash_sync_extable)
-        _ASM_EXTABLE(.Lft5,  compat_crash_page_fault_4)
-        _ASM_EXTABLE(.Lft6,  compat_crash_page_fault_8)
-        _ASM_EXTABLE(.Lft7,  compat_crash_page_fault)
-        _ASM_EXTABLE(.Lft8,  compat_crash_page_fault)
-        _ASM_EXTABLE(.Lft13, .Lfx13)
-
-compat_crash_page_fault_8:
-        addl  $4,%esi
-compat_crash_page_fault_4:
-        addl  $4,%esi
-compat_crash_page_fault:
-.Lft14: mov   %edi,%fs
-        ASM_CLAC
-        movl  %esi,%edi
-        call  show_page_walk
-        jmp   dom_crash_sync_extable
-.section .fixup,"ax"
-.Lfx14:
-        xorl  %edi,%edi
-        jmp   .Lft14
-.previous
-        _ASM_EXTABLE(.Lft14, .Lfx14)

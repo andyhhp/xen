@@ -30,7 +30,7 @@ ENTRY(switch_to_kernel)
         setc  %cl
         leal  (,%rcx,TBF_INTERRUPT),%ecx
         movb  %cl,TRAPBOUNCE_flags(%rdx)
-        call  create_bounce_frame
+        call  pv_create_exception_frame
         andl  $~X86_EFLAGS_DF,UREGS_eflags(%rsp)
         jmp   test_all_events
 
@@ -133,7 +133,7 @@ test_guest_events:
         movq  VCPU_event_addr(%rbx),%rax
         movq  %rax,TRAPBOUNCE_eip(%rdx)
         movb  $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
-        call  create_bounce_frame
+        call  pv_create_exception_frame
         jmp   test_all_events
 
         ALIGN
@@ -177,7 +177,7 @@ process_nmi:
         /* FALLTHROUGH */
 process_trap:
         leaq VCPU_trap_bounce(%rbx),%rdx
-        call create_bounce_frame
+        call pv_create_exception_frame
         jmp  test_all_events
 
 ENTRY(sysenter_entry)
@@ -268,7 +268,7 @@ UNLIKELY_END(msi_check)
         testb $1,DOMAIN_is_32bit_pv(%rax)
         jnz   compat_int80_direct_trap
 
-        call  create_bounce_frame
+        call  pv_create_exception_frame
         jmp   test_all_events
 
 int80_slow_path:
@@ -282,136 +282,6 @@ int80_slow_path:
         /* A GPF wouldn't have incremented the instruction pointer. */
         subq  $2,UREGS_rip(%rsp)
         jmp   handle_exception_saved
-
-/* CREATE A BASIC EXCEPTION FRAME ON GUEST OS STACK:                     */
-/*   { RCX, R11, [ERRCODE,] RIP, CS, RFLAGS, RSP, SS }                   */
-/* %rdx: trap_bounce, %rbx: struct vcpu                                  */
-/* On return only %rbx and %rdx are guaranteed non-clobbered.            */
-create_bounce_frame:
-        ASSERT_INTERRUPTS_ENABLED
-        testb $TF_kernel_mode,VCPU_thread_flags(%rbx)
-        jnz   1f
-        /* Push new frame at registered guest-OS stack base. */
-        pushq %rdx
-        movq  %rbx,%rdi
-        call  toggle_guest_mode
-        popq  %rdx
-        movq  VCPU_kernel_sp(%rbx),%rsi
-        jmp   2f
-1:      /* In kernel context already: push new frame at existing %rsp. */
-        movq  UREGS_rsp+8(%rsp),%rsi
-        andb  $0xfc,UREGS_cs+8(%rsp)    # Indicate kernel context to guest.
-2:      andq  $~0xf,%rsi                # Stack frames are 16-byte aligned.
-        movq  $HYPERVISOR_VIRT_START+1,%rax
-        cmpq  %rax,%rsi
-        movq  $HYPERVISOR_VIRT_END+8*8,%rax
-        sbb   %ecx,%ecx                 # In +ve address space? Then okay.
-        cmpq  %rax,%rsi
-        adc   %ecx,%ecx                 # Above Xen private area? Then okay.
-UNLIKELY_START(g, create_bounce_frame_bad_sp)
-        lea   UNLIKELY_DISPATCH_LABEL(create_bounce_frame_bad_sp)(%rip), %rdi
-        jmp   asm_domain_crash_synchronous  /* Does not return */
-__UNLIKELY_END(create_bounce_frame_bad_sp)
-
-#define STORE_GUEST_STACK(reg, n) \
-0:      movq  %reg,(n)*8(%rsi); \
-        _ASM_EXTABLE(0b, domain_crash_page_fault_ ## n ## x8)
-
-        subq  $7*8,%rsi
-        movq  UREGS_ss+8(%rsp),%rax
-        ASM_STAC
-        movq  VCPU_domain(%rbx),%rdi
-        STORE_GUEST_STACK(rax,6)        # SS
-        movq  UREGS_rsp+8(%rsp),%rax
-        STORE_GUEST_STACK(rax,5)        # RSP
-        movq  VCPU_vcpu_info(%rbx),%rax
-        pushq VCPUINFO_upcall_mask(%rax)
-        testb $TBF_INTERRUPT,TRAPBOUNCE_flags(%rdx)
-        setnz %ch                       # TBF_INTERRUPT -> set upcall mask
-        orb   %ch,VCPUINFO_upcall_mask(%rax)
-        popq  %rax
-        shlq  $32,%rax                  # Bits 32-39: saved_upcall_mask
-        movw  UREGS_cs+8(%rsp),%ax      # Bits  0-15: CS
-        STORE_GUEST_STACK(rax,3)        # CS / saved_upcall_mask
-        shrq  $32,%rax
-        testb $0xFF,%al                 # Bits 0-7: saved_upcall_mask
-        setz  %ch                       # %ch == !saved_upcall_mask
-        movl  UREGS_eflags+8(%rsp),%eax
-        andl  $~(X86_EFLAGS_IF|X86_EFLAGS_IOPL),%eax
-        addb  %ch,%ch                   # Bit 9 (EFLAGS.IF)
-        orb   %ch,%ah                   # Fold EFLAGS.IF into %eax
-        xorl  %ecx,%ecx                 # if ( VM_ASSIST(v->domain, architectural_iopl) )
-        testb $1 << VMASST_TYPE_architectural_iopl,DOMAIN_vm_assist(%rdi)
-        cmovnzl VCPU_iopl(%rbx),%ecx    # Bits 13:12 (EFLAGS.IOPL)
-        orl   %ecx,%eax                 # Fold EFLAGS.IOPL into %eax
-        STORE_GUEST_STACK(rax,4)        # RFLAGS
-        movq  UREGS_rip+8(%rsp),%rax
-        STORE_GUEST_STACK(rax,2)        # RIP
-        testb $TBF_EXCEPTION_ERRCODE,TRAPBOUNCE_flags(%rdx)
-        jz    1f
-        subq  $8,%rsi
-        movl  TRAPBOUNCE_error_code(%rdx),%eax
-        STORE_GUEST_STACK(rax,2)        # ERROR CODE
-1:
-        movq  UREGS_r11+8(%rsp),%rax
-        STORE_GUEST_STACK(rax,1)        # R11
-        movq  UREGS_rcx+8(%rsp),%rax
-        STORE_GUEST_STACK(rax,0)        # RCX
-        ASM_CLAC
-
-#undef STORE_GUEST_STACK
-
-        /* Rewrite our stack frame and return to guest-OS mode. */
-        /* IA32 Ref. Vol. 3: TF, VM, RF and NT flags are cleared on trap. */
-        /* Also clear AC: alignment checks shouldn't trigger in kernel mode. */
-        orl   $TRAP_syscall,UREGS_entry_vector+8(%rsp)
-        andl  $~(X86_EFLAGS_AC|X86_EFLAGS_VM|X86_EFLAGS_RF|\
-                 X86_EFLAGS_NT|X86_EFLAGS_TF),UREGS_eflags+8(%rsp)
-        movq  $FLAT_KERNEL_SS,UREGS_ss+8(%rsp)
-        movq  %rsi,UREGS_rsp+8(%rsp)
-        movq  $FLAT_KERNEL_CS,UREGS_cs+8(%rsp)
-        movq  TRAPBOUNCE_eip(%rdx),%rax
-        testq %rax,%rax
-UNLIKELY_START(z, create_bounce_frame_bad_bounce_ip)
-        lea   UNLIKELY_DISPATCH_LABEL(create_bounce_frame_bad_bounce_ip)(%rip), %rdi
-        jmp   asm_domain_crash_synchronous  /* Does not return */
-__UNLIKELY_END(create_bounce_frame_bad_bounce_ip)
-        movq  %rax,UREGS_rip+8(%rsp)
-        ret
-
-        .pushsection .fixup, "ax", @progbits
-        # Numeric tags below represent the intended overall %rsi adjustment.
-domain_crash_page_fault_6x8:
-        addq  $8,%rsi
-domain_crash_page_fault_5x8:
-        addq  $8,%rsi
-domain_crash_page_fault_4x8:
-        addq  $8,%rsi
-domain_crash_page_fault_3x8:
-        addq  $8,%rsi
-domain_crash_page_fault_2x8:
-        addq  $8,%rsi
-domain_crash_page_fault_1x8:
-        addq  $8,%rsi
-domain_crash_page_fault_0x8:
-        ASM_CLAC
-        movq  %rsi,%rdi
-        call  show_page_walk
-ENTRY(dom_crash_sync_extable)
-        ASM_CLAC
-        # Get out of the guest-save area of the stack.
-        GET_STACK_END(ax)
-        leaq  STACK_CPUINFO_FIELD(guest_cpu_user_regs)(%rax),%rsp
-        # create_bounce_frame() temporarily clobbers CS.RPL. Fix up.
-        __GET_CURRENT(ax)
-        movq  VCPU_domain(%rax),%rax
-        testb $1,DOMAIN_is_32bit_pv(%rax)
-        setz  %al
-        leal  (%rax,%rax,2),%eax
-        orb   %al,UREGS_cs(%rsp)
-        xorl  %edi,%edi
-        jmp   asm_domain_crash_synchronous /* Does not return */
-        .popsection
 
 ENTRY(common_interrupt)
         SAVE_ALL CLAC
@@ -508,8 +378,7 @@ handle_exception_saved:
         testb $TBF_EXCEPTION,TRAPBOUNCE_flags(%rdx)
         jz    test_all_events
 .Lbounce_exception:
-        call  create_bounce_frame
-        movb  $0,TRAPBOUNCE_flags(%rdx)
+        call  pv_create_exception_frame
         jmp   test_all_events
 
 /* No special register assumptions. */
