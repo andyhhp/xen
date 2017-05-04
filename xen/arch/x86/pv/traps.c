@@ -245,6 +245,139 @@ int pv_raise_interrupt(struct vcpu *v, uint8_t vector)
 }
 
 /*
+ * This function emulates the behaviour of hardware when Xen needs to inject
+ * an event into into a guest.
+ *
+ * It may switch from user mode to kernel mode, will write an appropriate
+ * hardware exception frame (including Xen-specific extras), and alter the
+ * root stack frame to invoke the guest kernels correct entry point on exit
+ * from the hypervisor.
+ */
+void pv_create_exception_frame(void)
+{
+    struct vcpu *curr = current;
+    struct trap_bounce *tb = &curr->arch.pv_vcpu.trap_bounce;
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
+    const bool user_mode_frame = !guest_kernel_mode(curr, regs);
+    uint8_t *evt_mask = &vcpu_info(curr, evtchn_upcall_mask);
+    unsigned long rflags;
+    unsigned int bytes, missing;
+
+    ASSERT_NOT_IN_ATOMIC();
+
+    if ( unlikely(null_trap_bounce(curr, tb)) )
+    {
+        gprintk(XENLOG_ERR, "Fatal: Attempting to inject null trap bounce\n");
+        __domain_crash_synchronous();
+    }
+
+    /* Fold the upcall mask and architectural IOPL into the guests rflags. */
+    rflags  = regs->rflags & ~(X86_EFLAGS_IF | X86_EFLAGS_IOPL);
+    rflags |= ((*evt_mask ? 0 : X86_EFLAGS_IF) |
+               (VM_ASSIST(curr->domain, architectural_iopl)
+                ? curr->arch.pv_vcpu.iopl : 0));
+
+    if ( is_pv_32bit_vcpu(curr) )
+    {
+        /* { [ERRCODE,] EIP, CS/MASK , EFLAGS, [ESP, SS] } */
+        unsigned int frame[6], *ptr = frame, ksp =
+            (user_mode_frame ? curr->arch.pv_vcpu.kernel_sp : regs->esp);
+
+        if ( tb->flags & TBF_EXCEPTION_ERRCODE )
+            *ptr++ = tb->error_code;
+
+        *ptr++ = regs->eip;
+        *ptr++ = regs->cs | (((unsigned int)*evt_mask) << 16);
+        *ptr++ = rflags;
+
+        if ( user_mode_frame )
+        {
+            *ptr++ = regs->esp;
+            *ptr++ = regs->ss;
+        }
+
+        /* Copy the constructed frame to the guest kernel stack. */
+        bytes = _p(ptr) - _p(frame);
+        ksp -= bytes;
+
+        if ( unlikely((missing = __copy_to_user(_p(ksp), frame, bytes)) != 0) )
+        {
+            gprintk(XENLOG_ERR, "Fatal: Fault while writing exception frame\n");
+            show_page_walk(ksp + missing);
+            __domain_crash_synchronous();
+        }
+
+        /* Rewrite our stack frame. */
+        regs->rip           = (uint32_t)tb->eip;
+        regs->cs            = tb->cs;
+        regs->eflags       &= ~(X86_EFLAGS_VM | X86_EFLAGS_RF |
+                                X86_EFLAGS_NT | X86_EFLAGS_TF);
+        regs->rsp           = ksp;
+        if ( user_mode_frame )
+            regs->ss = curr->arch.pv_vcpu.kernel_ss;
+    }
+    else
+    {
+        /* { RCX, R11, [ERRCODE,] RIP, CS/MASK, RFLAGS, RSP, SS } */
+        unsigned long frame[7], *ptr = frame, ksp =
+            (user_mode_frame ? curr->arch.pv_vcpu.kernel_sp : regs->rsp) & ~0xf;
+
+        if ( user_mode_frame )
+            toggle_guest_mode(curr);
+
+        *ptr++ = regs->rcx;
+        *ptr++ = regs->r11;
+
+        if ( tb->flags & TBF_EXCEPTION_ERRCODE )
+            *ptr++ = tb->error_code;
+
+        *ptr++ = regs->rip;
+        *ptr++ = (user_mode_frame ? regs->cs : regs->cs & ~3) |
+            ((unsigned long)(*evt_mask) << 32);
+        *ptr++ = rflags;
+        *ptr++ = regs->rsp;
+        *ptr++ = regs->ss;
+
+        /* Copy the constructed frame to the guest kernel stack. */
+        bytes = _p(ptr) - _p(frame);
+        ksp -= bytes;
+
+        if ( unlikely(!__addr_ok(ksp)) )
+        {
+            gprintk(XENLOG_ERR, "Fatal: Bad guest kernel stack %p\n", _p(ksp));
+            __domain_crash_synchronous();
+        }
+        else if ( unlikely((missing =
+                            __copy_to_user(_p(ksp), frame, bytes)) != 0) )
+        {
+            gprintk(XENLOG_ERR, "Fatal: Fault while writing exception frame\n");
+            show_page_walk(ksp + missing);
+            __domain_crash_synchronous();
+        }
+
+        /* Rewrite our stack frame. */
+        regs->entry_vector |= TRAP_syscall;
+        regs->rip           = tb->eip;
+        regs->cs            = FLAT_KERNEL_CS;
+        regs->rflags       &= ~(X86_EFLAGS_AC | X86_EFLAGS_VM | X86_EFLAGS_RF |
+                                X86_EFLAGS_NT | X86_EFLAGS_TF);
+        regs->rsp           = ksp;
+        regs->ss            = FLAT_KERNEL_SS;
+    }
+
+    /* Mask events if requested. */
+    if ( tb->flags & TBF_INTERRUPT )
+        *evt_mask = 1;
+
+    /*
+     * Clobber the injection information now it has been completed.  Buggy
+     * attempts to inject the same event twice will hit the null_trap_bounce()
+     * check above.
+     */
+    *tb = (struct trap_bounce){};
+}
+
+/*
  * Local variables:
  * mode: C
  * c-file-style: "BSD"
