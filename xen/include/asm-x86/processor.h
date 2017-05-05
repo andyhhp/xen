@@ -463,8 +463,6 @@ extern idt_entry_t *idt_tables[];
 
 DECLARE_PER_CPU(struct tss_struct, init_tss);
 
-extern void init_int80_direct_trap(struct vcpu *v);
-
 extern void write_ptbase(struct vcpu *v);
 
 void destroy_gdt(struct vcpu *d);
