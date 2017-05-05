@@ -257,7 +257,8 @@ void pv_create_exception_frame(void)
 {
     struct vcpu *curr = current;
     struct trap_bounce *tb = &curr->arch.pv_vcpu.trap_bounce;
-    struct cpu_user_regs *regs = guest_cpu_user_regs();
+    struct cpu_user_regs *regs = guest_cpu_user_regs(),
+        *uregs = &curr->arch.user_regs;
     const bool user_mode_frame = !guest_kernel_mode(curr, regs);
     uint8_t *evt_mask = &vcpu_info(curr, evtchn_upcall_mask);
     unsigned long rflags;
@@ -279,9 +280,17 @@ void pv_create_exception_frame(void)
 
     if ( is_pv_32bit_vcpu(curr) )
     {
-        /* { [ERRCODE,] EIP, CS/MASK , EFLAGS, [ESP, SS] } */
-        unsigned int frame[6], *ptr = frame, ksp =
+        /* { [DS-GS,] [ERRCODE,] EIP, CS/MASK , EFLAGS, [ESP, SS] } */
+        unsigned int frame[10], *ptr = frame, ksp =
             (user_mode_frame ? curr->arch.pv_vcpu.kernel_sp : regs->esp);
+
+        if ( tb->flags & TBF_FAILSAFE )
+        {
+            *ptr++ = uregs->ds;
+            *ptr++ = uregs->es;
+            *ptr++ = uregs->fs;
+            *ptr++ = uregs->gs;
+        }
 
         if ( tb->flags & TBF_EXCEPTION_ERRCODE )
             *ptr++ = tb->error_code;
@@ -313,13 +322,15 @@ void pv_create_exception_frame(void)
         regs->eflags       &= ~(X86_EFLAGS_VM | X86_EFLAGS_RF |
                                 X86_EFLAGS_NT | X86_EFLAGS_TF);
         regs->rsp           = ksp;
-        if ( user_mode_frame )
+        if ( tb->flags & TBF_FAILSAFE )
+            regs->ss = FLAT_COMPAT_KERNEL_SS;
+        else if ( user_mode_frame )
             regs->ss = curr->arch.pv_vcpu.kernel_ss;
     }
     else
     {
-        /* { RCX, R11, [ERRCODE,] RIP, CS/MASK, RFLAGS, RSP, SS } */
-        unsigned long frame[7], *ptr = frame, ksp =
+        /* { RCX, R11, [DS-GS,] [ERRCODE,] RIP, CS/MASK, RFLAGS, RSP, SS } */
+        unsigned long frame[11], *ptr = frame, ksp =
             (user_mode_frame ? curr->arch.pv_vcpu.kernel_sp : regs->rsp) & ~0xf;
 
         if ( user_mode_frame )
@@ -327,6 +338,14 @@ void pv_create_exception_frame(void)
 
         *ptr++ = regs->rcx;
         *ptr++ = regs->r11;
+
+        if ( tb->flags & TBF_FAILSAFE )
+        {
+            *ptr++ = uregs->ds;
+            *ptr++ = uregs->es;
+            *ptr++ = uregs->fs;
+            *ptr++ = uregs->gs;
+        }
 
         if ( tb->flags & TBF_EXCEPTION_ERRCODE )
             *ptr++ = tb->error_code;

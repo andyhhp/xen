@@ -1299,100 +1299,14 @@ static void load_segments(struct vcpu *n)
 
     if ( unlikely(!all_segs_okay) )
     {
-        struct pv_vcpu *pv = &n->arch.pv_vcpu;
-        struct cpu_user_regs *regs = guest_cpu_user_regs();
-        unsigned long *rsp =
-            (unsigned long *)(((n->arch.flags & TF_kernel_mode)
-                               ? regs->rsp : pv->kernel_sp) & ~0xf);
-        unsigned long cs_and_mask, rflags;
+        bool disable = n->arch.vgc_flags & VGCF_failsafe_disables_events;
 
-        /* Fold upcall mask and architectural IOPL into RFLAGS.IF. */
-        rflags  = regs->rflags & ~(X86_EFLAGS_IF|X86_EFLAGS_IOPL);
-        rflags |= !vcpu_info(n, evtchn_upcall_mask) << 9;
-        if ( VM_ASSIST(n->domain, architectural_iopl) )
-            rflags |= n->arch.pv_vcpu.iopl;
-
-        if ( is_pv_32bit_vcpu(n) )
-        {
-            unsigned int *esp = ring_1(regs) ?
-                                (unsigned int *)regs->rsp :
-                                (unsigned int *)pv->kernel_sp;
-            int ret = 0;
-
-            /* CS longword also contains full evtchn_upcall_mask. */
-            cs_and_mask = (unsigned short)regs->cs |
-                ((unsigned int)vcpu_info(n, evtchn_upcall_mask) << 16);
-
-            if ( !ring_1(regs) )
-            {
-                ret  = put_user(regs->ss,       esp-1);
-                ret |= put_user(regs->esp,      esp-2);
-                esp -= 2;
-            }
-
-            if ( ret |
-                 put_user(rflags,              esp-1) |
-                 put_user(cs_and_mask,         esp-2) |
-                 put_user(regs->eip,           esp-3) |
-                 put_user(uregs->gs,           esp-4) |
-                 put_user(uregs->fs,           esp-5) |
-                 put_user(uregs->es,           esp-6) |
-                 put_user(uregs->ds,           esp-7) )
-            {
-                gprintk(XENLOG_ERR,
-                        "error while creating compat failsafe callback frame\n");
-                domain_crash(n->domain);
-            }
-
-            if ( n->arch.vgc_flags & VGCF_failsafe_disables_events )
-                vcpu_info(n, evtchn_upcall_mask) = 1;
-
-            regs->entry_vector |= TRAP_syscall;
-            regs->eflags       &= ~(X86_EFLAGS_VM|X86_EFLAGS_RF|X86_EFLAGS_NT|
-                                    X86_EFLAGS_IOPL|X86_EFLAGS_TF);
-            regs->ss            = FLAT_COMPAT_KERNEL_SS;
-            regs->esp           = (unsigned long)(esp-7);
-            regs->cs            = FLAT_COMPAT_KERNEL_CS;
-            regs->eip           = pv->failsafe_callback_eip;
-            return;
-        }
-
-        if ( !(n->arch.flags & TF_kernel_mode) )
-            toggle_guest_mode(n);
-        else
-            regs->cs &= ~3;
-
-        /* CS longword also contains full evtchn_upcall_mask. */
-        cs_and_mask = (unsigned long)regs->cs |
-            ((unsigned long)vcpu_info(n, evtchn_upcall_mask) << 32);
-
-        if ( put_user(regs->ss,            rsp- 1) |
-             put_user(regs->rsp,           rsp- 2) |
-             put_user(rflags,              rsp- 3) |
-             put_user(cs_and_mask,         rsp- 4) |
-             put_user(regs->rip,           rsp- 5) |
-             put_user(uregs->gs,           rsp- 6) |
-             put_user(uregs->fs,           rsp- 7) |
-             put_user(uregs->es,           rsp- 8) |
-             put_user(uregs->ds,           rsp- 9) |
-             put_user(regs->r11,           rsp-10) |
-             put_user(regs->rcx,           rsp-11) )
-        {
-            gprintk(XENLOG_ERR,
-                    "error while creating failsafe callback frame\n");
-            domain_crash(n->domain);
-        }
-
-        if ( n->arch.vgc_flags & VGCF_failsafe_disables_events )
-            vcpu_info(n, evtchn_upcall_mask) = 1;
-
-        regs->entry_vector |= TRAP_syscall;
-        regs->rflags       &= ~(X86_EFLAGS_AC|X86_EFLAGS_VM|X86_EFLAGS_RF|
-                                X86_EFLAGS_NT|X86_EFLAGS_IOPL|X86_EFLAGS_TF);
-        regs->ss            = FLAT_KERNEL_SS;
-        regs->rsp           = (unsigned long)(rsp-11);
-        regs->cs            = FLAT_KERNEL_CS;
-        regs->rip           = pv->failsafe_callback_eip;
+        n->arch.pv_vcpu.trap_bounce = (struct trap_bounce){
+            .flags = (TBF_FAILSAFE | TBF_EXCEPTION |
+                      (disable ? TBF_INTERRUPT : 0)),
+            .cs    = FLAT_COMPAT_KERNEL_CS, /* Ignored for 64bit guests. */
+            .eip   = n->arch.pv_vcpu.failsafe_callback_eip
+        };
     }
 }
 
