@@ -1579,24 +1579,29 @@ void init_xen_l4_slots(l4_pgentry_t *l4t, mfn_t l4mfn,
         ro_mpt ? idle_pg_table[l4_table_offset(RO_MPT_VIRT_START)]
                : l4e_empty();
 
-    /* Slot 257: PCI MMCFG. */
+    /* Slot 257: Per-CPU mappings (filled on context switch). */
+    l4t[l4_table_offset(PERCPU_LINEAR_START)] = l4e_empty();
+
+    /* Slot 258: PCI MMCFG. */
     l4t[l4_table_offset(PCI_MCFG_VIRT_START)] =
         idle_pg_table[l4_table_offset(PCI_MCFG_VIRT_START)];
 
-    /* Slot 258: Self linear mappings. */
+    /* Slot 259: Self linear mappings. */
     ASSERT(!mfn_eq(l4mfn, INVALID_MFN));
     l4t[l4_table_offset(LINEAR_PT_VIRT_START)] =
         l4e_from_mfn(l4mfn, __PAGE_HYPERVISOR_RW);
 
-    /* Slot 259: Shadow linear mappings (if applicable) .*/
+    /* Slot 260: Shadow linear mappings (if applicable). */
     l4t[l4_table_offset(SH_LINEAR_PT_VIRT_START)] =
         mfn_eq(sl4mfn, INVALID_MFN) ? l4e_empty() :
         l4e_from_mfn(sl4mfn, __PAGE_HYPERVISOR_RW);
 
-    /* Slot 260: Per-domain mappings (if applicable). */
+    /* Slot 261: Per-domain mappings (if applicable). */
     l4t[l4_table_offset(PERDOMAIN_VIRT_START)] =
         d ? l4e_from_page(d->arch.perdomain_l3_pg, __PAGE_HYPERVISOR_RW)
           : l4e_empty();
+
+    /* !!! WARNING - TEMPORARILY STALE BELOW !!! */
 
     /* Slot 261-: text/data/bss, RW M2P, vmap, frametable, directmap. */
 #ifndef NDEBUG

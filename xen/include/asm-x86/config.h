@@ -124,13 +124,16 @@ extern unsigned char boot_edid_info[128];
  *  0xffff804000000000 - 0xffff807fffffffff [256GB, 2^38 bytes, PML4:256]
  *    Reserved for future shared info with the guest OS (GUEST ACCESSIBLE).
  *  0xffff808000000000 - 0xffff80ffffffffff [512GB, 2^39 bytes, PML4:257]
- *    ioremap for PCI mmconfig space
+ *    Per-CPU mappings (Xen's GDT/IDT/Stack etc.)
  *  0xffff810000000000 - 0xffff817fffffffff [512GB, 2^39 bytes, PML4:258]
- *    Guest linear page table.
+ *    ioremap for PCI mmconfig space
  *  0xffff818000000000 - 0xffff81ffffffffff [512GB, 2^39 bytes, PML4:259]
- *    Shadow linear page table.
+ *    Guest linear page table.
  *  0xffff820000000000 - 0xffff827fffffffff [512GB, 2^39 bytes, PML4:260]
- *    Per-domain mappings (e.g., GDT, LDT).
+ *    Shadow linear page table.
+ *
+ *                !!! WARNING - TEMPORARILY STALE BELOW !!!
+ *
  *  0xffff828000000000 - 0xffff82bfffffffff [256GB, 2^38 bytes, PML4:261]
  *    Machine-to-phys translation table.
  *  0xffff82c000000000 - 0xffff82cfffffffff [64GB,  2^36 bytes, PML4:261]
@@ -170,6 +173,8 @@ extern unsigned char boot_edid_info[128];
  *    Read-only machine-to-phys translation table (GUEST ACCESSIBLE).
  *  0x0000000100000000 - 0x00007fffffffffff [128TB-4GB,         PML4:0-255]
  *    Unused / Reserved for future use.
+ *
+ *                   !!! WARNING - TEMPORARILY STALE !!!
  */
 
 
@@ -187,26 +192,32 @@ extern unsigned char boot_edid_info[128];
 #define RO_MPT_VIRT_START       (PML4_ADDR(256))
 #define MPT_VIRT_SIZE           (PML4_ENTRY_BYTES / 2)
 #define RO_MPT_VIRT_END         (RO_MPT_VIRT_START + MPT_VIRT_SIZE)
-/* Slot 257: ioremap for PCI mmconfig space for 2048 segments (512GB)
+/* Slot 257: Per-CPU mappings. */
+#define PERCPU_LINEAR_START     (PML4_ADDR(257))
+#define PERCPU_LINEAR_END       (PERCPU_LINEAR_START + PML4_ENTRY_BYTES)
+/* Slot 258: ioremap for PCI mmconfig space for 2048 segments (512GB)
  *     - full 16-bit segment support needs 44 bits
  *     - since PML4 slot has 39 bits, we limit segments to 2048 (11-bits)
  */
-#define PCI_MCFG_VIRT_START     (PML4_ADDR(257))
+#define PCI_MCFG_VIRT_START     (PML4_ADDR(258))
 #define PCI_MCFG_VIRT_END       (PCI_MCFG_VIRT_START + PML4_ENTRY_BYTES)
-/* Slot 258: linear page table (guest table). */
-#define LINEAR_PT_VIRT_START    (PML4_ADDR(258))
+/* Slot 259: linear page table (guest table). */
+#define LINEAR_PT_VIRT_START    (PML4_ADDR(259))
 #define LINEAR_PT_VIRT_END      (LINEAR_PT_VIRT_START + PML4_ENTRY_BYTES)
-/* Slot 259: linear page table (shadow table). */
-#define SH_LINEAR_PT_VIRT_START (PML4_ADDR(259))
+/* Slot 260: linear page table (shadow table). */
+#define SH_LINEAR_PT_VIRT_START (PML4_ADDR(260))
 #define SH_LINEAR_PT_VIRT_END   (SH_LINEAR_PT_VIRT_START + PML4_ENTRY_BYTES)
-/* Slot 260: per-domain mappings (including map cache). */
-#define PERDOMAIN_VIRT_START    (PML4_ADDR(260))
+/* Slot 261: per-domain mappings (including map cache). */
+#define PERDOMAIN_VIRT_START    (PML4_ADDR(261))
 #define PERDOMAIN_SLOT_MBYTES   (PML4_ENTRY_BYTES >> (20 + PAGETABLE_ORDER))
 #define PERDOMAIN_SLOTS         3
 #define PERDOMAIN_VIRT_SLOT(s)  (PERDOMAIN_VIRT_START + (s) * \
                                  (PERDOMAIN_SLOT_MBYTES << 20))
+/*
+ *                !!! WARNING - TEMPORARILY STALE BELOW !!!
+ */
 /* Slot 261: machine-to-phys conversion table (256GB). */
-#define RDWR_MPT_VIRT_START     (PML4_ADDR(261))
+#define RDWR_MPT_VIRT_START     (PML4_ADDR(262))
 #define RDWR_MPT_VIRT_END       (RDWR_MPT_VIRT_START + MPT_VIRT_SIZE)
 /* Slot 261: vmap()/ioremap()/fixmap area (64GB). */
 #define VMAP_VIRT_START         RDWR_MPT_VIRT_END
@@ -234,12 +245,12 @@ extern unsigned char boot_edid_info[128];
 
 #ifndef CONFIG_BIGMEM
 /* Slot 262-271/510: A direct 1:1 mapping of all of physical memory. */
-#define DIRECTMAP_VIRT_START    (PML4_ADDR(262))
-#define DIRECTMAP_SIZE          (PML4_ENTRY_BYTES * (511 - 262))
+#define DIRECTMAP_VIRT_START    (PML4_ADDR(263))
+#define DIRECTMAP_SIZE          (PML4_ENTRY_BYTES * (511 - 263))
 #else
 /* Slot 265-271/510: A direct 1:1 mapping of all of physical memory. */
-#define DIRECTMAP_VIRT_START    (PML4_ADDR(265))
-#define DIRECTMAP_SIZE          (PML4_ENTRY_BYTES * (511 - 265))
+#define DIRECTMAP_VIRT_START    (PML4_ADDR(266))
+#define DIRECTMAP_SIZE          (PML4_ENTRY_BYTES * (511 - 266))
 #endif
 #define DIRECTMAP_VIRT_END      (DIRECTMAP_VIRT_START + DIRECTMAP_SIZE)
 
