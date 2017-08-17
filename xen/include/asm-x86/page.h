@@ -342,6 +342,7 @@ void efi_update_l4_pgtable(unsigned int l4idx, l4_pgentry_t);
 #define __PAGE_HYPERVISOR_UC      (__PAGE_HYPERVISOR | _PAGE_PCD | _PAGE_PWT)
 
 #define MAP_SMALL_PAGES _PAGE_AVAIL0 /* don't use superpages mappings */
+#define MAP_PERCPU_AUTOFREE _PAGE_AVAIL1
 
 #ifndef __ASSEMBLY__
 

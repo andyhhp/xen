@@ -54,6 +54,7 @@
 unsigned long __read_mostly trampoline_phys;
 
 DEFINE_PER_CPU_READ_MOSTLY(paddr_t, percpu_idle_pt);
+DEFINE_PER_CPU_READ_MOSTLY(l4_pgentry_t, percpu_mappings);
 
 /* representing HT siblings of each logical CPU */
 DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, cpu_sibling_mask);
@@ -828,6 +829,7 @@ static int cpu_smpboot_alloc_common(unsigned int cpu)
     unsigned int memflags = 0;
     nodeid_t node = cpu_to_node(cpu);
     l4_pgentry_t *l4t = NULL;
+    l3_pgentry_t *l3t = NULL;
     struct page_info *pg;
     int rc = -ENOMEM;
 
@@ -847,9 +849,22 @@ static int cpu_smpboot_alloc_common(unsigned int cpu)
     if ( rc )
         goto out;
 
+    rc = -ENOMEM;
+
+    /* Percpu L3 table, containing the percpu mappings. */
+    pg = alloc_domheap_page(NULL, memflags);
+    if ( !pg )
+        goto out;
+    l3t = __map_domain_page(pg);
+    clear_page(l3t);
+    per_cpu(percpu_mappings, cpu) = l4t[l4_table_offset(PERCPU_LINEAR_START)] =
+        l4e_from_page(pg, __PAGE_HYPERVISOR);
+
     rc = 0; /* Success */
 
  out:
+    if ( l3t )
+        unmap_domain_page(l3t);
     if ( l4t )
         unmap_domain_page(l4t);
 
@@ -917,6 +932,81 @@ static void cleanup_cpu_root_pgt(unsigned int cpu)
     }
 }
 
+/*
+ * Dismantles the pagetable structure under per_cpu(percpu_mappings, cpu),
+ * freeing all pagetable frames, and any RAM frames which are mapped with
+ * MAP_PERCPU_AUTOFREE.
+ */
+static void free_perpcpu_pagetables(unsigned int cpu)
+{
+    l4_pgentry_t *percpu_mappings = &per_cpu(percpu_mappings, cpu);
+    unsigned int l3i;
+    l3_pgentry_t *l3t = NULL;
+
+    if ( !l4e_get_intpte(*percpu_mappings) )
+        return;
+
+    l3t = map_domain_page(l4e_get_mfn(*percpu_mappings));
+
+    for ( l3i = 0; l3i < L3_PAGETABLE_ENTRIES; ++l3i )
+    {
+        l3_pgentry_t l3e = l3t[l3i];
+
+        if ( !(l3e_get_flags(l3e) & _PAGE_PRESENT) )
+            continue;
+
+        if ( !(l3e_get_flags(l3e) & _PAGE_PSE) )
+        {
+            unsigned int l2i;
+            l2_pgentry_t *l2t = __map_domain_page(l3e_get_page(l3e));
+
+            for ( l2i = 0; l2i < L2_PAGETABLE_ENTRIES; ++l2i )
+            {
+                l2_pgentry_t l2e = l2t[l2i];
+
+                if ( !(l2e_get_flags(l2e) & _PAGE_PRESENT) )
+                    continue;
+
+                if ( !(l2e_get_flags(l2e) & _PAGE_PSE) )
+                {
+                    unsigned int l1i;
+                    l1_pgentry_t *l1t = __map_domain_page(l2e_get_page(l2e));
+
+                    for ( l1i = 0; l1i < L1_PAGETABLE_ENTRIES; ++l1i )
+                    {
+                        l1_pgentry_t l1e = l1t[l1i];
+
+                        if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) )
+                            continue;
+
+                        if ( l1e_get_flags(l1e) & MAP_PERCPU_AUTOFREE )
+                        {
+                            struct page_info *pg = l1e_get_page(l1e);
+
+                            if ( is_xen_heap_page(pg) )
+                                free_xenheap_page(page_to_virt(pg));
+                            else
+                                free_domheap_page(pg);
+                        }
+                    }
+
+                    unmap_domain_page(l1t);
+                }
+
+                free_domheap_page(l2e_get_page(l2e));
+            }
+
+            unmap_domain_page(l2t);
+        }
+
+        free_domheap_page(l3e_get_page(l3e));
+    }
+
+    unmap_domain_page(l3t);
+    free_domheap_page(l4e_get_page(*percpu_mappings));
+    *percpu_mappings = l4e_empty();
+}
+
 static void cpu_smpboot_free(unsigned int cpu)
 {
     unsigned int order, socket = cpu_to_socket(cpu);
@@ -980,6 +1070,7 @@ static void cpu_smpboot_free(unsigned int cpu)
     }
 
     pt_shadow_free(cpu);
+    free_perpcpu_pagetables(cpu);
 }
 
 static int cpu_smpboot_alloc(unsigned int cpu)

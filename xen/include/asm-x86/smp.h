@@ -20,6 +20,7 @@
 #ifndef __ASSEMBLY__
 
 DECLARE_PER_CPU(paddr_t, percpu_idle_pt);
+DECLARE_PER_CPU(l4_pgentry_t, percpu_mappings);
 
 /*
  * Private routines/data
