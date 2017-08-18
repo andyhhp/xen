@@ -315,8 +315,10 @@ void start_secondary(void *unused)
     /* Critical region without IDT or TSS.  Any fault is deadly! */
 
     set_processor_id(cpu);
-    set_current(idle_vcpu[cpu]);
-    this_cpu(curr_vcpu) = idle_vcpu[cpu];
+    get_cpu_info()->cr4 = XEN_MINIMAL_CR4;
+
+    early_switch_to_idle();
+
     rdmsrl(MSR_EFER, this_cpu(efer));
     init_shadow_spec_ctrl_state();
 

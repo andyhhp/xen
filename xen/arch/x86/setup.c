@@ -248,11 +248,29 @@ void __init discard_initial_images(void)
 
 extern char __init_begin[], __init_end[], __bss_start[], __bss_end[];
 
+void early_switch_to_idle(void)
+{
+    unsigned int cpu = smp_processor_id();
+    struct vcpu *v = idle_vcpu[cpu];
+    unsigned long cr4 = read_cr4();
+
+    set_current(v);
+    per_cpu(curr_vcpu, cpu) = v;
+
+    asm volatile ( "mov %[npge], %%cr4;"
+                   "mov %[cr3], %%cr3;"
+                   "mov %[pge], %%cr4;"
+                   ::
+                    [npge] "r" (cr4 & ~X86_CR4_PGE),
+                    [cr3]  "r" (v->arch.cr3),
+                    [pge]  "r" (cr4)
+                   : "memory" );
+}
+
 static void __init init_idle_domain(void)
 {
     scheduler_init();
-    set_current(idle_vcpu[0]);
-    this_cpu(curr_vcpu) = current;
+    early_switch_to_idle();
 }
 
 void srat_detect_node(int cpu)

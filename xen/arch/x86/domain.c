@@ -358,7 +358,9 @@ int vcpu_initialise(struct vcpu *v)
     else
     {
         /* Idle domain */
-        v->arch.cr3 = __pa(idle_pg_table);
+        v->arch.cr3 = per_cpu(percpu_idle_pt, v->vcpu_id);
+        BUG_ON(!v->arch.cr3); /* Had better be initialised... */
+
         rc = 0;
         v->arch.msr = ZERO_BLOCK_PTR; /* Catch stray misuses */
     }
