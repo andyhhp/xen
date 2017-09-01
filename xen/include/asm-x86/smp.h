@@ -19,6 +19,8 @@
 #define INVALID_CUID (~0U)   /* AMD Compute Unit ID */
 #ifndef __ASSEMBLY__
 
+DECLARE_PER_CPU(paddr_t, percpu_idle_pt);
+
 /*
  * Private routines/data
  */

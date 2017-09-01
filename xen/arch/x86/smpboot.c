@@ -52,6 +52,8 @@
 
 unsigned long __read_mostly trampoline_phys;
 
+DEFINE_PER_CPU_READ_MOSTLY(paddr_t, percpu_idle_pt);
+
 /* representing HT siblings of each logical CPU */
 DEFINE_PER_CPU_READ_MOSTLY(cpumask_var_t, cpu_sibling_mask);
 /* representing HT and core siblings of each logical CPU */
@@ -817,6 +819,36 @@ static int setup_cpu_root_pgt(unsigned int cpu)
     return rc;
 }
 
+/* Allocate data common between the BSP and APs. */
+static int cpu_smpboot_alloc_common(unsigned int cpu)
+{
+    unsigned int memflags = 0;
+    nodeid_t node = cpu_to_node(cpu);
+    l4_pgentry_t *l4t = NULL;
+    struct page_info *pg;
+    int rc = -ENOMEM;
+
+    if ( node != NUMA_NO_NODE )
+        memflags = MEMF_node(node);
+
+    /* Percpu L4 table, used by the idle cpus. */
+    pg = alloc_domheap_page(NULL, memflags);
+    if ( !pg )
+        goto out;
+    per_cpu(percpu_idle_pt, cpu) = page_to_maddr(pg);
+    l4t = __map_domain_page(pg);
+    clear_page(l4t);
+    init_xen_l4_slots(l4t, page_to_mfn(pg), NULL, INVALID_MFN, false);
+
+    rc = 0; /* Success */
+
+ out:
+    if ( l4t )
+        unmap_domain_page(l4t);
+
+    return rc;
+}
+
 static void cleanup_cpu_root_pgt(unsigned int cpu)
 {
     root_pgentry_t *rpt = per_cpu(root_pgt, cpu);
@@ -933,6 +965,12 @@ static void cpu_smpboot_free(unsigned int cpu)
         free_xenheap_pages(stack_base[cpu], STACK_ORDER);
         stack_base[cpu] = NULL;
     }
+
+    if ( per_cpu(percpu_idle_pt, cpu) )
+    {
+        free_domheap_page(maddr_to_page(per_cpu(percpu_idle_pt, cpu)));
+        per_cpu(percpu_idle_pt, cpu) = 0;
+    }
 }
 
 static int cpu_smpboot_alloc(unsigned int cpu)
@@ -999,7 +1037,7 @@ static int cpu_smpboot_alloc(unsigned int cpu)
            alloc_cpumask_var(&per_cpu(scratch_cpumask, cpu))) )
         goto out;
 
-    rc = 0;
+    rc = cpu_smpboot_alloc_common(cpu);
 
  out:
     if ( rc )
@@ -1011,11 +1049,17 @@ static int cpu_smpboot_alloc(unsigned int cpu)
 void __init cpu_smpboot_bsp(void)
 {
     unsigned int cpu = smp_processor_id();
-    int rc = -ENOMEM;
+    int rc;
+
+    if ( (rc = cpu_smpboot_alloc_common(cpu)) != 0 )
+        goto err;
 
     if ( (per_cpu(stubs.addr, cpu) =
           alloc_stub_page(cpu, &per_cpu(stubs, cpu).mfn)) == 0 )
+    {
+        rc = -ENOMEM;
         goto err;
+    }
 
     return;
 
@@ -1046,7 +1090,8 @@ static int cpu_smpboot_callback(
 }
 
 static struct notifier_block cpu_smpboot_nfb = {
-    .notifier_call = cpu_smpboot_callback
+    .notifier_call = cpu_smpboot_callback,
+    .priority = 99, /* Must be after percpu area, before idle vcpu. */
 };
 
 void __init smp_prepare_cpus(void)
