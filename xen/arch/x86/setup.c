@@ -1567,6 +1567,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     init_speculation_mitigations();
 
+    arch_init_memory();
+
     cpu_smpboot_bsp();
 
     init_idle_domain();
@@ -1576,8 +1578,6 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     rcu_init();
 
     early_time_init();
-
-    arch_init_memory();
 
     alternative_instructions();
 

@@ -836,6 +836,7 @@ static int extend_frame_table(struct mem_hotadd_info *info)
 void __init subarch_init_memory(void)
 {
     unsigned long i, n, v, m2p_start_mfn;
+    l4_pgentry_t *pl4e;
     l3_pgentry_t l3e;
     l2_pgentry_t l2e;
 
@@ -886,6 +887,20 @@ void __init subarch_init_memory(void)
             share_xen_page_with_privileged_guests(
                 mfn_to_page(_mfn(m2p_start_mfn + i)), SHARE_ro);
     }
+
+    /* Create an L3 table for the MMCFG region, or remap it NX. */
+    pl4e = &idle_pg_table[l4_table_offset(PCI_MCFG_VIRT_START)];
+    if ( !(l4e_get_flags(*pl4e) & _PAGE_PRESENT) )
+    {
+        l3_pgentry_t *l3t = alloc_xen_pagetable();
+
+        BUG_ON(!l3t);
+
+        clear_page(l3t);
+        *pl4e = l4e_from_paddr(virt_to_maddr(l3t), __PAGE_HYPERVISOR_RW);
+    }
+    else
+        l4e_add_flags(*pl4e, _PAGE_NX_BIT);
 
     /* Mark all of direct map NX if hardware supports it. */
     if ( !cpu_has_nx )
