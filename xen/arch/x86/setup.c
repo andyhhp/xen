@@ -1567,11 +1567,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     init_speculation_mitigations();
 
-    init_idle_domain();
+    cpu_smpboot_bsp();
 
-    this_cpu(stubs.addr) = alloc_stub_page(smp_processor_id(),
-                                           &this_cpu(stubs).mfn);
-    BUG_ON(!this_cpu(stubs.addr));
+    init_idle_domain();
 
     trap_init();
 
