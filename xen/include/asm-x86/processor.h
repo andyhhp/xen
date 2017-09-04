@@ -437,7 +437,11 @@ extern idt_entry_t *idt_tables[];
 DECLARE_PER_CPU(struct tss_struct, init_tss);
 DECLARE_PER_CPU(root_pgentry_t *, root_pgt);
 
-extern void write_ptbase(struct vcpu *v);
+extern void do_write_ptbase(struct vcpu *v, bool tlb_maintenance);
+static inline void write_ptbase(struct vcpu *v)
+{
+    do_write_ptbase(v, true);
+}
 
 /* REP NOP (PAUSE) is a good thing to insert into busy-wait loops. */
 static always_inline void rep_nop(void)

@@ -500,9 +500,14 @@ void make_cr3(struct vcpu *v, mfn_t mfn)
     v->arch.cr3 = mfn_x(mfn) << PAGE_SHIFT;
 }
 
-void write_ptbase(struct vcpu *v)
+void do_write_ptbase(struct vcpu *v, bool tlb_maintenance)
 {
-    write_cr3(v->arch.cr3);
+    unsigned long new_cr3 = v->arch.cr3;
+
+    if ( tlb_maintenance )
+        write_cr3(new_cr3);
+    else
+        asm volatile ( "mov %0, %%cr3" :: "r" (new_cr3) : "memory" );
 }
 
 /*
