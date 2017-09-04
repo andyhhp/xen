@@ -41,6 +41,7 @@
 #include <asm/guest.h>
 #include <asm/msr.h>
 #include <asm/mtrr.h>
+#include <asm/pv/pt-shadow.h>
 #include <asm/spec_ctrl.h>
 #include <asm/time.h>
 #include <asm/tboot.h>
@@ -842,6 +843,10 @@ static int cpu_smpboot_alloc_common(unsigned int cpu)
     clear_page(l4t);
     init_xen_l4_slots(l4t, page_to_mfn(pg), NULL, INVALID_MFN, false);
 
+    rc = pt_shadow_alloc(cpu);
+    if ( rc )
+        goto out;
+
     rc = 0; /* Success */
 
  out:
@@ -973,6 +978,8 @@ static void cpu_smpboot_free(unsigned int cpu)
         free_domheap_page(maddr_to_page(per_cpu(percpu_idle_pt, cpu)));
         per_cpu(percpu_idle_pt, cpu) = 0;
     }
+
+    pt_shadow_free(cpu);
 }
 
 static int cpu_smpboot_alloc(unsigned int cpu)
