@@ -1,6 +1,8 @@
 #ifndef __PV_MM_H__
 #define __PV_MM_H__
 
+#include <asm/pv/pt-shadow.h>
+
 l1_pgentry_t *map_guest_l1e(unsigned long linear, mfn_t *gl1mfn);
 
 int new_guest_cr3(mfn_t mfn);
@@ -38,7 +40,7 @@ static inline l1_pgentry_t guest_get_eff_l1e(unsigned long linear)
  */
 static inline bool update_intpte(intpte_t *p, intpte_t old, intpte_t new,
                                  unsigned long mfn, struct vcpu *v,
-                                 bool preserve_ad)
+                                 bool preserve_ad, unsigned int level)
 {
     bool rv = true;
 
@@ -77,6 +79,11 @@ static inline bool update_intpte(intpte_t *p, intpte_t old, intpte_t new,
             old = t;
         }
     }
+
+    if ( level == 4 )
+        pt_shadow_l4_write(v->domain, mfn_to_page(mfn),
+                           pgentry_ptr_to_slot(p));
+
     return rv;
 }
 
@@ -87,7 +94,12 @@ static inline bool update_intpte(intpte_t *p, intpte_t old, intpte_t new,
 #define UPDATE_ENTRY(_t,_p,_o,_n,_m,_v,_ad)                         \
     update_intpte(&_t ## e_get_intpte(*(_p)),                       \
                   _t ## e_get_intpte(_o), _t ## e_get_intpte(_n),   \
-                  (_m), (_v), (_ad))
+                  (_m), (_v), (_ad), _t ## _LEVEL)
+
+#define l1_LEVEL 1
+#define l2_LEVEL 2
+#define l3_LEVEL 3
+#define l4_LEVEL 4
 
 static inline l1_pgentry_t adjust_guest_l1e(l1_pgentry_t l1e,
                                             const struct domain *d)

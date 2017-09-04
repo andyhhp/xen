@@ -28,6 +28,7 @@
 #include <acpi/apei.h>
 
 #define NR_PERCPU_SLOTS 1
+#define PERCPU_FIXSLOT_SHADOW 0
 
 /*
  * Here we define all the compile-time 'special' virtual

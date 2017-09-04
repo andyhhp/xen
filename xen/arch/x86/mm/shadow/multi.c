@@ -39,6 +39,7 @@ asm(".file \"" __OBJECT_FILE__ "\"");
 #include <asm/hvm/cacheattr.h>
 #include <asm/mtrr.h>
 #include <asm/guest_pt.h>
+#include <asm/pv/pt-shadow.h>
 #include <public/sched.h>
 #include "private.h"
 #include "types.h"
@@ -952,6 +953,7 @@ static int shadow_set_l4e(struct domain *d,
 
     /* Write the new entry */
     shadow_write_entries(sl4e, &new_sl4e, 1, sl4mfn);
+    pt_shadow_l4_write(d, mfn_to_page(sl4mfn), pgentry_ptr_to_slot(sl4e));
     flags |= SHADOW_SET_CHANGED;
 
     if ( shadow_l4e_get_flags(old_sl4e) & _PAGE_PRESENT )
