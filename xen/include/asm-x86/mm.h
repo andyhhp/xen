@@ -554,6 +554,8 @@ void audit_domains(void);
 
 #endif
 
+DECLARE_PER_CPU(unsigned long, curr_ptbase);
+
 void make_cr3(struct vcpu *v, mfn_t mfn);
 void update_cr3(struct vcpu *v);
 int vcpu_destroy_pagetables(struct vcpu *);

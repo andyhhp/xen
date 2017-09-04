@@ -500,14 +500,23 @@ void make_cr3(struct vcpu *v, mfn_t mfn)
     v->arch.cr3 = mfn_x(mfn) << PAGE_SHIFT;
 }
 
+DEFINE_PER_CPU(unsigned long, curr_ptbase);
+
 void do_write_ptbase(struct vcpu *v, bool tlb_maintenance)
 {
     unsigned long new_cr3 = v->arch.cr3;
+    unsigned int cpu = smp_processor_id();
+    unsigned long *this_curr_ptbase = &per_cpu(curr_ptbase, cpu);
+
+    /* Check that %cr3 isn't being shuffled under our feet. */
+    ASSERT(*this_curr_ptbase == read_cr3());
 
     if ( tlb_maintenance )
         write_cr3(new_cr3);
     else
         asm volatile ( "mov %0, %%cr3" :: "r" (new_cr3) : "memory" );
+
+    *this_curr_ptbase = new_cr3;
 }
 
 /*

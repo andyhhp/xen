@@ -265,6 +265,8 @@ void early_switch_to_idle(void)
                     [cr3]  "r" (v->arch.cr3),
                     [pge]  "r" (cr4)
                    : "memory" );
+
+    per_cpu(curr_ptbase, cpu) = v->arch.cr3;
 }
 
 static void __init init_idle_domain(void)
