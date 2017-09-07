@@ -508,18 +508,35 @@ void do_write_ptbase(struct vcpu *v, bool tlb_maintenance)
     unsigned long new_cr3;
     unsigned int cpu = smp_processor_id();
     unsigned long *this_curr_ptbase = &per_cpu(curr_ptbase, cpu);
+    struct page_info *new_pg;
 
     /* Check that %cr3 isn't being shuffled under our feet. */
     ASSERT(*this_curr_ptbase == read_cr3());
 
     new_cr3 = pt_maybe_shadow(v);
+    new_pg = maddr_to_page(new_cr3);
+
+    /* Check that new_cr3 isn't in use by a different pcpu. */
+    if ( new_cr3 != *this_curr_ptbase )
+        BUG_ON(test_and_set_bit(_PGC_inuse_pgtable, &new_pg->count_info));
+    else
+        /* Same cr3.  Check that it is still marked as in use. */
+        ASSERT(test_bit(_PGC_inuse_pgtable, &new_pg->count_info));
 
     if ( tlb_maintenance )
         write_cr3(new_cr3);
     else
         asm volatile ( "mov %0, %%cr3" :: "r" (new_cr3) : "memory" );
 
-    *this_curr_ptbase = new_cr3;
+    /* Mark the old cr3 as no longer in use. */
+    if ( new_cr3 != *this_curr_ptbase )
+    {
+        struct page_info *old_pg = maddr_to_page(*this_curr_ptbase);
+
+        BUG_ON(!test_and_clear_bit(_PGC_inuse_pgtable, &old_pg->count_info));
+
+        *this_curr_ptbase = new_cr3;
+    }
 }
 
 /*

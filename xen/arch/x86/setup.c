@@ -257,6 +257,7 @@ void early_switch_to_idle(void)
     set_current(v);
     per_cpu(curr_vcpu, cpu) = v;
 
+    __set_bit(_PGC_inuse_pgtable, &maddr_to_page(v->arch.cr3)->count_info);
     asm volatile ( "mov %[npge], %%cr4;"
                    "mov %[cr3], %%cr3;"
                    "mov %[pge], %%cr4;"
