@@ -508,6 +508,8 @@ void do_write_ptbase(struct vcpu *v, bool tlb_maintenance)
     unsigned long new_cr3;
     unsigned int cpu = smp_processor_id();
     unsigned long *this_curr_ptbase = &per_cpu(curr_ptbase, cpu);
+    l4_pgentry_t percpu_mappings = per_cpu(percpu_mappings, cpu);
+    l4_pgentry_t *new_l4t;
     struct page_info *new_pg;
 
     /* Check that %cr3 isn't being shuffled under our feet. */
@@ -522,6 +524,13 @@ void do_write_ptbase(struct vcpu *v, bool tlb_maintenance)
     else
         /* Same cr3.  Check that it is still marked as in use. */
         ASSERT(test_bit(_PGC_inuse_pgtable, &new_pg->count_info));
+
+    /* Insert percpu mappings into the new pagetables. */
+    set_percpu_fixmap(cpu, PERCPU_FIXSLOT_LINEAR,
+                      l1e_from_paddr(new_cr3, __PAGE_HYPERVISOR_RW));
+    new_l4t = percpu_fix_to_virt(cpu, PERCPU_FIXSLOT_LINEAR);
+    new_l4t[l4_table_offset(PERCPU_LINEAR_START)] = percpu_mappings;
+    barrier();
 
     if ( tlb_maintenance )
         write_cr3(new_cr3);

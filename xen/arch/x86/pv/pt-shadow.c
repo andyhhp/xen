@@ -160,6 +160,7 @@ unsigned long pt_maybe_shadow(struct vcpu *v)
     local_irq_save(flags);
 
     {
+        unsigned int slot = l4_table_offset(PERCPU_LINEAR_START);
         l4_pgentry_t *l4t, *vcpu_l4t;
 
         set_percpu_fixmap(cpu, PERCPU_FIXSLOT_SHADOW,
@@ -170,7 +171,18 @@ unsigned long pt_maybe_shadow(struct vcpu *v)
         l4t = ptsh->shadow_l4_va;
         vcpu_l4t = percpu_fix_to_virt(cpu, PERCPU_FIXSLOT_SHADOW);
 
-        copy_page(l4t, vcpu_l4t);
+        /*
+         * Careful!  When context switching between two vcpus, both of which
+         * require shadowing, l4t[] may be the live pagetables.
+         *
+         * We mustn't clobber the PERCPU slot (with a zero, as vcpu_l4t[] will
+         * never have had a percpu mapping inserted into it).  The context
+         * switch logic will unconditionally insert the correct value anyway.
+         */
+        memcpy(l4t, vcpu_l4t,
+               sizeof(*l4t) * slot);
+        memcpy(&l4t[slot + 1], &vcpu_l4t[slot + 1],
+               sizeof(*l4t) * (L4_PAGETABLE_ENTRIES - (slot + 1)));
     }
 
     return ptsh->shadow_l4;

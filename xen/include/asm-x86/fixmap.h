@@ -27,8 +27,9 @@
 #include <asm/msi.h>
 #include <acpi/apei.h>
 
-#define NR_PERCPU_SLOTS 1
+#define NR_PERCPU_SLOTS 2
 #define PERCPU_FIXSLOT_SHADOW 0
+#define PERCPU_FIXSLOT_LINEAR 1
 
 /*
  * Here we define all the compile-time 'special' virtual
