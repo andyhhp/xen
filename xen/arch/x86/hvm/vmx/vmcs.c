@@ -804,7 +804,6 @@ static void vmx_set_host_env(struct vcpu *v)
 
     __vmwrite(HOST_GDTR_BASE,
               (unsigned long)(this_cpu(gdt_table) - FIRST_RESERVED_GDT_ENTRY));
-    __vmwrite(HOST_IDTR_BASE, (unsigned long)idt_tables[cpu]);
 
     __vmwrite(HOST_TR_BASE, (unsigned long)&per_cpu(init_tss, cpu));
 
@@ -1132,6 +1131,9 @@ static int construct_vmcs(struct vcpu *v)
 
     /* Disable PML anyway here as it will only be enabled in log dirty mode */
     v->arch.hvm_vmx.secondary_exec_control &= ~SECONDARY_EXEC_ENABLE_PML;
+
+    /* Host system tables. */
+    __vmwrite(HOST_IDTR_BASE, PERCPU_IDT_MAPPING);
 
     /* Host data selectors. */
     __vmwrite(HOST_SS_SELECTOR, __HYPERVISOR_DS);

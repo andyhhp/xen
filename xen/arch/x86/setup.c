@@ -248,11 +248,24 @@ void __init discard_initial_images(void)
 
 extern char __init_begin[], __init_end[], __bss_start[], __bss_end[];
 
-void early_switch_to_idle(void)
+void early_switch_to_idle(bool bsp)
 {
     unsigned int cpu = smp_processor_id();
     struct vcpu *v = idle_vcpu[cpu];
     unsigned long cr4 = read_cr4();
+
+    /*
+     * VT-x hardwires the IDT limit at 0xffff on VMExit.
+     *
+     * We don't wish to reload on vcpu context switch, so have arranged for
+     * nothing else to live within 64k of the base.  Unilaterally setting the
+     * limit to 0xffff avoids leaking whether HVM vcpus are running to PV
+     * guests via SIDT.
+     */
+    const struct desc_ptr idtr = {
+        .base = PERCPU_IDT_MAPPING,
+        .limit = 0xffff,
+    };
 
     set_current(v);
     per_cpu(curr_vcpu, cpu) = v;
@@ -268,12 +281,17 @@ void early_switch_to_idle(void)
                    : "memory" );
 
     per_cpu(curr_ptbase, cpu) = v->arch.cr3;
+
+    lidt(&idtr);
+
+    if ( likely(!bsp) ) /* BSP IST setup deferred. */
+        enable_each_ist(idt_tables[cpu]);
 }
 
 static void __init init_idle_domain(void)
 {
     scheduler_init();
-    early_switch_to_idle();
+    early_switch_to_idle(true);
 }
 
 void srat_detect_node(int cpu)
@@ -645,6 +663,8 @@ static void __init noreturn reinit_bsp_stack(void)
 
     /* Update TSS and ISTs */
     load_system_tables();
+
+    enable_each_ist(idt_tables[0]);
 
     /* Update SYSCALL trampolines */
     percpu_traps_init();

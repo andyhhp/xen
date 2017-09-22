@@ -725,7 +725,6 @@ void __init early_cpu_init(void)
  */
 void load_system_tables(void)
 {
-	unsigned int cpu = smp_processor_id();
 	unsigned long stack_bottom = get_stack_bottom(),
 		stack_top = stack_bottom & ~(STACK_SIZE - 1);
 
@@ -738,10 +737,6 @@ void load_system_tables(void)
 	const struct desc_ptr gdtr = {
 		.base = (unsigned long)gdt,
 		.limit = LAST_RESERVED_GDT_BYTE,
-	};
-	const struct desc_ptr idtr = {
-		.base = (unsigned long)idt_tables[cpu],
-		.limit = (IDT_ENTRIES * sizeof(idt_entry_t)) - 1,
 	};
 
 	*tss = (struct tss_struct){
@@ -780,11 +775,8 @@ void load_system_tables(void)
 		SYS_DESC_tss_busy);
 
 	lgdt(&gdtr);
-	lidt(&idtr);
 	ltr(TSS_ENTRY << 3);
 	lldt(0);
-
-	enable_each_ist(idt_tables[cpu]);
 
 	/*
 	 * Bottom-of-stack must be 16-byte aligned!

@@ -319,7 +319,7 @@ void start_secondary(void *unused)
     set_processor_id(cpu);
     get_cpu_info()->cr4 = XEN_MINIMAL_CR4;
 
-    early_switch_to_idle();
+    early_switch_to_idle(false);
 
     rdmsrl(MSR_EFER, this_cpu(efer));
     init_shadow_spec_ctrl_state();
