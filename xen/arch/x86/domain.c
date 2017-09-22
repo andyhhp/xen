@@ -333,10 +333,6 @@ int vcpu_initialise(struct vcpu *v)
 
     v->arch.flags = TF_kernel_mode;
 
-    rc = mapcache_vcpu_init(v);
-    if ( rc )
-        return rc;
-
     if ( !is_idle_domain(d) )
     {
         paging_vcpu_init(v);
@@ -554,8 +550,6 @@ int arch_domain_create(struct domain *d,
     }
     else if ( is_pv_domain(d) )
     {
-        mapcache_domain_init(d);
-
         if ( (rc = pv_domain_initialise(d)) != 0 )
             goto fail;
     }

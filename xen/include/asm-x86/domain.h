@@ -38,42 +38,6 @@ struct trap_bounce {
     unsigned long eip;
 };
 
-#define MAPHASH_ENTRIES 8
-#define MAPHASH_HASHFN(pfn) ((pfn) & (MAPHASH_ENTRIES-1))
-#define MAPHASHENT_NOTINUSE ((u32)~0U)
-struct mapcache_vcpu {
-    /* Shadow of mapcache_domain.epoch. */
-    unsigned int shadow_epoch;
-
-    /* Lock-free per-VCPU hash of recently-used mappings. */
-    struct vcpu_maphash_entry {
-        unsigned long mfn;
-        uint32_t      idx;
-        uint32_t      refcnt;
-    } hash[MAPHASH_ENTRIES];
-};
-
-struct mapcache_domain {
-    /* The number of array entries, and a cursor into the array. */
-    unsigned int entries;
-    unsigned int cursor;
-
-    /* Protects map_domain_page(). */
-    spinlock_t lock;
-
-    /* Garbage mappings are flushed from TLBs in batches called 'epochs'. */
-    unsigned int epoch;
-    u32 tlbflush_timestamp;
-
-    /* Which mappings are in use, and which are garbage to reap next epoch? */
-    unsigned long *inuse;
-    unsigned long *garbage;
-};
-
-int mapcache_domain_init(struct domain *);
-int mapcache_vcpu_init(struct vcpu *);
-void mapcache_override_current(struct vcpu *);
-
 /* x86/64: toggle guest between kernel and user modes. */
 void toggle_guest_mode(struct vcpu *);
 /* x86/64: toggle guest page tables between kernel and user modes. */
@@ -252,9 +216,6 @@ struct pv_domain
     l1_pgentry_t **gdt_ldt_l1tab;
 
     atomic_t nr_l4_pages;
-
-    /* map_domain_page() mapping cache. */
-    struct mapcache_domain mapcache;
 
     struct cpuidmasks *cpuidmasks;
 };
@@ -447,9 +408,6 @@ struct arch_domain
 
 struct pv_vcpu
 {
-    /* map_domain_page() mapping cache. */
-    struct mapcache_vcpu mapcache;
-
     struct trap_info *trap_ctxt;
 
     unsigned long gdt_frames[FIRST_RESERVED_GDT_PAGE];

@@ -314,13 +314,6 @@ extern unsigned long xen_phys_start;
 #define LDT_VIRT_START(v)    \
     (GDT_VIRT_START(v) + (64*1024))
 
-/* map_domain_page() map cache. The second per-domain-mapping sub-area. */
-#define MAPCACHE_VCPU_ENTRIES    (CONFIG_PAGING_LEVELS * CONFIG_PAGING_LEVELS)
-#define MAPCACHE_ENTRIES         (MAX_VIRT_CPUS * MAPCACHE_VCPU_ENTRIES)
-#define MAPCACHE_VIRT_START      PERDOMAIN_VIRT_SLOT(1)
-#define MAPCACHE_VIRT_END        (MAPCACHE_VIRT_START + \
-                                  MAPCACHE_ENTRIES * PAGE_SIZE)
-
 /* Argument translation area. The third per-domain-mapping sub-area. */
 #define ARG_XLAT_VIRT_START      PERDOMAIN_VIRT_SLOT(2)
 /* Allow for at least one guard page (COMPAT_ARG_XLAT_SIZE being 2 pages): */
