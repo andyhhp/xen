@@ -560,6 +560,17 @@ void audit_domains(void);
 
 DECLARE_PER_CPU(unsigned long, curr_ptbase);
 
+/*
+ * Indicates whether the current %cr3 contains a short or extended directmap.
+ * Care needs to be taken when updating, as map_domain_page() is used in
+ * interrupt/exception context.  It is safe to indicate that the current %cr3
+ * is short when it is actually extended (in which case, map_domain_page()
+ * will use a mapping slot rather than refering to the directmap), but it is
+ * not safe to indicate the opposite (in which case, map_domain_page() will
+ * return a pointer into 64bit PV kernel address space).
+ */
+DECLARE_PER_CPU(bool, curr_extended_directmap);
+
 void make_cr3(struct vcpu *v, mfn_t mfn);
 void update_cr3(struct vcpu *v);
 int vcpu_destroy_pagetables(struct vcpu *);

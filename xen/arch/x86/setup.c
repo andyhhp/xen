@@ -281,6 +281,7 @@ void early_switch_to_idle(bool bsp)
                    : "memory" );
 
     per_cpu(curr_ptbase, cpu) = v->arch.cr3;
+    per_cpu(curr_extended_directmap, cpu) = true;
 
     lidt(&idtr);
 
@@ -730,6 +731,7 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     init_shadow_spec_ctrl_state();
 
     percpu_init_areas();
+    per_cpu(curr_extended_directmap, 0) = true;
 
     init_idt_traps();
     {

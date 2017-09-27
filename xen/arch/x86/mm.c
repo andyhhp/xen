@@ -502,6 +502,7 @@ void make_cr3(struct vcpu *v, mfn_t mfn)
 }
 
 DEFINE_PER_CPU(unsigned long, curr_ptbase);
+DEFINE_PER_CPU(bool, curr_extended_directmap);
 
 void do_write_ptbase(struct vcpu *v, bool tlb_maintenance)
 {
@@ -509,6 +510,8 @@ void do_write_ptbase(struct vcpu *v, bool tlb_maintenance)
     unsigned int cpu = smp_processor_id();
     unsigned long *this_curr_ptbase = &per_cpu(curr_ptbase, cpu);
     l4_pgentry_t percpu_mappings = per_cpu(percpu_mappings, cpu);
+    bool *this_extd_directmap = &per_cpu(curr_extended_directmap, cpu);
+    bool new_extd_directmap = paging_mode_external(v->domain);
     l4_pgentry_t *new_l4t;
     struct page_info *new_pg;
 
@@ -532,10 +535,18 @@ void do_write_ptbase(struct vcpu *v, bool tlb_maintenance)
     new_l4t[l4_table_offset(PERCPU_LINEAR_START)] = percpu_mappings;
     barrier();
 
+    /* If the new cr3 has a short directmap, report so before switching... */
+    if ( !new_extd_directmap )
+        *this_extd_directmap = new_extd_directmap;
+
     if ( tlb_maintenance )
         write_cr3(new_cr3);
     else
         asm volatile ( "mov %0, %%cr3" :: "r" (new_cr3) : "memory" );
+
+    /* ... else report afterwards. */
+    if ( new_extd_directmap )
+        *this_extd_directmap = new_extd_directmap;
 
     /* Mark the old cr3 as no longer in use. */
     if ( new_cr3 != *this_curr_ptbase )

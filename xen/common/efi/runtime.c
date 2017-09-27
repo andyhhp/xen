@@ -112,6 +112,7 @@ struct efi_rs_state efi_rs_enter(void)
     }
 
     write_cr3(virt_to_maddr(efi_l4_pgtable));
+    this_cpu(curr_extended_directmap) = true;
 
     return state;
 }
@@ -120,6 +121,8 @@ void efi_rs_leave(struct efi_rs_state *state)
 {
     if ( !state->cr3 )
         return;
+
+    this_cpu(curr_extended_directmap) = paging_mode_external(current->domain);
     write_cr3(state->cr3);
     if ( is_pv_vcpu(current) && !is_idle_vcpu(current) )
     {
