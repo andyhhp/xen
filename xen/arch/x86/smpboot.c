@@ -823,6 +823,94 @@ static int setup_cpu_root_pgt(unsigned int cpu)
     return rc;
 }
 
+/*
+ * Make an alteration to a CPUs percpu linear mappings.  The action parameter
+ * determines how **page and flags get used.
+ */
+enum percpu_alter_action {
+    PERCPU_MAP, /* Map existing frame: page and flags are input parameters. */
+};
+static int _alter_percpu_mappings(
+    unsigned int cpu, unsigned long linear,
+    enum percpu_alter_action action,
+    struct page_info **page, unsigned int flags)
+{
+    unsigned int memflags = 0;
+    nodeid_t node = cpu_to_node(cpu);
+    l4_pgentry_t mappings = per_cpu(percpu_mappings, cpu);
+    l3_pgentry_t *l3t = NULL;
+    l2_pgentry_t *l2t = NULL;
+    l1_pgentry_t *l1t = NULL;
+    struct page_info *pg;
+    int rc = -ENOMEM;
+
+    ASSERT(l4e_get_flags(mappings) & _PAGE_PRESENT);
+    ASSERT(linear >= PERCPU_LINEAR_START && linear <  PERCPU_LINEAR_END);
+
+    if ( node != NUMA_NO_NODE )
+        memflags = MEMF_node(node);
+
+    l3t = map_l3t_from_l4e(mappings);
+
+    /* Allocate or map the l2 table for linear. */
+    if ( !(l3e_get_flags(l3t[l3_table_offset(linear)]) & _PAGE_PRESENT) )
+    {
+        pg = alloc_domheap_page(NULL, memflags);
+        if ( !pg )
+            goto out;
+        l2t = __map_domain_page(pg);
+        clear_page(l2t);
+
+        l3t[l3_table_offset(linear)] = l3e_from_page(pg, __PAGE_HYPERVISOR);
+    }
+    else
+        l2t = map_l2t_from_l3e(l3t[l3_table_offset(linear)]);
+
+    /* Allocate or map the l1 table for linear. */
+    if ( !(l2e_get_flags(l2t[l2_table_offset(linear)]) & _PAGE_PRESENT) )
+    {
+        pg = alloc_domheap_page(NULL, memflags);
+        if ( !pg )
+            goto out;
+        l1t = __map_domain_page(pg);
+        clear_page(l1t);
+
+        l2t[l2_table_offset(linear)] = l2e_from_page(pg, __PAGE_HYPERVISOR);
+    }
+    else
+        l1t = map_l1t_from_l2e(l2t[l2_table_offset(linear)]);
+
+    switch ( action )
+    {
+    case PERCPU_MAP:
+        ASSERT(*page);
+        l1t[l1_table_offset(linear)] = l1e_from_page(*page, flags);
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+        rc = -EINVAL;
+        goto out;
+    }
+
+    rc = 0; /* Success */
+
+ out:
+    if ( l1t )
+        unmap_domain_page(l1t);
+    if ( l2t )
+        unmap_domain_page(l2t);
+    unmap_domain_page(l3t);
+
+    return rc;
+}
+
+static int percpu_map_frame(unsigned int cpu, unsigned long linear,
+                            struct page_info *page, unsigned int flags)
+{
+    return _alter_percpu_mappings(cpu, linear, PERCPU_MAP, &page, flags);
+}
+
 /* Allocate data common between the BSP and APs. */
 static int cpu_smpboot_alloc_common(unsigned int cpu)
 {
@@ -859,6 +947,12 @@ static int cpu_smpboot_alloc_common(unsigned int cpu)
     clear_page(l3t);
     per_cpu(percpu_mappings, cpu) = l4t[l4_table_offset(PERCPU_LINEAR_START)] =
         l4e_from_page(pg, __PAGE_HYPERVISOR);
+
+    /* Map the IDT. */
+    rc = percpu_map_frame(cpu, PERCPU_IDT_MAPPING,
+                          virt_to_page(idt_tables[cpu]), PAGE_HYPERVISOR_RO);
+    if ( rc )
+        goto out;
 
     rc = 0; /* Success */
 
@@ -1052,8 +1146,7 @@ static void cpu_smpboot_free(unsigned int cpu)
 
     free_xenheap_pages(per_cpu(compat_gdt_table, cpu), order);
 
-    order = get_order_from_bytes(IDT_ENTRIES * sizeof(idt_entry_t));
-    free_xenheap_pages(idt_tables[cpu], order);
+    free_xenheap_page(idt_tables[cpu]);
     idt_tables[cpu] = NULL;
 
     if ( stack_base[cpu] != NULL )
@@ -1103,11 +1196,11 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     memcpy(gdt, boot_cpu_compat_gdt_table, NR_RESERVED_GDT_PAGES * PAGE_SIZE);
     gdt[PER_CPU_GDT_ENTRY - FIRST_RESERVED_GDT_ENTRY].a = cpu;
 
-    order = get_order_from_bytes(IDT_ENTRIES * sizeof(idt_entry_t));
-    idt_tables[cpu] = alloc_xenheap_pages(order, memflags);
+    BUILD_BUG_ON(IDT_ENTRIES * sizeof(idt_entry_t) != PAGE_SIZE);
+    idt_tables[cpu] = alloc_xenheap_pages(0, memflags);
     if ( idt_tables[cpu] == NULL )
         goto out;
-    memcpy(idt_tables[cpu], idt_table, IDT_ENTRIES * sizeof(idt_entry_t));
+    memcpy(idt_tables[cpu], idt_table, PAGE_SIZE);
     disable_each_ist(idt_tables[cpu]);
 
     for ( stub_page = 0, i = cpu & ~(STUBS_PER_PAGE - 1);
