@@ -829,6 +829,7 @@ static int setup_cpu_root_pgt(unsigned int cpu)
  */
 enum percpu_alter_action {
     PERCPU_MAP, /* Map existing frame: page and flags are input parameters. */
+    PERCPU_ALLOC_L1T, /* Allocate an L1 table. optionally returned via *page. */
 };
 static int _alter_percpu_mappings(
     unsigned int cpu, unsigned long linear,
@@ -878,13 +879,21 @@ static int _alter_percpu_mappings(
         l2t[l2_table_offset(linear)] = l2e_from_page(pg, __PAGE_HYPERVISOR);
     }
     else
-        l1t = map_l1t_from_l2e(l2t[l2_table_offset(linear)]);
+    {
+        pg = l2e_get_page(l2t[l2_table_offset(linear)]);
+        l1t = __map_domain_page(pg);
+    }
 
     switch ( action )
     {
     case PERCPU_MAP:
         ASSERT(*page);
         l1t[l1_table_offset(linear)] = l1e_from_page(*page, flags);
+        break;
+
+    case PERCPU_ALLOC_L1T:
+        if ( page )
+            *page = pg;
         break;
 
     default:
@@ -909,6 +918,12 @@ static int percpu_map_frame(unsigned int cpu, unsigned long linear,
                             struct page_info *page, unsigned int flags)
 {
     return _alter_percpu_mappings(cpu, linear, PERCPU_MAP, &page, flags);
+}
+
+static int percpu_alloc_l1t(unsigned int cpu, unsigned long linear,
+                            struct page_info **page)
+{
+    return _alter_percpu_mappings(cpu, linear, PERCPU_ALLOC_L1T, page, 0);
 }
 
 /* Allocate data common between the BSP and APs. */
@@ -951,6 +966,16 @@ static int cpu_smpboot_alloc_common(unsigned int cpu)
     /* Map the IDT. */
     rc = percpu_map_frame(cpu, PERCPU_IDT_MAPPING,
                           virt_to_page(idt_tables[cpu]), PAGE_HYPERVISOR_RO);
+    if ( rc )
+        goto out;
+
+    /* Allocate space for the mapcache L1e's... */
+    rc = percpu_alloc_l1t(cpu, PERCPU_MAPCACHE_START, &pg);
+    if ( rc )
+        goto out;
+
+    /* ... and map the L1t so it can be used. */
+    rc = percpu_map_frame(cpu, PERCPU_MAPCACHE_L1ES, pg, PAGE_HYPERVISOR_RW);
     if ( rc )
         goto out;
 
