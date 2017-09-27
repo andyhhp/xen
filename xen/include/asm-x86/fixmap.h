@@ -27,10 +27,6 @@
 #include <asm/msi.h>
 #include <acpi/apei.h>
 
-#define NR_PERCPU_SLOTS 2
-#define PERCPU_FIXSLOT_SHADOW 0
-#define PERCPU_FIXSLOT_LINEAR 1
-
 /*
  * Here we define all the compile-time 'special' virtual
  * addresses. The point is to have a constant address at
@@ -53,8 +49,6 @@ enum fixed_addresses {
     FIX_PV_CONSOLE,
     FIX_XEN_SHARED_INFO,
 #endif /* CONFIG_XEN_GUEST */
-    FIX_PERCPU_BEGIN,
-    FIX_PERCPU_END = FIX_PERCPU_BEGIN + (NR_CPUS - 1) * NR_PERCPU_SLOTS,
     /* Everything else should go further down. */
     FIX_APIC_BASE,
     FIX_IO_APIC_BASE_0,
@@ -95,32 +89,6 @@ static inline unsigned long virt_to_fix(const unsigned long vaddr)
 {
     BUG_ON(vaddr >= FIXADDR_TOP || vaddr < FIXADDR_START);
     return __virt_to_fix(vaddr);
-}
-
-static inline void *percpu_fix_to_virt(unsigned int cpu, unsigned int slot)
-{
-    return (void *)fix_to_virt(FIX_PERCPU_BEGIN + (slot * NR_CPUS) + cpu);
-}
-
-static inline l1_pgentry_t *percpu_fixmap_l1e(unsigned int cpu, unsigned int slot)
-{
-    BUILD_BUG_ON(FIX_PERCPU_END >= L1_PAGETABLE_ENTRIES);
-
-    return &l1_fixmap[l1_table_offset((unsigned long)percpu_fix_to_virt(cpu, slot))];
-}
-
-static inline void set_percpu_fixmap(unsigned int cpu, unsigned int slot, l1_pgentry_t l1e)
-{
-    l1_pgentry_t *pl1e = percpu_fixmap_l1e(cpu, slot);
-
-    if ( l1e_get_intpte(*pl1e) != l1e_get_intpte(l1e) )
-    {
-        *pl1e = l1e;
-
-        __asm__ __volatile__ ( "invlpg %0"
-                               :: "m" (*(char *)percpu_fix_to_virt(cpu, slot))
-                               : "memory" );
-    }
 }
 
 #endif /* __ASSEMBLY__ */

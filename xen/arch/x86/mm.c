@@ -529,11 +529,9 @@ void do_write_ptbase(struct vcpu *v, bool tlb_maintenance)
         ASSERT(test_bit(_PGC_inuse_pgtable, &new_pg->count_info));
 
     /* Insert percpu mappings into the new pagetables. */
-    set_percpu_fixmap(cpu, PERCPU_FIXSLOT_LINEAR,
-                      l1e_from_paddr(new_cr3, __PAGE_HYPERVISOR_RW));
-    new_l4t = percpu_fix_to_virt(cpu, PERCPU_FIXSLOT_LINEAR);
+    new_l4t = map_domain_page(maddr_to_mfn(new_cr3));
     new_l4t[l4_table_offset(PERCPU_LINEAR_START)] = percpu_mappings;
-    barrier();
+    unmap_domain_page(new_l4t);
 
     /* If the new cr3 has a short directmap, report so before switching... */
     if ( !new_extd_directmap )

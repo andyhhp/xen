@@ -22,7 +22,6 @@
 #include <xen/mm.h>
 #include <xen/numa.h>
 
-#include <asm/fixmap.h>
 #include <asm/pv/pt-shadow.h>
 
 /*
@@ -163,13 +162,11 @@ unsigned long pt_maybe_shadow(struct vcpu *v)
         unsigned int slot = l4_table_offset(PERCPU_LINEAR_START);
         l4_pgentry_t *l4t, *vcpu_l4t;
 
-        set_percpu_fixmap(cpu, PERCPU_FIXSLOT_SHADOW,
-                          l1e_from_paddr(new_cr3, __PAGE_HYPERVISOR_RO));
         ptsh->shadowing = new_cr3;
         local_irq_restore(flags);
 
         l4t = ptsh->shadow_l4_va;
-        vcpu_l4t = percpu_fix_to_virt(cpu, PERCPU_FIXSLOT_SHADOW);
+        vcpu_l4t = map_domain_page(maddr_to_mfn(new_cr3));
 
         /*
          * Careful!  When context switching between two vcpus, both of which
@@ -183,6 +180,8 @@ unsigned long pt_maybe_shadow(struct vcpu *v)
                sizeof(*l4t) * slot);
         memcpy(&l4t[slot + 1], &vcpu_l4t[slot + 1],
                sizeof(*l4t) * (L4_PAGETABLE_ENTRIES - (slot + 1)));
+
+        unmap_domain_page(vcpu_l4t);
     }
 
     return ptsh->shadow_l4;
@@ -219,13 +218,11 @@ static void _pt_shadow_ipi(void *arg)
 
     case PTSH_IPI_WRITE:
         l4t = ptsh->shadow_l4_va;
-
-        /* Reuse the mapping established in pt_maybe_shadow(). */
-        ASSERT(l1e_get_paddr(*percpu_fixmap_l1e(cpu, PERCPU_FIXSLOT_SHADOW)) ==
-               maddr);
-        vcpu_l4t = percpu_fix_to_virt(cpu, PERCPU_FIXSLOT_SHADOW);
+        vcpu_l4t = map_domain_page(maddr_to_mfn(maddr));
 
         l4t[info->slot] = vcpu_l4t[info->slot];
+
+        unmap_domain_page(vcpu_l4t);
         break;
 
     default:
