@@ -830,6 +830,8 @@ static int setup_cpu_root_pgt(unsigned int cpu)
 enum percpu_alter_action {
     PERCPU_MAP, /* Map existing frame: page and flags are input parameters. */
     PERCPU_ALLOC_L1T, /* Allocate an L1 table. optionally returned via *page. */
+    PERCPU_ALLOC_FRAME, /* Allocate a frame. flags is an input, and *page is
+                         * optionally an output. */
 };
 static int _alter_percpu_mappings(
     unsigned int cpu, unsigned long linear,
@@ -891,6 +893,15 @@ static int _alter_percpu_mappings(
         l1t[l1_table_offset(linear)] = l1e_from_page(*page, flags);
         break;
 
+    case PERCPU_ALLOC_FRAME:
+        pg = alloc_domheap_page(NULL, memflags);
+        if ( !pg )
+            goto out;
+
+        clear_domain_page(page_to_mfn(pg));
+        l1t[l1_table_offset(linear)] = l1e_from_page(pg, flags);
+
+        /* Fallthrough */
     case PERCPU_ALLOC_L1T:
         if ( page )
             *page = pg;
@@ -924,6 +935,12 @@ static int percpu_alloc_l1t(unsigned int cpu, unsigned long linear,
                             struct page_info **page)
 {
     return _alter_percpu_mappings(cpu, linear, PERCPU_ALLOC_L1T, page, 0);
+}
+
+static int percpu_alloc_frame(unsigned int cpu, unsigned long linear,
+                              struct page_info **page, unsigned int flags)
+{
+    return _alter_percpu_mappings(cpu, linear, PERCPU_ALLOC_FRAME, page, flags);
 }
 
 /* Allocate data common between the BSP and APs. */
@@ -976,6 +993,16 @@ static int cpu_smpboot_alloc_common(unsigned int cpu)
 
     /* ... and map the L1t so it can be used. */
     rc = percpu_map_frame(cpu, PERCPU_MAPCACHE_L1ES, pg, PAGE_HYPERVISOR_RW);
+    if ( rc )
+        goto out;
+
+    /* Allocate two pages for the XLAT area. */
+    rc = percpu_alloc_frame(cpu, PERCPU_XLAT_START, NULL,
+                            PAGE_HYPERVISOR_RW | MAP_PERCPU_AUTOFREE);
+    if ( rc )
+        goto out;
+    rc = percpu_alloc_frame(cpu, PERCPU_XLAT_START + PAGE_SIZE, NULL,
+                            PAGE_HYPERVISOR_RW | MAP_PERCPU_AUTOFREE);
     if ( rc )
         goto out;
 
