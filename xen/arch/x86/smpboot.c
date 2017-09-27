@@ -1006,6 +1006,27 @@ static int cpu_smpboot_alloc_common(unsigned int cpu)
     if ( rc )
         goto out;
 
+    /* Allocate space for the GDT/LDT L1e's... */
+    rc = percpu_alloc_l1t(cpu, PERCPU_GDT_MAPPING, &pg);
+    if ( rc )
+        goto out;
+
+    /* ... and map the L1t so it can be used... */
+    rc = percpu_map_frame(cpu, PERCPU_GDT_LDT_L1ES, pg, PAGE_HYPERVISOR_RW);
+    if ( rc )
+        goto out;
+
+    /* ... and map Xen-reserved GDT frames. */
+    rc = percpu_map_frame(cpu, PERCPU_GDT_MAPPING + FIRST_RESERVED_GDT_BYTE,
+                          virt_to_page(per_cpu(gdt_table, cpu)),
+                          PAGE_HYPERVISOR_RW);
+    if ( rc )
+        goto out;
+    rc = percpu_map_frame(cpu, PERCPU_GDT_MAPPING + FIRST_RESERVED_GDT_BYTE + PAGE_SIZE,
+                          virt_to_page(zero_page), __PAGE_HYPERVISOR_RO);
+    if ( rc )
+        goto out;
+
     rc = 0; /* Success */
 
  out:

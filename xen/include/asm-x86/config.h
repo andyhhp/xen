@@ -302,6 +302,10 @@ extern unsigned long xen_phys_start;
 
 #define PERCPU_XLAT_START        (PERCPU_LINEAR_START + MB(6) + KB(8))
 
+#define PERCPU_GDT_LDT_L1ES      (PERCPU_LINEAR_START + MB(8) + KB(12))
+#define PERCPU_GDT_MAPPING       (PERCPU_LINEAR_START + MB(10))
+#define PERCPU_LDT_MAPPING       (PERCPU_LINEAR_START + MB(11))
+
 /* GDT/LDT shadow mapping area. The first per-domain-mapping sub-area. */
 #define GDT_LDT_VCPU_SHIFT       5
 #define GDT_LDT_VCPU_VA_SHIFT    (GDT_LDT_VCPU_SHIFT + PAGE_SHIFT)
