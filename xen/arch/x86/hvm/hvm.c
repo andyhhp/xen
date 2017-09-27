@@ -1546,10 +1546,6 @@ int hvm_vcpu_initialise(struct vcpu *v)
 
     v->arch.hvm_vcpu.inject_event.vector = HVM_EVENT_VECTOR_UNSET;
 
-    rc = setup_compat_arg_xlat(v); /* teardown: free_compat_arg_xlat() */
-    if ( rc != 0 )
-        goto fail4;
-
     if ( nestedhvm_enabled(d)
          && (rc = nestedhvm_vcpu_initialise(v)) < 0 ) /* teardown: nestedhvm_vcpu_destroy */
         goto fail5;
@@ -1573,8 +1569,6 @@ int hvm_vcpu_initialise(struct vcpu *v)
  fail6:
     nestedhvm_vcpu_destroy(v);
  fail5:
-    free_compat_arg_xlat(v);
- fail4:
     hvm_funcs.vcpu_destroy(v);
  fail3:
     vlapic_destroy(v);
@@ -1594,8 +1588,6 @@ void hvm_vcpu_destroy(struct vcpu *v)
         altp2m_vcpu_destroy(v);
 
     nestedhvm_vcpu_destroy(v);
-
-    free_compat_arg_xlat(v);
 
     tasklet_kill(&v->arch.hvm_vcpu.assert_evtchn_irq_tasklet);
     hvm_funcs.vcpu_destroy(v);

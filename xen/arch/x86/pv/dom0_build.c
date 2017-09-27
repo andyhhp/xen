@@ -388,8 +388,6 @@ int __init dom0_construct_pv(struct domain *d,
     {
         d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 1;
         v->vcpu_info = (void *)&d->shared_info->compat.vcpu_info[0];
-        if ( setup_compat_arg_xlat(v) != 0 )
-            BUG();
     }
 
     nr_pages = dom0_compute_nr_pages(d, &parms, initrd_len);

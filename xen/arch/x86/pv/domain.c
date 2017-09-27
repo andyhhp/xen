@@ -65,8 +65,7 @@ int switch_compat(struct domain *d)
 
     for_each_vcpu( d, v )
     {
-        if ( (rc = setup_compat_arg_xlat(v)) ||
-             (rc = setup_compat_l4(v)) )
+        if ( (rc = setup_compat_l4(v)) )
             goto undo_and_fail;
     }
 
@@ -80,10 +79,7 @@ int switch_compat(struct domain *d)
  undo_and_fail:
     d->arch.is_32bit_pv = d->arch.has_32bit_shinfo = 0;
     for_each_vcpu( d, v )
-    {
-        free_compat_arg_xlat(v);
         release_compat_l4(v);
-    }
 
     return rc;
 }
@@ -105,10 +101,7 @@ static void pv_destroy_gdt_ldt_l1tab(struct vcpu *v)
 void pv_vcpu_destroy(struct vcpu *v)
 {
     if ( is_pv_32bit_vcpu(v) )
-    {
-        free_compat_arg_xlat(v);
         release_compat_l4(v);
-    }
 
     pv_destroy_gdt_ldt_l1tab(v);
     xfree(v->arch.pv_vcpu.trap_ctxt);
@@ -145,9 +138,6 @@ int pv_vcpu_initialise(struct vcpu *v)
 
     if ( is_pv_32bit_domain(d) )
     {
-        if ( (rc = setup_compat_arg_xlat(v)) )
-            goto done;
-
         if ( (rc = setup_compat_l4(v)) )
             goto done;
     }

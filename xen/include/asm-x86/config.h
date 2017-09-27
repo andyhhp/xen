@@ -316,13 +316,6 @@ extern unsigned long xen_phys_start;
 #define LDT_VIRT_START(v)    \
     (GDT_VIRT_START(v) + (64*1024))
 
-/* Argument translation area. The third per-domain-mapping sub-area. */
-#define ARG_XLAT_VIRT_START      PERDOMAIN_VIRT_SLOT(2)
-/* Allow for at least one guard page (COMPAT_ARG_XLAT_SIZE being 2 pages): */
-#define ARG_XLAT_VA_SHIFT        (2 + PAGE_SHIFT)
-#define ARG_XLAT_START(v)        \
-    (ARG_XLAT_VIRT_START + ((v)->vcpu_id << ARG_XLAT_VA_SHIFT))
-
 #define NATIVE_VM_ASSIST_VALID   ((1UL << VMASST_TYPE_4gb_segments)        | \
                                   (1UL << VMASST_TYPE_4gb_segments_notify) | \
                                   (1UL << VMASST_TYPE_writable_pagetables) | \
