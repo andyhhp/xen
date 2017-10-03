@@ -1207,7 +1207,6 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner)
     unsigned long     pfn = l1e_get_pfn(l1e);
     struct page_info *page;
     struct domain    *pg_owner;
-    struct vcpu      *v;
 
     if ( !(l1e_get_flags(l1e) & _PAGE_PRESENT) || is_iomem_page(_mfn(pfn)) )
         return;
@@ -1243,25 +1242,9 @@ void put_page_from_l1e(l1_pgentry_t l1e, struct domain *l1e_owner)
      */
     if ( (l1e_get_flags(l1e) & _PAGE_RW) &&
          ((l1e_owner == pg_owner) || !paging_mode_external(pg_owner)) )
-    {
         put_page_and_type(page);
-    }
     else
-    {
-        /* We expect this is rare so we blow the entire shadow LDT. */
-        if ( unlikely(((page->u.inuse.type_info & PGT_type_mask) ==
-                       PGT_seg_desc_page)) &&
-             unlikely(((page->u.inuse.type_info & PGT_count_mask) != 0)) &&
-             (l1e_owner == pg_owner) )
-        {
-            for_each_vcpu ( pg_owner, v )
-            {
-                if ( pv_destroy_ldt(v) )
-                    flush_tlb_mask(cpumask_of(v->dirty_cpu));
-            }
-        }
         put_page(page);
-    }
 }
 
 

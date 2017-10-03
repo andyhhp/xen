@@ -449,10 +449,6 @@ struct pv_vcpu
     unsigned int iopl;        /* Current IOPL for this VCPU, shifted left by
                                * 12 to match the eflags register. */
 
-    /* Current LDT details. */
-    unsigned long shadow_ldt_mapcnt;
-    spinlock_t shadow_ldt_lock;
-
     /* data breakpoint extension MSRs */
     uint32_t dr_mask[4];
 

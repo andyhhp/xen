@@ -115,8 +115,6 @@ int pv_vcpu_initialise(struct vcpu *v)
 
     ASSERT(!is_idle_domain(d));
 
-    spin_lock_init(&v->arch.pv_vcpu.shadow_ldt_lock);
-
     rc = pv_create_gdt_ldt_l1tab(v);
     if ( rc )
         return rc;

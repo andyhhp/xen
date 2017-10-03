@@ -31,18 +31,12 @@
  */
 bool pv_destroy_ldt(struct vcpu *v)
 {
-    l1_pgentry_t *pl1e;
+    l1_pgentry_t *pl1e = pv_ldt_ptes(v);
     unsigned int i, mappings_dropped = 0;
     struct page_info *page;
 
     ASSERT(!in_irq());
-
-    spin_lock(&v->arch.pv_vcpu.shadow_ldt_lock);
-
-    if ( v->arch.pv_vcpu.shadow_ldt_mapcnt == 0 )
-        goto out;
-
-    pl1e = pv_ldt_ptes(v);
+    ASSERT(v == current || cpumask_empty(v->vcpu_dirty_cpumask));
 
     for ( i = 0; i < 16; i++ )
     {
@@ -58,12 +52,6 @@ bool pv_destroy_ldt(struct vcpu *v)
         put_page_and_type(page);
     }
 
-    ASSERT(v->arch.pv_vcpu.shadow_ldt_mapcnt == mappings_dropped);
-    v->arch.pv_vcpu.shadow_ldt_mapcnt = 0;
-
- out:
-    spin_unlock(&v->arch.pv_vcpu.shadow_ldt_lock);
-
     return mappings_dropped;
 }
 
@@ -73,6 +61,8 @@ void pv_destroy_gdt(struct vcpu *v)
     mfn_t zero_mfn = _mfn(virt_to_mfn(zero_page));
     l1_pgentry_t zero_l1e = l1e_from_mfn(zero_mfn, __PAGE_HYPERVISOR_RO);
     unsigned int i;
+
+    ASSERT(v == current || cpumask_empty(v->vcpu_dirty_cpumask));
 
     v->arch.pv_vcpu.gdt_ents = 0;
     for ( i = 0; i < FIRST_RESERVED_GDT_PAGE; i++ )
@@ -93,6 +83,8 @@ long pv_set_gdt(struct vcpu *v, unsigned long *frames, unsigned int entries)
     struct domain *d = v->domain;
     l1_pgentry_t *pl1e;
     unsigned int i, nr_frames = DIV_ROUND_UP(entries, 512);
+
+    ASSERT(v == current || cpumask_empty(v->vcpu_dirty_cpumask));
 
     if ( entries > FIRST_RESERVED_GDT_ENTRY )
         return -EINVAL;
