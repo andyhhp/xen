@@ -584,16 +584,6 @@ long subarch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg);
 int compat_arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void));
 int compat_subarch_memory_op(int op, XEN_GUEST_HANDLE_PARAM(void));
 
-#define NIL(type) ((type *)-sizeof(type))
-#define IS_NIL(ptr) (!((uintptr_t)(ptr) + sizeof(*(ptr))))
-
-int create_perdomain_mapping(struct domain *, unsigned long va,
-                             unsigned int nr, l1_pgentry_t **,
-                             struct page_info **);
-void destroy_perdomain_mapping(struct domain *, unsigned long va,
-                               unsigned int nr);
-void free_perdomain_mappings(struct domain *);
-
 extern int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm);
 
 void domain_set_alloc_bitsize(struct domain *d);

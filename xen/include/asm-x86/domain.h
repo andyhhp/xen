@@ -213,8 +213,6 @@ struct time_scale {
 
 struct pv_domain
 {
-    l1_pgentry_t **gdt_ldt_l1tab;
-
     atomic_t nr_l4_pages;
 
     struct cpuidmasks *cpuidmasks;
@@ -237,8 +235,6 @@ struct monitor_write_data {
 
 struct arch_domain
 {
-    struct page_info *perdomain_l3_pg;
-
     unsigned int hv_compat_vstart;
 
     /* Maximum physical-address bitwidth supported by this guest. */

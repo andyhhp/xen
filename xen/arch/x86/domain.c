@@ -581,7 +581,6 @@ int arch_domain_create(struct domain *d,
     xfree(d->arch.msr);
     if ( paging_initialised )
         paging_final_teardown(d);
-    free_perdomain_mappings(d);
 
     return rc;
 }
@@ -603,7 +602,6 @@ void arch_domain_destroy(struct domain *d)
 
     if ( is_pv_domain(d) )
         pv_domain_destroy(d);
-    free_perdomain_mappings(d);
 
     free_xenheap_page(d->shared_info);
     cleanup_domain_irq_mapping(d);

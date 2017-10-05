@@ -84,26 +84,11 @@ int switch_compat(struct domain *d)
     return rc;
 }
 
-static int pv_create_gdt_ldt_l1tab(struct vcpu *v)
-{
-    return create_perdomain_mapping(v->domain, GDT_VIRT_START(v),
-                                    1U << GDT_LDT_VCPU_SHIFT,
-                                    v->domain->arch.pv_domain.gdt_ldt_l1tab,
-                                    NULL);
-}
-
-static void pv_destroy_gdt_ldt_l1tab(struct vcpu *v)
-{
-    destroy_perdomain_mapping(v->domain, GDT_VIRT_START(v),
-                              1U << GDT_LDT_VCPU_SHIFT);
-}
-
 void pv_vcpu_destroy(struct vcpu *v)
 {
     if ( is_pv_32bit_vcpu(v) )
         release_compat_l4(v);
 
-    pv_destroy_gdt_ldt_l1tab(v);
     xfree(v->arch.pv_vcpu.trap_ctxt);
     v->arch.pv_vcpu.trap_ctxt = NULL;
 }
@@ -114,10 +99,6 @@ int pv_vcpu_initialise(struct vcpu *v)
     int rc;
 
     ASSERT(!is_idle_domain(d));
-
-    rc = pv_create_gdt_ldt_l1tab(v);
-    if ( rc )
-        return rc;
 
     BUILD_BUG_ON(NR_VECTORS * sizeof(*v->arch.pv_vcpu.trap_ctxt) >
                  PAGE_SIZE);
@@ -140,6 +121,8 @@ int pv_vcpu_initialise(struct vcpu *v)
             goto done;
     }
 
+    rc = 0; /* Success */
+
  done:
     if ( rc )
         pv_vcpu_destroy(v);
@@ -148,14 +131,8 @@ int pv_vcpu_initialise(struct vcpu *v)
 
 void pv_domain_destroy(struct domain *d)
 {
-    destroy_perdomain_mapping(d, GDT_LDT_VIRT_START,
-                              GDT_LDT_MBYTES << (20 - PAGE_SHIFT));
-
     xfree(d->arch.pv_domain.cpuidmasks);
     d->arch.pv_domain.cpuidmasks = NULL;
-
-    free_xenheap_page(d->arch.pv_domain.gdt_ldt_l1tab);
-    d->arch.pv_domain.gdt_ldt_l1tab = NULL;
 }
 
 
@@ -168,12 +145,6 @@ int pv_domain_initialise(struct domain *d)
     };
     int rc = -ENOMEM;
 
-    d->arch.pv_domain.gdt_ldt_l1tab =
-        alloc_xenheap_pages(0, MEMF_node(domain_to_node(d)));
-    if ( !d->arch.pv_domain.gdt_ldt_l1tab )
-        goto fail;
-    clear_page(d->arch.pv_domain.gdt_ldt_l1tab);
-
     if ( levelling_caps & ~LCAP_faulting )
     {
         d->arch.pv_domain.cpuidmasks = xmalloc(struct cpuidmasks);
@@ -181,12 +152,6 @@ int pv_domain_initialise(struct domain *d)
             goto fail;
         *d->arch.pv_domain.cpuidmasks = cpuidmask_defaults;
     }
-
-    rc = create_perdomain_mapping(d, GDT_LDT_VIRT_START,
-                                  GDT_LDT_MBYTES << (20 - PAGE_SHIFT),
-                                  NULL, NULL);
-    if ( rc )
-        goto fail;
 
     d->arch.ctxt_switch = &pv_csw;
 

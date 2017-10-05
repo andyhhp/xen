@@ -592,10 +592,6 @@ int hvm_domain_initialise(struct domain *d)
     INIT_LIST_HEAD(&d->arch.hvm_domain.mmcfg_regions);
     INIT_LIST_HEAD(&d->arch.hvm_domain.msix_tables);
 
-    rc = create_perdomain_mapping(d, PERDOMAIN_VIRT_START, 0, NULL, NULL);
-    if ( rc )
-        goto fail;
-
     hvm_init_cacheattr_region_list(d);
 
     rc = paging_enable(d, PG_refcounts|PG_translate|PG_external);
@@ -680,8 +676,6 @@ int hvm_domain_initialise(struct domain *d)
     xfree(d->arch.hvm_domain.irq);
  fail0:
     hvm_destroy_cacheattr_region_list(d);
-    destroy_perdomain_mapping(d, PERDOMAIN_VIRT_START, 0);
- fail:
     return rc;
 }
 

@@ -131,9 +131,6 @@ extern unsigned char boot_edid_info[128];
  *    Guest linear page table.
  *  0xffff820000000000 - 0xffff827fffffffff [512GB, 2^39 bytes, PML4:260]
  *    Shadow linear page table.
- *
- *                !!! WARNING - TEMPORARILY STALE BELOW !!!
- *
  *  0xffff828000000000 - 0xffff82bfffffffff [256GB, 2^38 bytes, PML4:261]
  *    Machine-to-phys translation table.
  *  0xffff82c000000000 - 0xffff82cfffffffff [64GB,  2^36 bytes, PML4:261]
@@ -207,17 +204,8 @@ extern unsigned char boot_edid_info[128];
 /* Slot 260: linear page table (shadow table). */
 #define SH_LINEAR_PT_VIRT_START (PML4_ADDR(260))
 #define SH_LINEAR_PT_VIRT_END   (SH_LINEAR_PT_VIRT_START + PML4_ENTRY_BYTES)
-/* Slot 261: per-domain mappings (including map cache). */
-#define PERDOMAIN_VIRT_START    (PML4_ADDR(261))
-#define PERDOMAIN_SLOT_MBYTES   (PML4_ENTRY_BYTES >> (20 + PAGETABLE_ORDER))
-#define PERDOMAIN_SLOTS         3
-#define PERDOMAIN_VIRT_SLOT(s)  (PERDOMAIN_VIRT_START + (s) * \
-                                 (PERDOMAIN_SLOT_MBYTES << 20))
-/*
- *                !!! WARNING - TEMPORARILY STALE BELOW !!!
- */
 /* Slot 261: machine-to-phys conversion table (256GB). */
-#define RDWR_MPT_VIRT_START     (PML4_ADDR(262))
+#define RDWR_MPT_VIRT_START     (PML4_ADDR(261))
 #define RDWR_MPT_VIRT_END       (RDWR_MPT_VIRT_START + MPT_VIRT_SIZE)
 /* Slot 261: vmap()/ioremap()/fixmap area (64GB). */
 #define VMAP_VIRT_START         RDWR_MPT_VIRT_END
@@ -245,12 +233,12 @@ extern unsigned char boot_edid_info[128];
 
 #ifndef CONFIG_BIGMEM
 /* Slot 262-271/510: A direct 1:1 mapping of all of physical memory. */
-#define DIRECTMAP_VIRT_START    (PML4_ADDR(263))
-#define DIRECTMAP_SIZE          (PML4_ENTRY_BYTES * (511 - 263))
+#define DIRECTMAP_VIRT_START    (PML4_ADDR(262))
+#define DIRECTMAP_SIZE          (PML4_ENTRY_BYTES * (511 - 262))
 #else
 /* Slot 265-271/510: A direct 1:1 mapping of all of physical memory. */
-#define DIRECTMAP_VIRT_START    (PML4_ADDR(266))
-#define DIRECTMAP_SIZE          (PML4_ENTRY_BYTES * (511 - 266))
+#define DIRECTMAP_VIRT_START    (PML4_ADDR(265))
+#define DIRECTMAP_SIZE          (PML4_ENTRY_BYTES * (511 - 265))
 #endif
 #define DIRECTMAP_VIRT_END      (DIRECTMAP_VIRT_START + DIRECTMAP_SIZE)
 
@@ -308,19 +296,7 @@ extern unsigned long xen_phys_start;
 #define PERCPU_LDT_MAPPING       (PERCPU_LINEAR_START + MB(11))
 #define PERCPU_LDT_MAPPING_END   (PERCPU_LDT_MAPPING + 0x10000)
 
-/* GDT/LDT shadow mapping area. The first per-domain-mapping sub-area. */
-#define GDT_LDT_VCPU_SHIFT       5
-#define GDT_LDT_VCPU_VA_SHIFT    (GDT_LDT_VCPU_SHIFT + PAGE_SHIFT)
-#define GDT_LDT_MBYTES           PERDOMAIN_SLOT_MBYTES
-#define MAX_VIRT_CPUS            (GDT_LDT_MBYTES << (20-GDT_LDT_VCPU_VA_SHIFT))
-#define GDT_LDT_VIRT_START       PERDOMAIN_VIRT_SLOT(0)
-#define GDT_LDT_VIRT_END         (GDT_LDT_VIRT_START + (GDT_LDT_MBYTES << 20))
-
-/* The address of a particular VCPU's GDT or LDT. */
-#define GDT_VIRT_START(v)    \
-    (PERDOMAIN_VIRT_START + ((v)->vcpu_id << GDT_LDT_VCPU_VA_SHIFT))
-#define LDT_VIRT_START(v)    \
-    (GDT_VIRT_START(v) + (64*1024))
+#define MAX_VIRT_CPUS            8192
 
 #define NATIVE_VM_ASSIST_VALID   ((1UL << VMASST_TYPE_4gb_segments)        | \
                                   (1UL << VMASST_TYPE_4gb_segments_notify) | \
