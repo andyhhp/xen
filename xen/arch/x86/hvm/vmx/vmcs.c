@@ -802,9 +802,6 @@ static void vmx_set_host_env(struct vcpu *v)
 {
     unsigned int cpu = smp_processor_id();
 
-    __vmwrite(HOST_GDTR_BASE,
-              (unsigned long)(this_cpu(gdt_table) - FIRST_RESERVED_GDT_ENTRY));
-
     __vmwrite(HOST_TR_BASE, (unsigned long)&per_cpu(init_tss, cpu));
 
     __vmwrite(HOST_SYSENTER_ESP, get_stack_bottom());
@@ -1134,6 +1131,7 @@ static int construct_vmcs(struct vcpu *v)
 
     /* Host system tables. */
     __vmwrite(HOST_IDTR_BASE, PERCPU_IDT_MAPPING);
+    __vmwrite(HOST_GDTR_BASE, PERCPU_GDT_MAPPING);
 
     /* Host data selectors. */
     __vmwrite(HOST_SS_SELECTOR, __HYPERVISOR_DS);

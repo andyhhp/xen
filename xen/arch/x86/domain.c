@@ -69,6 +69,7 @@
 #include <asm/spec_ctrl.h>
 
 DEFINE_PER_CPU(struct vcpu *, curr_vcpu);
+DEFINE_PER_CPU(unsigned int, ldt_ents);
 
 static void default_idle(void);
 void (*pm_idle) (void) __read_mostly = default_idle;
@@ -929,8 +930,13 @@ int arch_set_info_guest(
             fail = compat_pfn_to_cr3(pfn) != c.cmp->ctrlreg[3];
         }
 
-        for ( i = 0; i < ARRAY_SIZE(v->arch.pv_vcpu.gdt_frames); ++i )
-            fail |= v->arch.pv_vcpu.gdt_frames[i] != c(gdt_frames[i]);
+        for ( i = 0; i < MAX_PV_GDT_FRAMES; ++i )
+        {
+            paddr_t addr = pfn_to_paddr(c(gdt_frames[i])) ?: __pa(zero_page);
+
+            fail |= l1e_get_paddr(v->arch.pv_vcpu.gdt_l1es[i]) != addr;
+        }
+
         fail |= v->arch.pv_vcpu.gdt_ents != c(gdt_ents);
 
         fail |= v->arch.pv_vcpu.ldt_base != c(ldt_base);
@@ -1027,10 +1033,10 @@ int arch_set_info_guest(
         rc = (int)pv_set_gdt(v, c.nat->gdt_frames, c.nat->gdt_ents);
     else
     {
-        unsigned long gdt_frames[ARRAY_SIZE(v->arch.pv_vcpu.gdt_frames)];
+        unsigned long gdt_frames[MAX_PV_GDT_FRAMES];
         unsigned int nr_frames = DIV_ROUND_UP(c.cmp->gdt_ents, 512);
 
-        if ( nr_frames > ARRAY_SIZE(v->arch.pv_vcpu.gdt_frames) )
+        if ( nr_frames > MAX_PV_GDT_FRAMES )
             return -EINVAL;
 
         for ( i = 0; i < nr_frames; ++i )
@@ -1600,15 +1606,18 @@ static inline bool need_full_gdt(const struct domain *d)
     return is_pv_domain(d) && !is_idle_domain(d);
 }
 
+static bool needs_ldt(const struct vcpu *v)
+{
+    return is_pv_vcpu(v) && v->arch.pv_vcpu.ldt_ents;
+}
+
 static void __context_switch(void)
 {
     struct cpu_user_regs *stack_regs = guest_cpu_user_regs();
-    unsigned int          cpu = smp_processor_id();
+    unsigned int          cpu = smp_processor_id(), i;
     struct vcpu          *p = per_cpu(curr_vcpu, cpu);
     struct vcpu          *n = current;
     struct domain        *pd = p->domain, *nd = n->domain;
-    struct desc_struct   *gdt;
-    struct desc_ptr       gdt_desc;
 
     ASSERT(p != n);
     ASSERT(!vcpu_cpu_dirty(n));
@@ -1648,38 +1657,41 @@ static void __context_switch(void)
 
     psr_ctxt_switch_to(nd);
 
-    gdt = !is_pv_32bit_domain(nd) ? per_cpu(gdt_table, cpu) :
-                                    per_cpu(compat_gdt_table, cpu);
+    /* Load a full new GDT if the new vcpu needs one. */
     if ( need_full_gdt(nd) )
     {
-        unsigned long mfn = virt_to_mfn(gdt);
-        l1_pgentry_t *pl1e = pv_gdt_ptes(n);
-        unsigned int i;
+        memcpy(pv_gdt_ptes, n->arch.pv_vcpu.gdt_l1es,
+               sizeof(n->arch.pv_vcpu.gdt_l1es));
 
-        for ( i = 0; i < NR_RESERVED_GDT_PAGES; i++ )
-            l1e_write(pl1e + FIRST_RESERVED_GDT_PAGE + i,
-                      l1e_from_pfn(mfn + i, __PAGE_HYPERVISOR_RW));
+        l1e_write(&pv_gdt_ptes[FIRST_RESERVED_GDT_PAGE],
+                  l1e_from_pfn(virt_to_mfn(!is_pv_32bit_domain(nd)
+                                           ? per_cpu(gdt_table, cpu)
+                                           : per_cpu(compat_gdt_table, cpu)),
+                               __PAGE_HYPERVISOR_RW));
     }
-
-    if ( need_full_gdt(pd) &&
-         ((p->vcpu_id != n->vcpu_id) || !need_full_gdt(nd)) )
+    /* or clobber a previous full GDT. */
+    else if ( need_full_gdt(pd) )
     {
-        gdt_desc.limit = LAST_RESERVED_GDT_BYTE;
-        gdt_desc.base  = (unsigned long)(gdt - FIRST_RESERVED_GDT_ENTRY);
+        l1_pgentry_t zero_l1e = l1e_from_paddr(__pa(zero_page),
+                                               __PAGE_HYPERVISOR_RO);
 
-        lgdt(&gdt_desc);
+        for ( i = 0; i < FIRST_RESERVED_GDT_PAGE; ++i )
+            pv_gdt_ptes[i] = zero_l1e;
+
+        l1e_write(&pv_gdt_ptes[FIRST_RESERVED_GDT_PAGE],
+                  l1e_from_pfn(virt_to_mfn(per_cpu(gdt_table, cpu)),
+                               __PAGE_HYPERVISOR_RW));
     }
+
+    /* Load the LDT frames if needed. */
+    if ( needs_ldt(n) )
+        memcpy(pv_ldt_ptes, n->arch.pv_vcpu.ldt_l1es,
+               sizeof(n->arch.pv_vcpu.ldt_l1es));
+    /* or clobber the previous LDT. */
+    else if ( needs_ldt(p) )
+        memset(pv_ldt_ptes, 0, sizeof(n->arch.pv_vcpu.ldt_l1es));
 
     write_ptbase(n);
-
-    if ( need_full_gdt(nd) &&
-         ((p->vcpu_id != n->vcpu_id) || !need_full_gdt(pd)) )
-    {
-        gdt_desc.limit = LAST_RESERVED_GDT_BYTE;
-        gdt_desc.base = GDT_VIRT_START(n);
-
-        lgdt(&gdt_desc);
-    }
 
     load_LDT(n);
 

@@ -4,21 +4,26 @@
 
 #ifndef __ASSEMBLY__
 
+DECLARE_PER_CPU(unsigned int, ldt_ents);
+
 static inline void load_LDT(struct vcpu *v)
 {
-    struct desc_struct *desc;
     unsigned int ents = is_pv_vcpu(v) && v->arch.pv_vcpu.ldt_ents;
+    unsigned int *this_ldt_ents = &this_cpu(ldt_ents);
+
+    if ( likely(ents == *this_ldt_ents) )
+        return;
 
     if ( ents == 0 )
         lldt(0);
     else
     {
-        desc = (!is_pv_32bit_vcpu(v)
-                ? this_cpu(gdt_table) : this_cpu(compat_gdt_table))
-               + LDT_ENTRY - FIRST_RESERVED_GDT_ENTRY;
-        _set_tssldt_desc(desc, LDT_VIRT_START(v), ents*8-1, SYS_DESC_ldt);
+        _set_tssldt_desc(&pv_gdt[LDT_ENTRY], PERCPU_LDT_MAPPING,
+                         ents * 8 - 1, SYS_DESC_ldt);
         lldt(LDT_ENTRY << 3);
     }
+
+    *this_ldt_ents = ents;
 }
 
 #endif /* !__ASSEMBLY__ */

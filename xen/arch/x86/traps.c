@@ -1159,36 +1159,6 @@ static int handle_ldt_mapping_fault(unsigned int offset,
     return EXCRET_fault_fixed;
 }
 
-static int handle_gdt_ldt_mapping_fault(unsigned long offset,
-                                        struct cpu_user_regs *regs)
-{
-    struct vcpu *curr = current;
-    /* Which vcpu's area did we fault in, and is it in the ldt sub-area? */
-    unsigned int is_ldt_area = (offset >> (GDT_LDT_VCPU_VA_SHIFT-1)) & 1;
-    unsigned int vcpu_area   = (offset >> GDT_LDT_VCPU_VA_SHIFT);
-
-    /*
-     * If the fault is in another vcpu's area, it cannot be due to
-     * a GDT/LDT descriptor load. Thus we can reasonably exit immediately, and
-     * indeed we have to since pv_map_ldt_shadow_page() works correctly only on
-     * accesses to a vcpu's own area.
-     */
-    if ( vcpu_area != curr->vcpu_id )
-        return 0;
-
-    /* Byte offset within the gdt/ldt sub-area. */
-    offset &= (1UL << (GDT_LDT_VCPU_VA_SHIFT-1)) - 1UL;
-
-    if ( likely(is_ldt_area) )
-        return handle_ldt_mapping_fault(offset, regs);
-
-    /* GDT fault: handle the fault as #GP[sel]. */
-    regs->error_code = offset & ~(X86_XEC_EXT | X86_XEC_IDT | X86_XEC_TI);
-    do_general_protection(regs);
-
-    return EXCRET_fault_fixed;
-}
-
 #define IN_HYPERVISOR_RANGE(va) \
     (((va) >= HYPERVISOR_VIRT_START) && ((va) < HYPERVISOR_VIRT_END))
 
@@ -1339,9 +1309,9 @@ static int fixup_page_fault(unsigned long addr, struct cpu_user_regs *regs)
     if ( unlikely(IN_HYPERVISOR_RANGE(addr)) )
     {
         if ( !(regs->error_code & (PFEC_user_mode | PFEC_reserved_bit)) &&
-             (addr >= GDT_LDT_VIRT_START) && (addr < GDT_LDT_VIRT_END) )
-            return handle_gdt_ldt_mapping_fault(
-                addr - GDT_LDT_VIRT_START, regs);
+             (addr >= PERCPU_LDT_MAPPING) && (addr < PERCPU_LDT_MAPPING_END) )
+            return handle_ldt_mapping_fault(addr - PERCPU_LDT_MAPPING, regs);
+
         return 0;
     }
 

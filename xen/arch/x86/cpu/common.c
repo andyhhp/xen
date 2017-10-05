@@ -734,11 +734,6 @@ void load_system_tables(void)
 	struct desc_struct *compat_gdt =
 		this_cpu(compat_gdt_table) - FIRST_RESERVED_GDT_ENTRY;
 
-	const struct desc_ptr gdtr = {
-		.base = (unsigned long)gdt,
-		.limit = LAST_RESERVED_GDT_BYTE,
-	};
-
 	*tss = (struct tss_struct){
 		/* Main stack for interrupts/exceptions. */
 		.rsp0 = stack_bottom,
@@ -774,9 +769,7 @@ void load_system_tables(void)
 		offsetof(struct tss_struct, __cacheline_filler) - 1,
 		SYS_DESC_tss_busy);
 
-	lgdt(&gdtr);
 	ltr(TSS_ENTRY << 3);
-	lldt(0);
 
 	/*
 	 * Bottom-of-stack must be 16-byte aligned!

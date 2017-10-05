@@ -255,13 +255,17 @@ void early_switch_to_idle(bool bsp)
     unsigned long cr4 = read_cr4();
 
     /*
-     * VT-x hardwires the IDT limit at 0xffff on VMExit.
+     * VT-x hardwires the GDT and IDT limit at 0xffff on VMExit.
      *
      * We don't wish to reload on vcpu context switch, so have arranged for
      * nothing else to live within 64k of the base.  Unilaterally setting the
      * limit to 0xffff avoids leaking whether HVM vcpus are running to PV
-     * guests via SIDT.
+     * guests via SGDT/SIDT.
      */
+    const struct desc_ptr gdtr = {
+        .base = PERCPU_GDT_MAPPING,
+        .limit = 0xffff,
+    };
     const struct desc_ptr idtr = {
         .base = PERCPU_IDT_MAPPING,
         .limit = 0xffff,
@@ -283,7 +287,9 @@ void early_switch_to_idle(bool bsp)
     per_cpu(curr_ptbase, cpu) = v->arch.cr3;
     per_cpu(curr_extended_directmap, cpu) = true;
 
+    lgdt(&gdtr);
     lidt(&idtr);
+    lldt(0);
 
     if ( likely(!bsp) ) /* BSP IST setup deferred. */
         enable_each_ist(idt_tables[cpu]);

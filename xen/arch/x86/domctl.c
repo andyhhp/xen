@@ -1604,8 +1604,17 @@ void arch_get_info_guest(struct vcpu *v, vcpu_guest_context_u c)
     {
         c(ldt_base = v->arch.pv_vcpu.ldt_base);
         c(ldt_ents = v->arch.pv_vcpu.ldt_ents);
-        for ( i = 0; i < ARRAY_SIZE(v->arch.pv_vcpu.gdt_frames); ++i )
-            c(gdt_frames[i] = v->arch.pv_vcpu.gdt_frames[i]);
+
+        for ( i = 0; i < MAX_PV_GDT_FRAMES; ++i )
+        {
+            paddr_t addr = l1e_get_paddr(v->arch.pv_vcpu.gdt_l1es[i]);
+
+            if ( addr == __pa(zero_page) )
+                break;
+
+            c(gdt_frames[i] = paddr_to_pfn(addr));
+        }
+
         BUILD_BUG_ON(ARRAY_SIZE(c.nat->gdt_frames) !=
                      ARRAY_SIZE(c.cmp->gdt_frames));
         for ( ; i < ARRAY_SIZE(c.nat->gdt_frames); ++i )

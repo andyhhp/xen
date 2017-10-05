@@ -399,18 +399,21 @@ struct arch_domain
 
 #define has_arch_pdevs(d)    (!list_empty(&(d)->arch.pdev_list))
 
-#define gdt_ldt_pt_idx(v) \
-      ((v)->vcpu_id >> (PAGETABLE_ORDER - GDT_LDT_VCPU_SHIFT))
-#define pv_gdt_ptes(v) \
-    ((v)->domain->arch.pv_domain.gdt_ldt_l1tab[gdt_ldt_pt_idx(v)] + \
-     (((v)->vcpu_id << GDT_LDT_VCPU_SHIFT) & (L1_PAGETABLE_ENTRIES - 1)))
-#define pv_ldt_ptes(v) (pv_gdt_ptes(v) + 16)
+#define pv_gdt ((struct desc_struct *)PERCPU_GDT_MAPPING)
+#define pv_ldt ((struct desc_struct *)PERCPU_LDT_MAPPING)
+
+#define pv_gdt_ptes \
+    ((l1_pgentry_t *)PERCPU_GDT_LDT_L1ES + l1_table_offset(PERCPU_GDT_MAPPING))
+#define pv_ldt_ptes \
+    ((l1_pgentry_t *)PERCPU_GDT_LDT_L1ES + l1_table_offset(PERCPU_LDT_MAPPING))
 
 struct pv_vcpu
 {
     struct trap_info *trap_ctxt;
 
-    unsigned long gdt_frames[FIRST_RESERVED_GDT_PAGE];
+#define MAX_PV_GDT_FRAMES FIRST_RESERVED_GDT_PAGE
+    l1_pgentry_t gdt_l1es[MAX_PV_GDT_FRAMES];
+    l1_pgentry_t ldt_l1es[16];
     unsigned long ldt_base;
     unsigned int gdt_ents, ldt_ents;
 
