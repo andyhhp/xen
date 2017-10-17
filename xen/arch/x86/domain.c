@@ -1681,6 +1681,8 @@ static void __context_switch(void)
         lgdt(&gdt_desc);
     }
 
+    load_LDT(n);
+
     if ( pd != nd )
         cpumask_clear_cpu(cpu, pd->dirty_cpumask);
     p->dirty_cpu = VCPU_CPU_CLEAN;
@@ -1742,10 +1744,7 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
         local_irq_enable();
 
         if ( is_pv_domain(nextd) )
-        {
-            load_LDT(next);
             load_segments(next);
-        }
 
         ctxt_switch_levelling(next);
 

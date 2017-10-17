@@ -7,9 +7,9 @@
 static inline void load_LDT(struct vcpu *v)
 {
     struct desc_struct *desc;
-    unsigned long ents;
+    unsigned int ents = is_pv_vcpu(v) && v->arch.pv_vcpu.ldt_ents;
 
-    if ( (ents = v->arch.pv_vcpu.ldt_ents) == 0 )
+    if ( ents == 0 )
         lldt(0);
     else
     {
