@@ -640,6 +640,9 @@ static void __init noreturn reinit_bsp_stack(void)
 {
     unsigned long *stack = (void*)(get_stack_bottom() & ~(STACK_SIZE - 1));
 
+    /* Sanity check that IST settings weren't set up before this point. */
+    ASSERT(MASK_EXTR(idt_tables[0][TRAP_nmi].a, 7UL << 32) == 0);
+
     /* Update TSS and ISTs */
     load_system_tables();
 
@@ -709,7 +712,19 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     percpu_init_areas();
 
     init_idt_traps();
-    load_system_tables();
+    {
+        const struct desc_ptr gdtr = {
+            .base = (unsigned long)this_cpu(gdt_table) - FIRST_RESERVED_GDT_BYTE,
+            .limit = LAST_RESERVED_GDT_BYTE,
+        };
+        const struct desc_ptr idtr = {
+            .base = (unsigned long)idt_table,
+            .limit = (IDT_ENTRIES * sizeof(idt_entry_t)) - 1,
+        };
+
+        lgdt(&gdtr);
+        lidt(&idtr);
+    }
 
     smp_prepare_boot_cpu();
     sort_exception_tables();
