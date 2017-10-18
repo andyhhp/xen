@@ -251,15 +251,15 @@ static void __init noreturn efi_arch_post_exit_boot(void)
 #endif
                    "movabs $__start_xen, %[rip]\n\t"
                    "lgdt   gdt_descr(%%rip)\n\t"
-                   "mov    stack_start(%%rip), %%rsp\n\t"
+                   "lea    %c[stkoff] + cpu0_stack(%%rip), %%rsp\n\t"
                    "mov    %[ds], %%ss\n\t"
                    "mov    %[ds], %%ds\n\t"
                    "mov    %[ds], %%es\n\t"
                    "mov    %[ds], %%fs\n\t"
                    "mov    %[ds], %%gs\n\t"
-                   "movl   %[cs], 8(%%rsp)\n\t"
-                   "mov    %[rip], (%%rsp)\n\t"
-                   "lretq  %[stkoff]-16"
+                   "push   %[cs]\n\t"
+                   "push   %[rip]\n\t"
+                   "lretq"
                    : [rip] "=&r" (efer/* any dead 64-bit variable */),
                      [cr4] "+&r" (cr4)
                    : [cr3] "r" (idle_pg_table),

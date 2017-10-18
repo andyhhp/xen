@@ -69,8 +69,6 @@ void smp_send_call_function_mask(const cpumask_t *mask);
 
 int alloc_cpu_id(void);
 
-extern void *stack_base[NR_CPUS];
-
 void initialize_cpu_data(unsigned int cpu);
 
 #endif /* __XEN_SMP_H__ */

@@ -87,8 +87,6 @@ static enum cpu_state {
 } cpu_state;
 #define set_cpu_state(state) do { smp_mb(); cpu_state = (state); } while (0)
 
-void *stack_base[NR_CPUS];
-
 void initialize_cpu_data(unsigned int cpu)
 {
     cpu_data[cpu] = boot_cpu_data;
@@ -401,7 +399,6 @@ void start_secondary(void *unused)
 
 /* Used to pass percpu_idle_pt to the booting AP. */
 paddr_t ap_cr3;
-extern void *stack_start;
 
 static int wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
 {
@@ -544,7 +541,6 @@ static int do_boot_cpu(int apicid, int cpu)
                cpu, apicid, start_eip);
 
     ap_cr3 = per_cpu(percpu_idle_pt, cpu);
-    stack_start = stack_base[cpu];
 
     /* This grunge runs the startup process for the targeted processor. */
 
@@ -1249,13 +1245,6 @@ static void cpu_smpboot_free(unsigned int cpu)
     free_xenheap_page(idt_tables[cpu]);
     idt_tables[cpu] = NULL;
 
-    if ( stack_base[cpu] != NULL )
-    {
-        memguard_unguard_stack(stack_base[cpu]);
-        free_xenheap_pages(stack_base[cpu], STACK_ORDER);
-        stack_base[cpu] = NULL;
-    }
-
     if ( per_cpu(percpu_idle_pt, cpu) )
     {
         free_domheap_page(maddr_to_page(per_cpu(percpu_idle_pt, cpu)));
@@ -1276,11 +1265,6 @@ static int cpu_smpboot_alloc(unsigned int cpu)
 
     if ( node != NUMA_NO_NODE )
         memflags = MEMF_node(node);
-
-    stack_base[cpu] = alloc_xenheap_pages(STACK_ORDER, memflags);
-    if ( stack_base[cpu] == NULL )
-        goto out;
-    memguard_guard_stack(stack_base[cpu]);
 
     order = get_order_from_pages(NR_RESERVED_GDT_PAGES);
     per_cpu(gdt_table, cpu) = gdt = alloc_xenheap_pages(order, memflags);
@@ -1401,8 +1385,6 @@ void __init smp_prepare_cpus(void)
 
     boot_cpu_physical_apicid = get_apic_id();
     x86_cpu_to_apicid[0] = boot_cpu_physical_apicid;
-
-    stack_base[0] = stack_start;
 
     rc = setup_cpu_root_pgt(0);
     if ( rc )

@@ -666,8 +666,6 @@ static void noinline init_done(void)
 /* Reinitalise all state referring to the old virtual address of the stack. */
 static void __init noreturn reinit_bsp_stack(void)
 {
-    unsigned long *stack = (void*)(get_stack_bottom() & ~(STACK_SIZE - 1));
-
     /* Sanity check that IST settings weren't set up before this point. */
     ASSERT(MASK_EXTR(idt_tables[0][TRAP_nmi].a, 7UL << 32) == 0);
 
@@ -678,9 +676,6 @@ static void __init noreturn reinit_bsp_stack(void)
 
     /* Update SYSCALL trampolines */
     percpu_traps_init();
-
-    stack_base[0] = stack;
-    memguard_guard_stack(stack);
 
     reset_stack_and_jump(init_done);
 }
@@ -1819,11 +1814,25 @@ void __init noreturn __start_xen(unsigned long mbi_p)
 
     setup_io_bitmap(dom0);
 
-    /* Jump to the 1:1 virtual mappings of cpu0_stack. */
-    asm volatile ("mov %[stk], %%rsp; jmp %c[fn]" ::
-                  [stk] "g" (__va(__pa(get_stack_bottom()))),
-                  [fn] "i" (reinit_bsp_stack) : "memory");
-    unreachable();
+    /*
+     * Switch from cpu0_stack to the percpu stack, copying the non-GPR
+     * cpu_info data into place before hand.
+     */
+    {
+        const struct cpu_info *src = get_cpu_info();
+        struct cpu_info *dst = _p(PERCPU_STACK_MAPPING + STACK_SIZE -
+                                  sizeof(*dst));
+
+        dst->processor_id   = src->processor_id;
+        dst->current_vcpu   = src->current_vcpu;
+        dst->per_cpu_offset = src->per_cpu_offset;
+        dst->cr4            = src->cr4;
+
+        asm volatile ("mov %[stk], %%rsp; jmp %c[fn]" ::
+                      [stk] "g" (&dst->guest_cpu_user_regs.es),
+                      [fn] "i" (reinit_bsp_stack) : "memory");
+        unreachable();
+    }
 }
 
 void arch_get_xen_caps(xen_capabilities_info_t *info)

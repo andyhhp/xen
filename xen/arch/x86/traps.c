@@ -384,9 +384,6 @@ unsigned long get_stack_trace_bottom(unsigned long sp)
         return ROUNDUP(sp, PAGE_SIZE) -
             offsetof(struct cpu_user_regs, es) - sizeof(unsigned long);
 
-#ifndef MEMORY_GUARD
-    case 3 ... 5:
-#endif
     case 6 ... 7:
         return ROUNDUP(sp, STACK_SIZE) -
             sizeof(struct cpu_info) - sizeof(unsigned long);
@@ -403,9 +400,6 @@ unsigned long get_stack_dump_bottom(unsigned long sp)
     case 0 ... 2:
         return ROUNDUP(sp, PAGE_SIZE) - sizeof(unsigned long);
 
-#ifndef MEMORY_GUARD
-    case 3 ... 5:
-#endif
     case 6 ... 7:
         return ROUNDUP(sp, STACK_SIZE) - sizeof(unsigned long);
 
@@ -546,9 +540,9 @@ void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs)
     unsigned long esp_top, esp_bottom;
 #endif
 
-    if ( _p(curr_stack_base) != stack_base[cpu] )
+    if ( curr_stack_base != PERCPU_STACK_MAPPING )
         printk("Current stack base %p differs from expected %p\n",
-               _p(curr_stack_base), stack_base[cpu]);
+               _p(curr_stack_base), _p(PERCPU_STACK_MAPPING));
 
 #ifdef MEMORY_GUARD
     esp_bottom = (esp | (STACK_SIZE - 1)) + 1;

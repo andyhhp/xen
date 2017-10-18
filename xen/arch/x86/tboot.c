@@ -243,29 +243,6 @@ static void tboot_gen_domain_integrity(const uint8_t key[TB_KEY_SIZE],
     memset(&ctx, 0, sizeof(ctx));
 }
 
-/*
- * For stack overflow detection in debug build, a guard page is set up.
- * This fn is used to detect whether a page is in the guarded pages for
- * the above reason.
- */
-static int mfn_in_guarded_stack(unsigned long mfn)
-{
-    void *p;
-    int i;
-
-    for ( i = 0; i < nr_cpu_ids; i++ )
-    {
-        if ( !stack_base[i] )
-            continue;
-        p = (void *)((unsigned long)stack_base[i] + STACK_SIZE -
-                     PRIMARY_STACK_SIZE - PAGE_SIZE);
-        if ( mfn == virt_to_mfn(p) )
-            return -1;
-    }
-
-    return 0;
-}
-
 static void tboot_gen_xenheap_integrity(const uint8_t key[TB_KEY_SIZE],
                                         vmac_t *mac)
 {
@@ -290,12 +267,8 @@ static void tboot_gen_xenheap_integrity(const uint8_t key[TB_KEY_SIZE],
 
         if ( is_page_in_use(page) && is_xen_heap_page(page) )
         {
-            void *pg;
+            void *pg = mfn_to_virt(mfn);
 
-            if ( mfn_in_guarded_stack(mfn) )
-                continue; /* skip guard stack, see memguard_guard_stack() in mm.c */
-
-            pg = mfn_to_virt(mfn);
             vmac_update((uint8_t *)pg, PAGE_SIZE, &ctx);
         }
     }

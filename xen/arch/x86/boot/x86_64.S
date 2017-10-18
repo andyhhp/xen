@@ -15,21 +15,25 @@ ENTRY(__high_start)
         mov     $XEN_MINIMAL_CR4,%rcx
         mov     %rcx,%cr4
 
-        /* Set up %cr3 (differs between BSP and APs). */
+        /* Set up %cr3 and %rsp (differs between BSP and APs). */
         test    %ebx, %ebx
         jz      .Lbsp_setup
 
         /* APs switch onto percpu_idle_pt[], as provided by do_boot_cpu(). */
         mov     ap_cr3(%rip), %rax
         mov     %rax, %cr3
+
+        /* APs move straight onto the PERCPU stack. */
+        movabs  $STACK_SIZE - CPUINFO_sizeof + PERCPU_STACK_MAPPING, %rsp
+
         jmp     .Ldone
 
 .Lbsp_setup:
         /* The BSP stays on the idle_pg_table[] during early boot. */
-.Ldone:
 
-        mov     stack_start(%rip),%rsp
-        or      $(STACK_SIZE-CPUINFO_sizeof),%rsp
+        /* The BSP starts on cpu0_stack. */
+        lea     STACK_SIZE - CPUINFO_sizeof + cpu0_stack(%rip), %rsp
+.Ldone:
 
         /* Reset EFLAGS (subsumes CLI and CLD). */
         pushq   $0
@@ -60,9 +64,6 @@ multiboot_ptr:
 GLOBAL(gdt_descr)
         .word   LAST_RESERVED_GDT_BYTE
         .quad   boot_cpu_gdt_table - FIRST_RESERVED_GDT_BYTE
-
-GLOBAL(stack_start)
-        .quad   cpu0_stack
 
         .section .data.page_aligned, "aw", @progbits
         .align PAGE_SIZE, 0

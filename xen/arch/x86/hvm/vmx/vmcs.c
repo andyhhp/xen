@@ -804,15 +804,6 @@ static void vmx_set_host_env(struct vcpu *v)
 
     __vmwrite(HOST_TR_BASE, (unsigned long)&per_cpu(init_tss, cpu));
 
-    __vmwrite(HOST_SYSENTER_ESP, get_stack_bottom());
-
-    /*
-     * Skip end of cpu_user_regs when entering the hypervisor because the
-     * CPU does not save context onto the stack. SS,RSP,CS,RIP,RFLAGS,etc
-     * all get saved into the VMCS instead.
-     */
-    __vmwrite(HOST_RSP,
-              (unsigned long)&get_cpu_info()->guest_cpu_user_regs.error_code);
 }
 
 void vmx_clear_msr_intercept(struct vcpu *v, unsigned int msr,
@@ -1148,13 +1139,21 @@ static int construct_vmcs(struct vcpu *v)
     __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
     __vmwrite(HOST_CR4, mmu_cr4_features);
 
-    /* Host CS:RIP. */
+    /* Host code/stack. */
     __vmwrite(HOST_CS_SELECTOR, __HYPERVISOR_CS);
     __vmwrite(HOST_RIP, (unsigned long)vmx_asm_vmexit_handler);
+    __vmwrite(HOST_RSP, /* VMExit doesn't push an excpetion frame. */
+              (PERCPU_STACK_MAPPING + STACK_SIZE -
+               sizeof(struct cpu_info) +
+               offsetof(struct cpu_info, guest_cpu_user_regs.error_code)));
 
-    /* Host SYSENTER CS:RIP. */
+    /* Host SYSENTER code/stack. */
     __vmwrite(HOST_SYSENTER_CS, __HYPERVISOR_CS);
     __vmwrite(HOST_SYSENTER_EIP, (unsigned long)sysenter_entry);
+    __vmwrite(HOST_SYSENTER_ESP,
+              (PERCPU_STACK_MAPPING + STACK_SIZE -
+               sizeof(struct cpu_info) +
+               offsetof(struct cpu_info, guest_cpu_user_regs.es)));
 
     /* MSR intercepts. */
     __vmwrite(VM_EXIT_MSR_LOAD_COUNT, 0);
