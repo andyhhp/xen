@@ -296,6 +296,8 @@ extern unsigned long xen_phys_start;
 #define PERCPU_LDT_MAPPING       (PERCPU_LINEAR_START + MB(11))
 #define PERCPU_LDT_MAPPING_END   (PERCPU_LDT_MAPPING + 0x10000)
 
+#define PERCPU_STACK_MAPPING     (PERCPU_LINEAR_START + MB(12))
+
 #define MAX_VIRT_CPUS            8192
 
 #define NATIVE_VM_ASSIST_VALID   ((1UL << VMASST_TYPE_4gb_segments)        | \

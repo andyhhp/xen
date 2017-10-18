@@ -946,7 +946,7 @@ static int percpu_alloc_frame(unsigned int cpu, unsigned long linear,
 /* Allocate data common between the BSP and APs. */
 static int cpu_smpboot_alloc_common(unsigned int cpu)
 {
-    unsigned int memflags = 0;
+    unsigned int memflags = 0, i;
     nodeid_t node = cpu_to_node(cpu);
     l4_pgentry_t *l4t = NULL;
     l3_pgentry_t *l3t = NULL;
@@ -1026,6 +1026,31 @@ static int cpu_smpboot_alloc_common(unsigned int cpu)
                           virt_to_page(zero_page), __PAGE_HYPERVISOR_RO);
     if ( rc )
         goto out;
+
+    /* Allocate the stack. */
+    for ( i = 0; i < 8; ++i )
+    {
+        BUILD_BUG_ON((1u << STACK_ORDER) != 8);
+        BUILD_BUG_ON(!IS_ALIGNED(PERCPU_STACK_MAPPING, STACK_SIZE));
+        BUILD_BUG_ON((sizeof(struct cpu_info) -
+                      offsetof(struct cpu_info, guest_cpu_user_regs.es)) & 0xf);
+
+        /*
+         * Pages 0-2: #DF, #NMI, #MCE IST stacks
+         * Pages 3-5: Guard pages - UNMAPPED
+         * Pages 6-7: Main stack
+         */
+        if ( i == 3 )
+        {
+            i = 5;
+            continue;
+        }
+
+        rc = percpu_alloc_frame(cpu, PERCPU_STACK_MAPPING + i * PAGE_SIZE, NULL,
+                                PAGE_HYPERVISOR_RW | MAP_PERCPU_AUTOFREE);
+        if ( rc )
+            goto out;
+    }
 
     rc = 0; /* Success */
 
