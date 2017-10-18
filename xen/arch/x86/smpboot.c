@@ -984,6 +984,12 @@ static int cpu_smpboot_alloc_common(unsigned int cpu)
     if ( rc )
         goto out;
 
+    /* Map the TSS. */
+    rc = percpu_map_frame(cpu, PERCPU_TSS_MAPPING,
+                          virt_to_page(&global_tss), PAGE_HYPERVISOR_RO);
+    if ( rc )
+        goto out;
+
     /* Allocate space for the mapcache L1e's... */
     rc = percpu_alloc_l1t(cpu, PERCPU_MAPCACHE_START, &pg);
     if ( rc )

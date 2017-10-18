@@ -283,6 +283,7 @@ extern unsigned long xen_phys_start;
 
 /* Mappings in the percpu area: */
 #define PERCPU_IDT_MAPPING       (PERCPU_LINEAR_START + KB(4))
+#define PERCPU_TSS_MAPPING       (PERCPU_LINEAR_START + KB(128))
 
 #define PERCPU_MAPCACHE_L1ES     (PERCPU_LINEAR_START + MB(2) + KB(12))
 #define PERCPU_MAPCACHE_START    (PERCPU_LINEAR_START + MB(4))

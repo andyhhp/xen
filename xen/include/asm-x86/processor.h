@@ -434,6 +434,8 @@ static inline void disable_each_ist(idt_entry_t *idt)
 extern idt_entry_t idt_table[];
 extern idt_entry_t *idt_tables[];
 
+extern const struct tss_struct global_tss;
+
 DECLARE_PER_CPU(struct tss_struct, init_tss);
 DECLARE_PER_CPU(root_pgentry_t *, root_pgt);
 

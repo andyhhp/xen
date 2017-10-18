@@ -108,6 +108,35 @@ idt_entry_t __section(".bss.page_aligned") __aligned(PAGE_SIZE)
 /* Pointer to the IDT of every CPU. */
 idt_entry_t *idt_tables[NR_CPUS] __read_mostly;
 
+/* Global TSS.  All stack entry points are identical on each CPU. */
+const struct tss_struct global_tss
+__section(".rodata.page_aligned") __aligned(PAGE_SIZE) =
+{
+    /* Main stack for interrupts/exceptions. */
+    .rsp0 = (PERCPU_STACK_MAPPING + STACK_SIZE -
+             sizeof(struct cpu_info) +
+             offsetof(struct cpu_info, guest_cpu_user_regs.es)) ,
+
+    /* Ring 1 and 2 stacks poisoned. */
+    .rsp1 = 0x8600111111111111ul,
+    .rsp2 = 0x8600111111111111ul,
+
+    /*
+     * MCE, NMI and Double Fault handlers get their own stacks.
+     * All others poisoned.
+     */
+    .ist = {
+        [IST_MCE - 1] = PERCPU_STACK_MAPPING + IST_MCE * PAGE_SIZE,
+        [IST_DF  - 1] = PERCPU_STACK_MAPPING + IST_DF  * PAGE_SIZE,
+        [IST_NMI - 1] = PERCPU_STACK_MAPPING + IST_NMI * PAGE_SIZE,
+
+        [IST_MAX ... ARRAY_SIZE(global_tss.ist) - 1] =
+            0x8600111111111111ul,
+    },
+
+    .bitmap = IOBMP_INVALID_OFFSET,
+};
+
 bool (*ioemul_handle_quirk)(
     u8 opcode, char *io_emul_stub, struct cpu_user_regs *regs);
 
