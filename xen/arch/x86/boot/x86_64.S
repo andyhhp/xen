@@ -15,6 +15,19 @@ ENTRY(__high_start)
         mov     $XEN_MINIMAL_CR4,%rcx
         mov     %rcx,%cr4
 
+        /* Set up %cr3 (differs between BSP and APs). */
+        test    %ebx, %ebx
+        jz      .Lbsp_setup
+
+        /* APs switch onto percpu_idle_pt[], as provided by do_boot_cpu(). */
+        mov     ap_cr3(%rip), %rax
+        mov     %rax, %cr3
+        jmp     .Ldone
+
+.Lbsp_setup:
+        /* The BSP stays on the idle_pg_table[] during early boot. */
+.Ldone:
+
         mov     stack_start(%rip),%rsp
         or      $(STACK_SIZE-CPUINFO_sizeof),%rsp
 

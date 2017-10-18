@@ -317,7 +317,6 @@ void start_secondary(void *unused)
     /* Critical region without IDT or TSS.  Any fault is deadly! */
 
     set_processor_id(cpu);
-    get_cpu_info()->cr4 = XEN_MINIMAL_CR4;
 
     early_switch_to_idle(false);
 
@@ -400,6 +399,8 @@ void start_secondary(void *unused)
     startup_cpu_idle_loop();
 }
 
+/* Used to pass percpu_idle_pt to the booting AP. */
+paddr_t ap_cr3;
 extern void *stack_start;
 
 static int wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
@@ -542,6 +543,7 @@ static int do_boot_cpu(int apicid, int cpu)
         printk("Booting processor %d/%d eip %lx\n",
                cpu, apicid, start_eip);
 
+    ap_cr3 = per_cpu(percpu_idle_pt, cpu);
     stack_start = stack_base[cpu];
 
     /* This grunge runs the startup process for the targeted processor. */

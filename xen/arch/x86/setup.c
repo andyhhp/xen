@@ -252,7 +252,6 @@ void early_switch_to_idle(bool bsp)
 {
     unsigned int cpu = smp_processor_id();
     struct vcpu *v = idle_vcpu[cpu];
-    unsigned long cr4 = read_cr4();
 
     /*
      * VT-x hardwires the GDT and IDT limit at 0xffff on VMExit.
@@ -275,14 +274,6 @@ void early_switch_to_idle(bool bsp)
     per_cpu(curr_vcpu, cpu) = v;
 
     __set_bit(_PGC_inuse_pgtable, &maddr_to_page(v->arch.cr3)->count_info);
-    asm volatile ( "mov %[npge], %%cr4;"
-                   "mov %[cr3], %%cr3;"
-                   "mov %[pge], %%cr4;"
-                   ::
-                    [npge] "r" (cr4 & ~X86_CR4_PGE),
-                    [cr3]  "r" (v->arch.cr3),
-                    [pge]  "r" (cr4)
-                   : "memory" );
 
     per_cpu(curr_ptbase, cpu) = v->arch.cr3;
     per_cpu(curr_extended_directmap, cpu) = true;
@@ -297,7 +288,19 @@ void early_switch_to_idle(bool bsp)
 
 static void __init init_idle_domain(void)
 {
+    unsigned long cr4 = read_cr4();
+
     scheduler_init();
+
+    asm volatile ( "mov %[npge], %%cr4;"
+                   "mov %[cr3], %%cr3;"
+                   "mov %[pge], %%cr4;"
+                   ::
+                    [npge] "r" (cr4 & ~X86_CR4_PGE),
+                    [cr3]  "r" (idle_vcpu[0]->arch.cr3),
+                    [pge]  "r" (cr4)
+                   : "memory" );
+
     early_switch_to_idle(true);
 }
 
