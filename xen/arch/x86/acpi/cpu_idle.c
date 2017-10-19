@@ -247,23 +247,23 @@ static void get_hw_residencies(uint32_t cpu, struct hw_residencies *hw_res)
 
 static void print_hw_residencies(uint32_t cpu)
 {
-    struct hw_residencies hw_res;
+    struct hw_residencies *hw_res = get_smp_ipi_buf(struct hw_residencies);
 
-    get_hw_residencies(cpu, &hw_res);
+    get_hw_residencies(cpu, hw_res);
 
-    if ( hw_res.mc0 | hw_res.mc6 )
+    if ( hw_res->mc0 | hw_res->mc6 )
         printk("MC0[%"PRIu64"] MC6[%"PRIu64"]\n",
-               hw_res.mc0, hw_res.mc6);
+               hw_res->mc0, hw_res->mc6);
     printk("PC2[%"PRIu64"] PC%d[%"PRIu64"] PC6[%"PRIu64"] PC7[%"PRIu64"]\n",
-           hw_res.pc2,
-           hw_res.pc4 ? 4 : 3, hw_res.pc4 ?: hw_res.pc3,
-           hw_res.pc6, hw_res.pc7);
-    if ( hw_res.pc8 | hw_res.pc9 | hw_res.pc10 )
+           hw_res->pc2,
+           hw_res->pc4 ? 4 : 3, hw_res->pc4 ?: hw_res->pc3,
+           hw_res->pc6, hw_res->pc7);
+    if ( hw_res->pc8 | hw_res->pc9 | hw_res->pc10 )
         printk("PC8[%"PRIu64"] PC9[%"PRIu64"] PC10[%"PRIu64"]\n",
-               hw_res.pc8, hw_res.pc9, hw_res.pc10);
+               hw_res->pc8, hw_res->pc9, hw_res->pc10);
     printk("CC%d[%"PRIu64"] CC6[%"PRIu64"] CC7[%"PRIu64"]\n",
-           hw_res.cc1 ? 1 : 3, hw_res.cc1 ?: hw_res.cc3,
-           hw_res.cc6, hw_res.cc7);
+           hw_res->cc1 ? 1 : 3, hw_res->cc1 ?: hw_res->cc3,
+           hw_res->cc6, hw_res->cc7);
 }
 
 static char* acpi_cstate_method_name[] =
@@ -1277,7 +1277,7 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
     }
     else
     {
-        struct hw_residencies hw_res;
+        struct hw_residencies *hw_res = get_smp_ipi_buf(struct hw_residencies);
         signed int last_state_idx;
 
         stat->nr = power->count;
@@ -1311,13 +1311,13 @@ int pmstat_get_cx_stat(uint32_t cpuid, struct pm_cx_stat *stat)
             idle_res += res[i];
         }
 
-        get_hw_residencies(cpuid, &hw_res);
+        get_hw_residencies(cpuid, hw_res);
 
 #define PUT_xC(what, n) do { \
         if ( stat->nr_##what >= n && \
-             copy_to_guest_offset(stat->what, n - 1, &hw_res.what##n, 1) ) \
+             copy_to_guest_offset(stat->what, n - 1, &hw_res->what##n, 1) ) \
             return -EFAULT; \
-        if ( hw_res.what##n ) \
+        if ( hw_res->what##n ) \
             nr_##what = n; \
     } while ( 0 )
 #define PUT_PC(n) PUT_xC(pc, n)

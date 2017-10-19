@@ -730,21 +730,21 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
 
     case XENPF_resource_op:
     {
-        struct resource_access ra;
+        struct resource_access *ra = get_smp_ipi_buf(struct resource_access);
         unsigned int cpu;
         XEN_GUEST_HANDLE(xenpf_resource_entry_t) guest_entries;
 
-        ra.nr_entries = op->u.resource_op.nr_entries;
-        if ( ra.nr_entries == 0 )
+        ra->nr_entries = op->u.resource_op.nr_entries;
+        if ( ra->nr_entries == 0 )
             break;
-        if ( ra.nr_entries > RESOURCE_ACCESS_MAX_ENTRIES )
+        if ( ra->nr_entries > RESOURCE_ACCESS_MAX_ENTRIES )
         {
             ret = -EINVAL;
             break;
         }
 
-        ra.entries = xmalloc_array(xenpf_resource_entry_t, ra.nr_entries);
-        if ( !ra.entries )
+        ra->entries = xmalloc_array(xenpf_resource_entry_t, ra->nr_entries);
+        if ( !ra->entries )
         {
             ret = -ENOMEM;
             break;
@@ -752,46 +752,46 @@ ret_t do_platform_op(XEN_GUEST_HANDLE_PARAM(xen_platform_op_t) u_xenpf_op)
 
         guest_from_compat_handle(guest_entries, op->u.resource_op.entries);
 
-        if ( copy_from_guest(ra.entries, guest_entries, ra.nr_entries) )
+        if ( copy_from_guest(ra->entries, guest_entries, ra->nr_entries) )
         {
-            xfree(ra.entries);
+            xfree(ra->entries);
             ret = -EFAULT;
             break;
         }
 
         /* Do sanity check earlier to omit the potential IPI overhead. */
-        check_resource_access(&ra);
-        if ( ra.nr_done == 0 )
+        check_resource_access(ra);
+        if ( ra->nr_done == 0 )
         {
             /* Copy the return value for entry 0 if it failed. */
-            if ( __copy_to_guest(guest_entries, ra.entries, 1) )
+            if ( __copy_to_guest(guest_entries, ra->entries, 1) )
                 ret = -EFAULT;
 
-            xfree(ra.entries);
+            xfree(ra->entries);
             break;
         }
 
         cpu = op->u.resource_op.cpu;
         if ( (cpu >= nr_cpu_ids) || !cpu_online(cpu) )
         {
-            xfree(ra.entries);
+            xfree(ra->entries);
             ret = -ENODEV;
             break;
         }
         if ( cpu == smp_processor_id() )
-            resource_access(&ra);
+            resource_access(ra);
         else
-            on_selected_cpus(cpumask_of(cpu), resource_access, &ra, 1);
+            on_selected_cpus(cpumask_of(cpu), resource_access, ra, 1);
 
         /* Copy all if succeeded or up to the failed entry. */
-        if ( __copy_to_guest(guest_entries, ra.entries,
-                             ra.nr_done < ra.nr_entries ? ra.nr_done + 1
-                                                        : ra.nr_entries) )
+        if ( __copy_to_guest(guest_entries, ra->entries,
+                             ra->nr_done < ra->nr_entries ? ra->nr_done + 1
+                                                        : ra->nr_entries) )
             ret = -EFAULT;
         else
-            ret = ra.nr_done;
+            ret = ra->nr_done;
 
-        xfree(ra.entries);
+        xfree(ra->entries);
     }
     break;
 

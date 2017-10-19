@@ -1285,8 +1285,9 @@ static int write_psr_msrs(unsigned int socket, unsigned int cos,
                           enum psr_feat_type feat_type)
 {
     struct psr_socket_info *info = get_socket_info(socket);
-    struct cos_write_info data =
-    {
+    struct cos_write_info *data = get_smp_ipi_buf(struct cos_write_info);
+
+    *data = (struct cos_write_info){
         .cos = cos,
         .val = val,
         .array_len = array_len,
@@ -1296,14 +1297,14 @@ static int write_psr_msrs(unsigned int socket, unsigned int cos,
         return -EINVAL;
 
     if ( socket == cpu_to_socket(smp_processor_id()) )
-        do_write_psr_msrs(&data);
+        do_write_psr_msrs(data);
     else
     {
         unsigned int cpu = get_socket_cpu(socket);
 
         if ( cpu >= nr_cpu_ids )
             return -ENOTSOCK;
-        on_selected_cpus(cpumask_of(cpu), do_write_psr_msrs, &data, 1);
+        on_selected_cpus(cpumask_of(cpu), do_write_psr_msrs, data, 1);
     }
 
     return 0;

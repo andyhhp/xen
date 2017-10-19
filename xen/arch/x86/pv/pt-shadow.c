@@ -367,35 +367,35 @@ static void _pt_shadow_ipi(void *arg)
 void pt_shadow_l4_write(const struct domain *d, const struct page_info *pg,
                         unsigned int slot)
 {
-    struct ptsh_ipi_info info;
+    struct ptsh_ipi_info *info = get_smp_ipi_buf(struct ptsh_ipi_info);
 
     if ( !pt_need_shadow(d) )
         return;
 
-    info = (struct ptsh_ipi_info){
+    *info = (struct ptsh_ipi_info){
         .d = d,
         .pg = pg,
         .op = PTSH_IPI_WRITE,
         .slot = slot,
     };
 
-    on_selected_cpus(d->domain_dirty_cpumask, _pt_shadow_ipi, &info, 1);
+    on_selected_cpus(d->domain_dirty_cpumask, _pt_shadow_ipi, info, 1);
 }
 
 void pt_shadow_l4_invlpg(const struct domain *d, const struct page_info *pg)
 {
-    struct ptsh_ipi_info info;
+    struct ptsh_ipi_info *info = get_smp_ipi_buf(struct ptsh_ipi_info);
 
     if ( !pt_need_shadow(d) )
         return;
 
-    info = (struct ptsh_ipi_info){
+    *info = (struct ptsh_ipi_info){
         .d = d,
         .pg = pg,
         .op = PTSH_IPI_INVLPG,
     };
 
-    on_selected_cpus(d->domain_dirty_cpumask, _pt_shadow_ipi, &info, 1);
+    on_selected_cpus(d->domain_dirty_cpumask, _pt_shadow_ipi, info, 1);
 }
 
 /*

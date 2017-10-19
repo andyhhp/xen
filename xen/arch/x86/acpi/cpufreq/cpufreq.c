@@ -198,7 +198,7 @@ static u32 get_cur_val(const cpumask_t *mask)
 {
     struct cpufreq_policy *policy;
     struct processor_performance *perf;
-    struct drv_cmd cmd;
+    struct drv_cmd *cmd = get_smp_ipi_buf(struct drv_cmd);
     unsigned int cpu = smp_processor_id();
 
     if (unlikely(cpumask_empty(mask)))
@@ -215,23 +215,23 @@ static u32 get_cur_val(const cpumask_t *mask)
 
     switch (cpufreq_drv_data[policy->cpu]->arch_cpu_flags) {
     case SYSTEM_INTEL_MSR_CAPABLE:
-        cmd.type = SYSTEM_INTEL_MSR_CAPABLE;
-        cmd.addr.msr.reg = MSR_IA32_PERF_STATUS;
+        cmd->type = SYSTEM_INTEL_MSR_CAPABLE;
+        cmd->addr.msr.reg = MSR_IA32_PERF_STATUS;
         break;
     case SYSTEM_IO_CAPABLE:
-        cmd.type = SYSTEM_IO_CAPABLE;
+        cmd->type = SYSTEM_IO_CAPABLE;
         perf = cpufreq_drv_data[policy->cpu]->acpi_data;
-        cmd.addr.io.port = perf->control_register.address;
-        cmd.addr.io.bit_width = perf->control_register.bit_width;
+        cmd->addr.io.port = perf->control_register.address;
+        cmd->addr.io.bit_width = perf->control_register.bit_width;
         break;
     default:
         return 0;
     }
 
-    cmd.mask = cpumask_of(cpu);
+    cmd->mask = cpumask_of(cpu);
 
-    drv_read(&cmd);
-    return cmd.val;
+    drv_read(cmd);
+    return cmd->val;
 }
 
 struct perf_pair {
@@ -270,7 +270,7 @@ static void read_measured_perf_ctrs(void *_readin)
 unsigned int get_measured_perf(unsigned int cpu, unsigned int flag)
 {
     struct cpufreq_policy *policy;    
-    struct perf_pair readin, cur, *saved;
+    struct perf_pair *readin = get_smp_ipi_buf(struct perf_pair), cur, *saved;
     unsigned int perf_percent;
     unsigned int retval;
 
@@ -298,16 +298,15 @@ unsigned int get_measured_perf(unsigned int cpu, unsigned int flag)
     }
 
     if (cpu == smp_processor_id()) {
-        read_measured_perf_ctrs((void *)&readin);
+        read_measured_perf_ctrs(readin);
     } else {
-        on_selected_cpus(cpumask_of(cpu), read_measured_perf_ctrs,
-                        &readin, 1);
+        on_selected_cpus(cpumask_of(cpu), read_measured_perf_ctrs, readin, 1);
     }
 
-    cur.aperf.whole = readin.aperf.whole - saved->aperf.whole;
-    cur.mperf.whole = readin.mperf.whole - saved->mperf.whole;
-    saved->aperf.whole = readin.aperf.whole;
-    saved->mperf.whole = readin.mperf.whole;
+    cur.aperf.whole = readin->aperf.whole - saved->aperf.whole;
+    cur.mperf.whole = readin->mperf.whole - saved->mperf.whole;
+    saved->aperf.whole = readin->aperf.whole;
+    saved->mperf.whole = readin->mperf.whole;
 
     if (unlikely(((unsigned long)(-1) / 100) < cur.aperf.whole)) {
         int shift_count = 7;
@@ -389,7 +388,7 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
     struct processor_performance *perf;
     struct cpufreq_freqs freqs;
     cpumask_t online_policy_cpus;
-    struct drv_cmd cmd;
+    struct drv_cmd *cmd = get_smp_ipi_buf(struct drv_cmd);
     unsigned int next_state = 0; /* Index into freq_table */
     unsigned int next_perf_state = 0; /* Index into perf table */
     unsigned int j;
@@ -424,31 +423,31 @@ static int acpi_cpufreq_target(struct cpufreq_policy *policy,
 
     switch (data->arch_cpu_flags) {
     case SYSTEM_INTEL_MSR_CAPABLE:
-        cmd.type = SYSTEM_INTEL_MSR_CAPABLE;
-        cmd.addr.msr.reg = MSR_IA32_PERF_CTL;
-        cmd.val = (u32) perf->states[next_perf_state].control;
+        cmd->type = SYSTEM_INTEL_MSR_CAPABLE;
+        cmd->addr.msr.reg = MSR_IA32_PERF_CTL;
+        cmd->val = (u32) perf->states[next_perf_state].control;
         break;
     case SYSTEM_IO_CAPABLE:
-        cmd.type = SYSTEM_IO_CAPABLE;
-        cmd.addr.io.port = perf->control_register.address;
-        cmd.addr.io.bit_width = perf->control_register.bit_width;
-        cmd.val = (u32) perf->states[next_perf_state].control;
+        cmd->type = SYSTEM_IO_CAPABLE;
+        cmd->addr.io.port = perf->control_register.address;
+        cmd->addr.io.bit_width = perf->control_register.bit_width;
+        cmd->val = (u32) perf->states[next_perf_state].control;
         break;
     default:
         return -ENODEV;
     }
 
     if (policy->shared_type != CPUFREQ_SHARED_TYPE_ANY)
-        cmd.mask = &online_policy_cpus;
+        cmd->mask = &online_policy_cpus;
     else
-        cmd.mask = cpumask_of(policy->cpu);
+        cmd->mask = cpumask_of(policy->cpu);
 
     freqs.old = perf->states[perf->state].core_frequency * 1000;
     freqs.new = data->freq_table[next_state].frequency;
 
-    drv_write(&cmd);
+    drv_write(cmd);
 
-    if (acpi_pstate_strict && !check_freqs(cmd.mask, freqs.new, data)) {
+    if (acpi_pstate_strict && !check_freqs(cmd->mask, freqs.new, data)) {
         printk(KERN_WARNING "Fail transfer to new freq %d\n", freqs.new);
         return -EAGAIN;
     }

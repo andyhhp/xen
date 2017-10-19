@@ -13,6 +13,7 @@
 #ifndef __ASSEMBLY__
 #include <xen/bitops.h>
 #include <asm/mpspec.h>
+#include <asm/hardirq.h>
 #endif
 
 #define BAD_APICID   (-1U)
@@ -88,6 +89,25 @@ static inline bool arch_ipi_param_ok(const void *_param)
     return (!is_canonical_address(param) ||
             l4_table_offset(param) != l4_table_offset(PERCPU_LINEAR_START));
 }
+
+struct smp_ipi_buf {
+#define SMP_IPI_BUF_SZ 0x70
+    char OPAQUE[SMP_IPI_BUF_SZ];
+};
+DECLARE_PER_CPU(struct smp_ipi_buf, smp_ipi_buf);
+
+/*
+ * Wrapper to obtain an IPI bounce buffer, checking that there is sufficient
+ * size.  The choice of SMP_IPI_BUF_SZ is arbitrary, and should be the size of
+ * the largest object passed into an IPI.
+ */
+#define get_smp_ipi_buf(obj)                                    \
+    ({                                                          \
+        typeof(obj) *_o = (void *)this_cpu(smp_ipi_buf).OPAQUE; \
+        BUILD_BUG_ON(sizeof(obj) > SMP_IPI_BUF_SZ);             \
+        ASSERT(!in_irq());                                      \
+        _o;                                                     \
+    })
 
 #endif /* !__ASSEMBLY__ */
 

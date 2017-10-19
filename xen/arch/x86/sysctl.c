@@ -139,7 +139,7 @@ long arch_do_sysctl(
             break;
         case XEN_SYSCTL_PSR_CMT_get_l3_cache_size:
         {
-            struct l3_cache_info info;
+            struct l3_cache_info *info = get_smp_ipi_buf(struct l3_cache_info);
             unsigned int cpu = sysctl->u.psr_cmt_op.u.l3_cache.cpu;
 
             if ( (cpu >= nr_cpu_ids) || !cpu_online(cpu) )
@@ -149,12 +149,12 @@ long arch_do_sysctl(
                 break;
             }
             if ( cpu == smp_processor_id() )
-                l3_cache_get(&info);
+                l3_cache_get(info);
             else
-                on_selected_cpus(cpumask_of(cpu), l3_cache_get, &info, 1);
+                on_selected_cpus(cpumask_of(cpu), l3_cache_get, info, 1);
 
-            ret = info.ret;
-            sysctl->u.psr_cmt_op.u.data = (ret ? 0 : info.size);
+            ret = info->ret;
+            sysctl->u.psr_cmt_op.u.data = (ret ? 0 : info->size);
             break;
         }
         case XEN_SYSCTL_PSR_CMT_get_l3_event_mask:

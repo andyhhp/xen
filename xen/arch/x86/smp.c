@@ -22,6 +22,8 @@
 #include <asm/hvm/support.h>
 #include <mach_apic.h>
 
+DEFINE_PER_CPU(struct smp_ipi_buf, smp_ipi_buf);
+
 /*
  * send_IPI_mask(cpumask, vector): sends @vector IPI to CPUs in @cpumask,
  * excluding the local CPU. @cpumask may be empty.

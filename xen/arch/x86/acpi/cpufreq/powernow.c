@@ -94,7 +94,7 @@ static int powernow_cpufreq_target(struct cpufreq_policy *policy,
     struct acpi_cpufreq_data *data = cpufreq_drv_data[policy->cpu];
     struct processor_performance *perf;
     unsigned int next_state; /* Index into freq_table */
-    unsigned int next_perf_state; /* Index into perf table */
+    unsigned int *next_perf_state = get_smp_ipi_buf(unsigned int);
     int result;
 
     if (unlikely(data == NULL ||
@@ -110,8 +110,8 @@ static int powernow_cpufreq_target(struct cpufreq_policy *policy,
     if (unlikely(result))
         return result;
 
-    next_perf_state = data->freq_table[next_state].index;
-    if (perf->state == next_perf_state) {
+    *next_perf_state = data->freq_table[next_state].index;
+    if (perf->state == *next_perf_state) {
         if (unlikely(data->arch_cpu_flags & ARCH_CPU_FLAG_RESUME)) 
             data->arch_cpu_flags &= ~ARCH_CPU_FLAG_RESUME;
         else
@@ -120,8 +120,8 @@ static int powernow_cpufreq_target(struct cpufreq_policy *policy,
 
     if (policy->shared_type == CPUFREQ_SHARED_TYPE_HW &&
         likely(policy->cpu == smp_processor_id())) {
-        transition_pstate(&next_perf_state);
-        cpufreq_statistic_update(policy->cpu, perf->state, next_perf_state);
+        transition_pstate(next_perf_state);
+        cpufreq_statistic_update(policy->cpu, perf->state, *next_perf_state);
     } else {
         cpumask_t online_policy_cpus;
         unsigned int cpu;
@@ -131,15 +131,15 @@ static int powernow_cpufreq_target(struct cpufreq_policy *policy,
         if (policy->shared_type == CPUFREQ_SHARED_TYPE_ALL ||
             unlikely(policy->cpu != smp_processor_id()))
             on_selected_cpus(&online_policy_cpus, transition_pstate,
-                             &next_perf_state, 1);
+                             next_perf_state, 1);
         else
-            transition_pstate(&next_perf_state);
+            transition_pstate(next_perf_state);
 
         for_each_cpu(cpu, &online_policy_cpus)
-            cpufreq_statistic_update(cpu, perf->state, next_perf_state);
+            cpufreq_statistic_update(cpu, perf->state, *next_perf_state);
     }
 
-    perf->state = next_perf_state;
+    perf->state = *next_perf_state;
     policy->cur = data->freq_table[next_state].frequency;
 
     return 0;
@@ -236,7 +236,7 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
     struct acpi_cpufreq_data *data;
     unsigned int result = 0;
     struct processor_performance *perf;
-    struct amd_cpu_data info;
+    struct amd_cpu_data *info = get_smp_ipi_buf(struct amd_cpu_data);
     struct cpuinfo_x86 *c = &cpu_data[policy->cpu];
 
     data = xzalloc(struct acpi_cpufreq_data);
@@ -247,7 +247,7 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
 
     data->acpi_data = &processor_pminfo[cpu]->perf;
 
-    info.perf = perf = data->acpi_data;
+    info->perf = perf = data->acpi_data;
     policy->shared_type = perf->shared_type;
 
     if (policy->shared_type == CPUFREQ_SHARED_TYPE_ALL ||
@@ -293,10 +293,10 @@ static int powernow_cpufreq_cpu_init(struct cpufreq_policy *policy)
 
     policy->governor = cpufreq_opt_governor ? : CPUFREQ_DEFAULT_GOVERNOR;
 
-    on_selected_cpus(cpumask_of(cpu), get_cpu_data, &info, 1);
+    on_selected_cpus(cpumask_of(cpu), get_cpu_data, info, 1);
 
     /* table init */
-    for (i = 0; i < perf->state_count && i <= info.max_hw_pstate; i++) {
+    for (i = 0; i < perf->state_count && i <= info->max_hw_pstate; i++) {
         if (i > 0 && perf->states[i].core_frequency >=
             data->freq_table[valid_states-1].frequency / 1000)
             continue;
