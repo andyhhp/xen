@@ -9,6 +9,9 @@
 #define CPUID5_ECX_EXTENSIONS_SUPPORTED 0x1
 #define CPUID5_ECX_INTERRUPT_BREAK	0x2
 
+#define CPUID_MWAIT_MIN_FEATURES \
+    (CPUID5_ECX_EXTENSIONS_SUPPORTED | CPUID5_ECX_INTERRUPT_BREAK)
+
 #define MWAIT_ECX_INTERRUPT_BREAK	0x1
 
 void mwait_idle_with_hints(unsigned int eax, unsigned int ecx);

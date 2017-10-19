@@ -22,10 +22,6 @@
 #define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)
 
-#define CPUID_MWAIT_LEAF                5
-#define CPUID5_ECX_EXTENSIONS_SUPPORTED 0x1
-#define CPUID5_ECX_INTERRUPT_BREAK      0x2
-
 #define CPUID_PM_LEAF                    6
 #define CPUID6_ECX_APERFMPERF_CAPABILITY 0x1
 
@@ -113,6 +109,7 @@
 #define cpu_has_aperfmperf      boot_cpu_has(X86_FEATURE_APERFMPERF)
 #define cpu_has_lfence_dispatch boot_cpu_has(X86_FEATURE_LFENCE_DISPATCH)
 #define cpu_has_no_xpti         boot_cpu_has(X86_FEATURE_NO_XPTI)
+#define cpu_has_xen_monitor     boot_cpu_has(X86_FEATURE_XEN_MONITOR)
 
 enum _cache_type {
     CACHE_TYPE_NULL = 0,

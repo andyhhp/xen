@@ -12,6 +12,7 @@
 #include <mach_apic.h>
 #include <asm/setup.h>
 #include <public/sysctl.h> /* for XEN_INVALID_{SOCKET,CORE}_ID */
+#include <asm/mwait.h>
 
 #include "cpu.h"
 
@@ -389,6 +390,12 @@ static void generic_identify(struct cpuinfo_x86 *c)
 
 	if ( cpu_has(c, X86_FEATURE_CLFLUSH) )
 		c->x86_clflush_size = ((ebx >> 8) & 0xff) * 8;
+
+	/* Xen only uses MONITOR if INTERRUPT_BREAK is available. */
+	if ( cpu_has(c, X86_FEATURE_MONITOR) &&
+	     ((cpuid_ecx(CPUID_MWAIT_LEAF) & CPUID_MWAIT_MIN_FEATURES) ==
+	      CPUID_MWAIT_MIN_FEATURES) )
+		set_bit(X86_FEATURE_XEN_MONITOR, c->x86_capability);
 
 	if ( (c->cpuid_level >= CPUID_PM_LEAF) &&
 	     (cpuid_ecx(CPUID_PM_LEAF) & CPUID6_ECX_APERFMPERF_CAPABILITY) )

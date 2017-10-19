@@ -31,3 +31,4 @@ XEN_CPUFEATURE(XEN_IBRS_CLEAR,  (FSCAPINTS+0)*32+17) /* IBRSB && IBRS clear in X
 XEN_CPUFEATURE(RSB_NATIVE,      (FSCAPINTS+0)*32+18) /* RSB overwrite needed for native */
 XEN_CPUFEATURE(RSB_VMEXIT,      (FSCAPINTS+0)*32+19) /* RSB overwrite needed for vmexit */
 XEN_CPUFEATURE(NO_XPTI,         (FSCAPINTS+0)*32+20) /* XPTI mitigation not in use */
+XEN_CPUFEATURE(XEN_MONITOR,     (FSCAPINTS+0)*32+21) /* Xen uses MONITOR */
