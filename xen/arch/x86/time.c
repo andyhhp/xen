@@ -1560,8 +1560,11 @@ static void (*time_calibration_rendezvous_fn)(void *) =
 
 static void time_calibration(void *unused)
 {
-    struct calibration_rendezvous r = {
-        .semaphore = ATOMIC_INIT(0)
+    /* Can't pass a stack pointer to an IPI. */
+    static struct calibration_rendezvous r;
+
+    r = (struct calibration_rendezvous){
+        .semaphore = ATOMIC_INIT(0),
     };
 
     if ( clocksource_is_tsc() )

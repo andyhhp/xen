@@ -59,9 +59,6 @@ u64 __read_mostly size_and_mask;
 
 const struct mtrr_ops *__read_mostly mtrr_if = NULL;
 
-static void set_mtrr(unsigned int reg, unsigned long base,
-		     unsigned long size, mtrr_type type);
-
 static const char *const mtrr_strings[MTRR_NUM_TYPES] =
 {
     "uncachable",               /* 0 */
@@ -211,21 +208,27 @@ static inline int types_compatible(mtrr_type type1, mtrr_type type2) {
 static void set_mtrr(unsigned int reg, unsigned long base,
 		     unsigned long size, mtrr_type type)
 {
+	/* Can't pass a stack pointer to an IPI. */
+	static struct set_mtrr_data data;
+
 	cpumask_t allbutself;
 	unsigned int nr_cpus;
-	struct set_mtrr_data data;
 	unsigned long flags;
+
+	ASSERT(spin_is_locked(&mtrr_mutex));
 
 	cpumask_andnot(&allbutself, &cpu_online_map,
                       cpumask_of(smp_processor_id()));
 	nr_cpus = cpumask_weight(&allbutself);
 
-	data.smp_reg = reg;
-	data.smp_base = base;
-	data.smp_size = size;
-	data.smp_type = type;
-	atomic_set(&data.count, nr_cpus);
-	atomic_set(&data.gate,0);
+	data = (struct set_mtrr_data){
+		.smp_reg  = reg,
+		.smp_base = base,
+		.smp_size = size,
+		.smp_type = type,
+		.count    = ATOMIC_INIT(nr_cpus),
+		.gate     = ATOMIC_INIT(0),
+	};
 
 	/* Start the ball rolling on other CPUs */
 	on_selected_cpus(&allbutself, ipi_handler, &data, 0);
@@ -593,7 +596,9 @@ void mtrr_ap_init(void)
 	 * 2.cpu hotadd time. We let mtrr_add/del_page hold cpuhotplug lock to
 	 * prevent mtrr entry changes
 	 */
+	mutex_lock(&mtrr_mutex);
 	set_mtrr(~0U, 0, 0, 0);
+	mutex_unlock(&mtrr_mutex);
 }
 
 /**
@@ -621,7 +626,9 @@ void mtrr_aps_sync_end(void)
 {
 	if (!use_intel())
 		return;
+	mutex_lock(&mtrr_mutex);
 	set_mtrr(~0U, 0, 0, 0);
+	mutex_unlock(&mtrr_mutex);
 	hold_mtrr_updates_on_aps = 0;
 }
 

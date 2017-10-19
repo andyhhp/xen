@@ -567,9 +567,13 @@ void machine_restart(unsigned int delay_millisecs)
         /* Ensure we are the boot CPU. */
         if ( get_apic_id() != boot_cpu_physical_apicid )
         {
+            /* Can't pass a stack pointer to an IPI. */
+            static unsigned int delay;
+
+            delay = delay_millisecs;
+
             /* Send IPI to the boot CPU (logical cpu 0). */
-            on_selected_cpus(cpumask_of(0), __machine_restart,
-                             &delay_millisecs, 0);
+            on_selected_cpus(cpumask_of(0), __machine_restart, &delay, 0);
             for ( ; ; )
                 halt();
         }
