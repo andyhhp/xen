@@ -579,7 +579,7 @@ void show_stack_overflow(unsigned int cpu, const struct cpu_user_regs *regs)
 
     printk("Valid stack range: %p-%p, sp=%p, tss.rsp0=%p\n",
            (void *)esp_top, (void *)esp_bottom, (void *)esp,
-           (void *)per_cpu(init_tss, cpu).rsp0);
+           (void *)global_tss.rsp0);
 
     /*
      * Trigger overflow trace if %esp is anywhere within the guard page, or
@@ -1836,7 +1836,6 @@ static void __init set_intr_gate(unsigned int n, void *addr)
 
 void load_TR(void)
 {
-    struct tss_struct *tss = &this_cpu(init_tss);
     struct desc_ptr old_gdt, tss_gdt = {
         .base = (long)(this_cpu(gdt_table) - FIRST_RESERVED_GDT_ENTRY),
         .limit = LAST_RESERVED_GDT_BYTE
@@ -1844,12 +1843,12 @@ void load_TR(void)
 
     _set_tssldt_desc(
         this_cpu(gdt_table) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
-        (unsigned long)tss,
+        (unsigned long)&global_tss,
         offsetof(struct tss_struct, __cacheline_filler) - 1,
         SYS_DESC_tss_avail);
     _set_tssldt_desc(
         this_cpu(compat_gdt_table) + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
-        (unsigned long)tss,
+        (unsigned long)&global_tss,
         offsetof(struct tss_struct, __cacheline_filler) - 1,
         SYS_DESC_tss_busy);
 

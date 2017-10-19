@@ -92,8 +92,6 @@ unsigned long __read_mostly xen_phys_start;
 
 unsigned long __read_mostly xen_virt_end;
 
-DEFINE_PER_CPU(struct tss_struct, init_tss);
-
 char __section(".bss.stack_aligned") __aligned(STACK_SIZE)
     cpu0_stack[STACK_SIZE];
 
@@ -269,6 +267,10 @@ void early_switch_to_idle(bool bsp)
         .base = PERCPU_IDT_MAPPING,
         .limit = 0xffff,
     };
+    struct desc_struct *gdt =
+        this_cpu(gdt_table) - FIRST_RESERVED_GDT_ENTRY;
+    struct desc_struct *compat_gdt =
+        this_cpu(compat_gdt_table) - FIRST_RESERVED_GDT_ENTRY;
 
     set_current(v);
     per_cpu(curr_vcpu, cpu) = v;
@@ -278,8 +280,20 @@ void early_switch_to_idle(bool bsp)
     per_cpu(curr_ptbase, cpu) = v->arch.cr3;
     per_cpu(curr_extended_directmap, cpu) = true;
 
+    _set_tssldt_desc(
+        gdt + TSS_ENTRY,
+        (unsigned long)&global_tss,
+        offsetof(struct tss_struct, __cacheline_filler) - 1,
+        SYS_DESC_tss_avail);
+    _set_tssldt_desc(
+        compat_gdt + TSS_ENTRY,
+        (unsigned long)&global_tss,
+        offsetof(struct tss_struct, __cacheline_filler) - 1,
+        SYS_DESC_tss_busy);
+
     lgdt(&gdtr);
     lidt(&idtr);
+    ltr(TSS_ENTRY << 3);
     lldt(0);
 
     if ( likely(!bsp) ) /* BSP IST setup deferred. */
@@ -669,9 +683,7 @@ static void __init noreturn reinit_bsp_stack(void)
     /* Sanity check that IST settings weren't set up before this point. */
     ASSERT(MASK_EXTR(idt_tables[0][TRAP_nmi].a, 7UL << 32) == 0);
 
-    /* Update TSS and ISTs */
-    load_system_tables();
-
+    /* Enable BSP ISTs now we've switched stack. */
     enable_each_ist(idt_tables[0]);
 
     /* Update SYSCALL trampolines */

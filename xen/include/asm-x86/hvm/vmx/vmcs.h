@@ -157,7 +157,6 @@ struct arch_vmx_struct {
     struct segment_register vm86_saved_seg[x86_seg_tr + 1];
     /* Remember EFLAGS while in virtual 8086 mode */
     uint32_t             vm86_saved_eflags;
-    int                  hostenv_migrated;
 
     /* Bitmap to control vmexit policy for Non-root VMREAD/VMWRITE */
     struct page_info     *vmread_bitmap;

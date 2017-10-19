@@ -318,6 +318,8 @@ void start_secondary(void *unused)
 
     early_switch_to_idle(false);
 
+    /* Full exception support from here on in. */
+
     rdmsrl(MSR_EFER, this_cpu(efer));
     init_shadow_spec_ctrl_state();
 
@@ -341,10 +343,6 @@ void start_secondary(void *unused)
 
     get_cpu_info()->xen_cr3 = 0;
     get_cpu_info()->pv_cr3 = this_cpu(root_pgt) ? __pa(this_cpu(root_pgt)) : 0;
-
-    load_system_tables();
-
-    /* Full exception support from here on in. */
 
     /* Safe to enable feature such as CR4.MCE with the IDT set up now. */
     write_cr4(mmu_cr4_features);

@@ -798,14 +798,6 @@ void vmx_vmcs_exit(struct vcpu *v)
     }
 }
 
-static void vmx_set_host_env(struct vcpu *v)
-{
-    unsigned int cpu = smp_processor_id();
-
-    __vmwrite(HOST_TR_BASE, (unsigned long)&per_cpu(init_tss, cpu));
-
-}
-
 void vmx_clear_msr_intercept(struct vcpu *v, unsigned int msr,
                              enum vmx_msr_intercept_type type)
 {
@@ -897,12 +889,6 @@ void vmx_vmcs_switch(paddr_t from, paddr_t to)
     vmx->vmcs_pa = to;
     vmx->launched = 0;
     this_cpu(current_vmcs) = to;
-
-    if ( vmx->hostenv_migrated )
-    {
-        vmx->hostenv_migrated = 0;
-        vmx_set_host_env(current);
-    }
 
     spin_unlock(&vmx->vmcs_lock);
 }
@@ -1123,6 +1109,7 @@ static int construct_vmcs(struct vcpu *v)
     /* Host system tables. */
     __vmwrite(HOST_IDTR_BASE, PERCPU_IDT_MAPPING);
     __vmwrite(HOST_GDTR_BASE, PERCPU_GDT_MAPPING);
+    __vmwrite(HOST_TR_BASE,   PERCPU_TSS_MAPPING);
 
     /* Host data selectors. */
     __vmwrite(HOST_SS_SELECTOR, __HYPERVISOR_DS);
@@ -1703,13 +1690,6 @@ void vmx_do_resume(struct vcpu *v)
         vmx_load_vmcs(v);
         hvm_migrate_timers(v);
         hvm_migrate_pirqs(v);
-        vmx_set_host_env(v);
-        /*
-         * Both n1 VMCS and n2 VMCS need to update the host environment after 
-         * VCPU migration. The environment of current VMCS is updated in place,
-         * but the action of another VMCS is deferred till it is switched in.
-         */
-        v->arch.hvm_vmx.hostenv_migrated = 1;
 
         hvm_asid_flush_vcpu(v);
     }
