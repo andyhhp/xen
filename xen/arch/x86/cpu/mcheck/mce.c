@@ -49,18 +49,6 @@ struct mca_banks *mca_allbanks;
 #define SEG_PL(segsel)   ((segsel) & 0x3)
 #define _MC_MSRINJ_F_REQ_HWCR_WREN (1 << 16)
 
-#if 0
-#define x86_mcerr(fmt, err, args...)                                    \
-    ({                                                                  \
-        int _err = (err);                                               \
-        gdprintk(XENLOG_WARNING, "x86_mcerr: " fmt ", returning %d\n",  \
-                 ## args, _err);                                        \
-        _err;                                                           \
-    })
-#else
-#define x86_mcerr(fmt, err, args...) (err)
-#endif
-
 int mce_verbosity;
 static int __init mce_set_verbosity(const char *str)
 {
@@ -1306,8 +1294,11 @@ CHECK_mcinfo_recovery;
 /* Machine Check Architecture Hypercall */
 long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
 {
+    static spinlock_t mca_lock = SPIN_LOCK_UNLOCKED;
+    static struct xen_mc curop;
+
     long ret = 0;
-    struct xen_mc curop, *op = &curop;
+    struct xen_mc *op = &curop;
     struct vcpu *v = current;
     union {
         struct xen_mc_fetch *nat;
@@ -1328,13 +1319,26 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
 
     ret = xsm_do_mca(XSM_PRIV);
     if ( ret )
-        return x86_mcerr("", ret);
+        return ret;
+
+    while ( !spin_trylock(&mca_lock) )
+    {
+        if ( hypercall_preempt_check() )
+            return hypercall_create_continuation(__HYPERVISOR_mca,
+                                                 "h", u_xen_mc);
+    }
 
     if ( copy_from_guest(op, u_xen_mc, 1) )
-        return x86_mcerr("do_mca: failed copyin of xen_mc_t", -EFAULT);
+    {
+        ret = -EFAULT;
+        goto out;
+    }
 
     if ( op->interface_version != XEN_MCA_INTERFACE_VERSION )
-        return x86_mcerr("do_mca: interface version mismatch", -EACCES);
+    {
+        ret = -EACCES;
+        goto out;
+    }
 
     switch ( op->cmd )
     {
@@ -1353,7 +1357,8 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
             break;
 
         default:
-            return x86_mcerr("do_mca fetch: bad cmdflags", -EINVAL);
+            ret = -EINVAL;
+            goto out;
         }
 
         flags = XEN_MC_OK;
@@ -1368,8 +1373,10 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
             if ( !is_pv_32bit_vcpu(v)
                  ? guest_handle_is_null(mc_fetch.nat->data)
                  : compat_handle_is_null(mc_fetch.cmp->data) )
-                return x86_mcerr("do_mca fetch: guest buffer "
-                                 "invalid", -EINVAL);
+            {
+                ret = -EINVAL;
+                goto out;
+            }
 
             mctc = mctelem_consume_oldest_begin(which);
             if ( mctc )
@@ -1402,7 +1409,10 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
         break;
 
     case XEN_MC_notifydomain:
-        return x86_mcerr("do_mca notify unsupported", -EINVAL);
+    {
+        ret = -EINVAL;
+        goto out;
+    }
 
     case XEN_MC_physcpuinfo:
         mc_physcpuinfo.nat = &op->u.mc_physcpuinfo;
@@ -1413,12 +1423,17 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
              : !compat_handle_is_null(mc_physcpuinfo.cmp->info) )
         {
             if ( mc_physcpuinfo.nat->ncpus <= 0 )
-                return x86_mcerr("do_mca cpuinfo: ncpus <= 0",
-                                 -EINVAL);
+            {
+                ret = -EINVAL;
+                goto out;
+            }
             nlcpu = min(nlcpu, (int)mc_physcpuinfo.nat->ncpus);
             log_cpus = xmalloc_array(xen_mc_logical_cpu_t, nlcpu);
             if ( log_cpus == NULL )
-                return x86_mcerr("do_mca cpuinfo", -ENOMEM);
+            {
+                ret = -ENOMEM;
+                goto out;
+            }
             on_each_cpu(do_mc_get_cpu_info, log_cpus, 1);
             if ( !is_pv_32bit_vcpu(v)
                  ? copy_to_guest(mc_physcpuinfo.nat->info, log_cpus, nlcpu)
@@ -1430,26 +1445,27 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
         mc_physcpuinfo.nat->ncpus = nlcpu;
 
         if ( copy_to_guest(u_xen_mc, op, 1) )
-            return x86_mcerr("do_mca cpuinfo", -EFAULT);
-
+            ret = -EFAULT;
         break;
 
     case XEN_MC_msrinject:
         if ( nr_mce_banks == 0 )
-            return x86_mcerr("do_mca inject", -ENODEV);
+        {
+            ret = -ENODEV;
+            goto out;
+        }
 
         mc_msrinject = &op->u.mc_msrinject;
         target = mc_msrinject->mcinj_cpunr;
 
-        if ( target >= nr_cpu_ids )
-            return x86_mcerr("do_mca inject: bad target", -EINVAL);
-
-        if ( !cpu_online(target) )
-            return x86_mcerr("do_mca inject: target offline",
-                             -EINVAL);
+        if ( target >= nr_cpu_ids || !cpu_online(target) )
+        {
+            ret = -EINVAL;
+            goto out;
+        }
 
         if ( mc_msrinject->mcinj_count == 0 )
-            return 0;
+            goto out;
 
         if ( mc_msrinject->mcinj_flags & MC_MSRINJ_F_GPADDR )
         {
@@ -1464,14 +1480,17 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
             domid = (mc_msrinject->mcinj_domid == DOMID_SELF) ?
                     current->domain->domain_id : mc_msrinject->mcinj_domid;
             if ( domid >= DOMID_FIRST_RESERVED )
-                return x86_mcerr("do_mca inject: incompatible flag "
-                                 "MC_MSRINJ_F_GPADDR with domain %d",
-                                 -EINVAL, domid);
+            {
+                ret = -EINVAL;
+                goto out;
+            }
 
             d = get_domain_by_id(domid);
             if ( d == NULL )
-                return x86_mcerr("do_mca inject: bad domain id %d",
-                                 -EINVAL, domid);
+            {
+                ret = -EINVAL;
+                goto out;
+            }
 
             for ( i = 0, msr = &mc_msrinject->mcinj_msr[0];
                   i < mc_msrinject->mcinj_count;
@@ -1485,8 +1504,8 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
                 {
                     put_gfn(d, gfn);
                     put_domain(d);
-                    return x86_mcerr("do_mca inject: bad gfn %#lx of domain %d",
-                                     -EINVAL, gfn, domid);
+                    ret = -EINVAL;
+                    goto out;
                 }
 
                 msr->value = pfn_to_paddr(mfn) | (gaddr & (PAGE_SIZE - 1));
@@ -1498,7 +1517,10 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
         }
 
         if ( !x86_mc_msrinject_verify(mc_msrinject) )
-            return x86_mcerr("do_mca inject: illegal MSR", -EINVAL);
+        {
+            ret = -EINVAL;
+            goto out;
+        }
 
         add_taint(TAINT_ERROR_INJECT);
 
@@ -1509,16 +1531,19 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
 
     case XEN_MC_mceinject:
         if ( nr_mce_banks == 0 )
-            return x86_mcerr("do_mca #MC", -ENODEV);
+        {
+            ret = -ENODEV;
+            goto out;
+        }
 
         mc_mceinject = &op->u.mc_mceinject;
         target = mc_mceinject->mceinj_cpunr;
 
-        if ( target >= nr_cpu_ids )
-            return x86_mcerr("do_mca #MC: bad target", -EINVAL);
-
-        if ( !cpu_online(target) )
-            return x86_mcerr("do_mca #MC: target offline", -EINVAL);
+        if ( target >= nr_cpu_ids || !cpu_online(target) )
+        {
+            ret = -EINVAL;
+            goto out;
+        }
 
         add_taint(TAINT_ERROR_INJECT);
 
@@ -1536,7 +1561,10 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
         bool broadcast = op->u.mc_inject_v2.flags & XEN_MC_INJECT_CPU_BROADCAST;
 
         if ( nr_mce_banks == 0 )
-            return x86_mcerr("do_mca #MC", -ENODEV);
+        {
+            ret = -ENODEV;
+            goto out;
+        }
 
         if ( broadcast )
             cpumap = &cpu_online_map;
@@ -1549,7 +1577,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
             if ( !cpumask_intersects(cpumap, &cpu_online_map) )
             {
                 free_cpumask_var(cmv);
-                ret = x86_mcerr("No online CPU passed\n", -EINVAL);
+                ret = -EINVAL;
                 break;
             }
             if ( !cpumask_subset(cpumap, &cpu_online_map) )
@@ -1568,7 +1596,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
 
         case XEN_MC_INJECT_TYPE_CMCI:
             if ( !cmci_apic_vector )
-                ret = x86_mcerr("No CMCI supported in platform\n", -EINVAL);
+                ret = -EINVAL;
             else
             {
                 if ( cpumask_test_cpu(smp_processor_id(), cpumap) )
@@ -1580,26 +1608,25 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
         case XEN_MC_INJECT_TYPE_LMCE:
             if ( !lmce_support )
             {
-                ret = x86_mcerr("No LMCE support", -EINVAL);
+                ret = -EINVAL;
                 break;
             }
             if ( broadcast )
             {
-                ret = x86_mcerr("Broadcast cannot be used with LMCE", -EINVAL);
+                ret = -EINVAL;
                 break;
             }
             /* Ensure at most one CPU is specified. */
             if ( nr_cpu_ids > cpumask_next(cpumask_first(cpumap), cpumap) )
             {
-                ret = x86_mcerr("More than one CPU specified for LMCE",
-                                -EINVAL);
+                ret = -EINVAL;
                 break;
             }
             on_selected_cpus(cpumap, x86_mc_mceinject, NULL, 1);
             break;
 
         default:
-            ret = x86_mcerr("Wrong mca type\n", -EINVAL);
+            ret = -EINVAL;
             break;
         }
 
@@ -1610,8 +1637,12 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
     }
 
     default:
-        return x86_mcerr("do_mca: bad command", -EINVAL);
+        ret = -EINVAL;
+        break;
     }
+
+ out:
+    spin_unlock(&mca_lock);
 
     return ret;
 }
