@@ -73,6 +73,21 @@ void set_nr_sockets(void);
 /* Representing HT and core siblings in each socket. */
 extern cpumask_t **socket_cpumask;
 
+static inline bool arch_ipi_param_ok(const void *_param)
+{
+    unsigned long param = (unsigned long)_param;
+
+    /*
+     * It is not safe to pass pointers in the PERCPU linear range to other
+     * cpus in an IPI.
+     *
+     * Not all parameters passed are actually pointers, so only reject
+     * parameters which are a canonical address in the PERCPU range.
+     */
+    return (!is_canonical_address(param) ||
+            l4_table_offset(param) != l4_table_offset(PERCPU_LINEAR_START));
+}
+
 #endif /* !__ASSEMBLY__ */
 
 #endif

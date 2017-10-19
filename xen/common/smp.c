@@ -54,6 +54,7 @@ void on_selected_cpus(
 
     ASSERT(local_irq_is_enabled());
     ASSERT(cpumask_subset(selected, &cpu_online_map));
+    ASSERT(arch_ipi_param_ok(info));
 
     spin_lock(&call_lock);
 

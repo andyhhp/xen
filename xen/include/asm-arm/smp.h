@@ -28,6 +28,9 @@ extern void init_secondary(void);
 extern void smp_init_cpus(void);
 extern void smp_clear_cpu_maps (void);
 extern int smp_get_max_cpus (void);
+
+static inline bool arch_ipi_param_ok(const void *param) { return true; }
+
 #endif
 
 /*
