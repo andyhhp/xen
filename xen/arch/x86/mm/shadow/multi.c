@@ -1895,6 +1895,8 @@ void sh_destroy_l4_shadow(struct domain *d, mfn_t smfn)
         }
     });
 
+    pt_shadow_l4_invlpg(d, sp);
+
     /* Put the memory back in the pool */
     shadow_free(d, smfn);
 }

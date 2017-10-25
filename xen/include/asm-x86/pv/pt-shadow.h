@@ -47,6 +47,13 @@ unsigned long pt_maybe_shadow(struct vcpu *v);
 void pt_shadow_l4_write(
     const struct domain *d, const struct page_info *pg, unsigned int slot);
 
+/*
+ * Called when an L4 pagetable is freed.  The PT shadow logic ensures that it
+ * is purged from any caches.
+ */
+void pt_shadow_l4_invlpg(
+    const struct domain *d, const struct page_info *pg);
+
 #else /* !CONFIG_PV */
 
 static inline int pt_shadow_alloc(unsigned int cpu) { return 0; }
@@ -58,6 +65,8 @@ static inline unsigned long pt_maybe_shadow(struct vcpu *v)
 }
 static inline void pt_shadow_l4_write(
     const struct domain *d, const struct page_info *pg, unsigned int slot) { }
+static inline void pt_shadow_l4_invlpg(
+    const struct domain *d, const struct page_info *pg) { }
 
 #endif /* CONFIG_PV */
 

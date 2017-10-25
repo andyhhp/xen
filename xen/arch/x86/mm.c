@@ -2468,6 +2468,8 @@ int free_page_type(struct page_info *page, unsigned long type,
     case PGT_l4_page_table:
         ASSERT(preemptible);
         rc = free_l4_table(page);
+        if ( !rc )
+            pt_shadow_l4_invlpg(owner, page);
         break;
     default:
         gdprintk(XENLOG_WARNING, "type %" PRtype_info " mfn %" PRI_mfn "\n",
