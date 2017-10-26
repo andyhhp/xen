@@ -113,6 +113,18 @@ enum hvm_translation_result hvm_translate_get_page(
     pagefault_info_t *pfinfo, struct page_info **page_p,
     gfn_t *gfn_p, p2m_type_t *p2mt_p);
 
+/*
+ * Copy data to and from a guest, performing segmentation and paging checks
+ * on the provided seg:offset virtual address.
+ * Returns X86EMUL_* and raises exceptions with the current vcpu.
+ */
+int hvm_copy_to_guest_virt(
+    enum x86_segment seg, unsigned long offset, void *buf, unsigned int bytes,
+    uint32_t pfec);
+int hvm_copy_from_guest_virt(
+    void *buf, enum x86_segment seg, unsigned long offset, unsigned int bytes,
+    uint32_t pfec);
+
 #define HVM_HCALL_completed  0 /* hypercall completed - no further action */
 #define HVM_HCALL_preempted  1 /* hypercall preempted - re-execute VMCALL */
 int hvm_hypercall(struct cpu_user_regs *regs);
