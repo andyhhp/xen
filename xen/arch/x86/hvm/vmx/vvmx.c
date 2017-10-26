@@ -437,8 +437,7 @@ static inline u32 __n2_secondary_exec_control(struct vcpu *v)
 }
 
 static int decode_vmx_inst(struct cpu_user_regs *regs,
-                           struct vmx_inst_decoded *decode,
-                           unsigned long *poperandS)
+                           struct vmx_inst_decoded *decode)
 {
     struct vcpu *v = current;
     union vmx_inst_info info;
@@ -452,13 +451,6 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
     if ( info.fields.memreg ) {
         decode->op[0].type = VMX_INST_MEMREG_TYPE_REG;
         decode->op[0].reg_idx = info.fields.reg1;
-        if ( poperandS != NULL )
-        {
-            int rc = operand_read(poperandS, &decode->op[0], regs,
-                                  decode->op[0].len);
-            if ( rc != X86EMUL_OKAY )
-                return rc;
-        }
     }
     else
     {
@@ -495,14 +487,6 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
 
         decode->op[0].mem = base;
         decode->op[0].len = size;
-
-        if ( poperandS != NULL )
-        {
-            int rc = operand_read(poperandS, &decode->op[0], regs,
-                                  decode->op[0].len);
-            if ( rc != X86EMUL_OKAY )
-                return rc;
-        }
     }
 
     decode->op[1].type = VMX_INST_MEMREG_TYPE_REG;
@@ -1586,7 +1570,11 @@ static int nvmx_handle_vmxon(struct cpu_user_regs *regs)
     uint32_t nvmcs_revid;
     int rc;
 
-    rc = decode_vmx_inst(regs, &decode, &gpa);
+    rc = decode_vmx_inst(regs, &decode);
+    if ( rc != X86EMUL_OKAY )
+        return rc;
+
+    rc = operand_read(&gpa, &decode.op[0], regs, decode.op[0].len);
     if ( rc != X86EMUL_OKAY )
         return rc;
 
@@ -1813,7 +1801,11 @@ static int nvmx_handle_vmptrld(struct cpu_user_regs *regs)
     unsigned long gpa = 0;
     int rc;
 
-    rc = decode_vmx_inst(regs, &decode, &gpa);
+    rc = decode_vmx_inst(regs, &decode);
+    if ( rc != X86EMUL_OKAY )
+        return rc;
+
+    rc = operand_read(&gpa, &decode.op[0], regs, decode.op[0].len);
     if ( rc != X86EMUL_OKAY )
         return rc;
 
@@ -1889,7 +1881,7 @@ static int nvmx_handle_vmptrst(struct cpu_user_regs *regs)
     unsigned long gpa = 0;
     int rc;
 
-    rc = decode_vmx_inst(regs, &decode, NULL);
+    rc = decode_vmx_inst(regs, &decode);
     if ( rc != X86EMUL_OKAY )
         return rc;
 
@@ -1916,7 +1908,11 @@ static int nvmx_handle_vmclear(struct cpu_user_regs *regs)
     void *vvmcs;
     int rc;
 
-    rc = decode_vmx_inst(regs, &decode, &gpa);
+    rc = decode_vmx_inst(regs, &decode);
+    if ( rc != X86EMUL_OKAY )
+        return rc;
+
+    rc = operand_read(&gpa, &decode.op[0], regs, decode.op[0].len);
     if ( rc != X86EMUL_OKAY )
         return rc;
 
@@ -1979,7 +1975,7 @@ static int nvmx_handle_vmread(struct cpu_user_regs *regs)
     int rc;
     unsigned long vmcs_encoding = 0;
 
-    rc = decode_vmx_inst(regs, &decode, NULL);
+    rc = decode_vmx_inst(regs, &decode);
     if ( rc != X86EMUL_OKAY )
         return rc;
 
@@ -2023,12 +2019,16 @@ static int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     struct vmx_inst_decoded decode;
-    unsigned long operand; 
+    unsigned long operand = 0;
     unsigned long vmcs_encoding = 0;
     enum vmx_insn_errno err;
     int rc;
 
-    rc = decode_vmx_inst(regs, &decode, &operand);
+    rc = decode_vmx_inst(regs, &decode);
+    if ( rc != X86EMUL_OKAY )
+        return rc;
+
+    rc = operand_read(&operand, &decode.op[0], regs, decode.op[0].len);
     if ( rc != X86EMUL_OKAY )
         return rc;
 
@@ -2070,11 +2070,10 @@ static int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
 static int nvmx_handle_invept(struct cpu_user_regs *regs)
 {
     struct vmx_inst_decoded decode;
-    unsigned long eptp;
     unsigned long invept_type = 0;
     int ret;
 
-    if ( (ret = decode_vmx_inst(regs, &decode, &eptp)) != X86EMUL_OKAY )
+    if ( (ret = decode_vmx_inst(regs, &decode)) != X86EMUL_OKAY )
         return ret;
 
     ret = operand_read(&invept_type, &decode.op[1], regs, decode.op[1].len);
@@ -2085,6 +2084,12 @@ static int nvmx_handle_invept(struct cpu_user_regs *regs)
     {
     case INVEPT_SINGLE_CONTEXT:
     {
+        unsigned long eptp = 0;
+
+        ret = operand_read(&eptp, &decode.op[0], regs, decode.op[0].len);
+        if ( ret )
+            return ret;
+
         np2m_flush_base(current, eptp);
         break;
     }
@@ -2106,7 +2111,7 @@ static int nvmx_handle_invvpid(struct cpu_user_regs *regs)
     unsigned long invvpid_type = 0;
     int ret;
 
-    if ( (ret = decode_vmx_inst(regs, &decode, NULL)) != X86EMUL_OKAY )
+    if ( (ret = decode_vmx_inst(regs, &decode)) != X86EMUL_OKAY )
         return ret;
 
     ret = operand_read(&invvpid_type, &decode.op[1], regs, decode.op[1].len);
