@@ -1889,7 +1889,7 @@ static int nvmx_handle_vmptrst(struct cpu_user_regs *regs)
     unsigned long gpa = 0;
     int rc;
 
-    rc = decode_vmx_inst(regs, &decode, &gpa);
+    rc = decode_vmx_inst(regs, &decode, NULL);
     if ( rc != X86EMUL_OKAY )
         return rc;
 
@@ -2090,10 +2090,9 @@ static int nvmx_handle_invept(struct cpu_user_regs *regs)
 static int nvmx_handle_invvpid(struct cpu_user_regs *regs)
 {
     struct vmx_inst_decoded decode;
-    unsigned long vpid;
     int ret;
 
-    if ( (ret = decode_vmx_inst(regs, &decode, &vpid)) != X86EMUL_OKAY )
+    if ( (ret = decode_vmx_inst(regs, &decode, NULL)) != X86EMUL_OKAY )
         return ret;
 
     switch ( reg_read(regs, decode.op[1].reg_idx) )
