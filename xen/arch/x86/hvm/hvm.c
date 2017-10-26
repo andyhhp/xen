@@ -3392,6 +3392,63 @@ unsigned long copy_from_user_hvm(void *to, const void *from, unsigned len)
     return rc ? len : 0; /* fake a copy_from_user() return code */
 }
 
+static int _hvm_copy_guest_virt(
+    enum x86_segment seg, unsigned long offset, void *buf, unsigned int bytes,
+    uint32_t pfec, unsigned int flags)
+{
+    struct vcpu *curr = current;
+    struct segment_register sreg, cs;
+    enum hvm_translation_result res;
+    pagefault_info_t pfinfo;
+    unsigned long linear;
+
+    ASSERT(is_x86_user_segment(seg));
+
+    hvm_get_segment_register(curr, seg, &sreg);
+    hvm_get_segment_register(curr, x86_seg_cs, &cs);
+
+    if ( !hvm_virtual_to_linear_addr(
+             seg, &sreg, offset, bytes,
+             flags & HVMCOPY_to_guest ? hvm_access_write : hvm_access_read,
+             &cs, &linear) )
+    {
+        hvm_inject_hw_exception(
+            (seg == x86_seg_ss) ? TRAP_stack_error : TRAP_gp_fault, 0);
+        return X86EMUL_EXCEPTION;
+    }
+
+    if ( flags & HVMCOPY_to_guest )
+        res = hvm_copy_to_guest_linear(linear, buf, bytes, pfec, &pfinfo);
+    else
+        res = hvm_copy_from_guest_linear(buf, linear, bytes, pfec, &pfinfo);
+
+    if ( res == HVMTRANS_bad_linear_to_gfn )
+    {
+        hvm_inject_page_fault(pfinfo.ec, pfinfo.linear);
+        return X86EMUL_EXCEPTION;
+    }
+    else if ( res )
+        return X86EMUL_RETRY;
+
+    return X86EMUL_OKAY;
+}
+
+int hvm_copy_to_guest_virt(
+    enum x86_segment seg, unsigned long offset, void *buf, unsigned int bytes,
+    uint32_t pfec)
+{
+    return _hvm_copy_guest_virt(seg, offset, buf, bytes, pfec,
+                                HVMCOPY_to_guest);
+}
+
+int hvm_copy_from_guest_virt(
+    void *buf, enum x86_segment seg, unsigned long offset, unsigned int bytes,
+    uint32_t pfec)
+{
+    return _hvm_copy_guest_virt(seg, offset, buf, bytes, pfec,
+                                HVMCOPY_from_guest);
+}
+
 int hvm_vmexit_cpuid(struct cpu_user_regs *regs, unsigned int inst_len)
 {
     struct vcpu *curr = current;
