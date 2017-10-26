@@ -212,16 +212,16 @@ bool_t nvmx_ept_enabled(struct vcpu *v)
 struct vmx_inst_decoded {
 #define VMX_INST_MEMREG_TYPE_MEMORY 0
 #define VMX_INST_MEMREG_TYPE_REG    1
-    int type;
-    union {
-        struct {
-            unsigned long mem;
-            unsigned int  len;
+    struct vmx_inst_op {
+        int type;
+        union {
+            struct {
+                unsigned long mem;
+                unsigned int  len;
+            };
+            unsigned int reg_idx;
         };
-        unsigned int reg1;
-    };
-
-    unsigned int reg2;
+    } op[2];
 };
 
 static int vvmcs_offset(u32 width, u32 type, u32 index)
@@ -397,16 +397,16 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
     info.word = offset;
 
     if ( info.fields.memreg ) {
-        decode->type = VMX_INST_MEMREG_TYPE_REG;
-        decode->reg1 = info.fields.reg1;
+        decode->op[0].type = VMX_INST_MEMREG_TYPE_REG;
+        decode->op[0].reg_idx = info.fields.reg1;
         if ( poperandS != NULL )
-            *poperandS = reg_read(regs, decode->reg1);
+            *poperandS = reg_read(regs, decode->op[0].reg_idx);
     }
     else
     {
         bool mode_64bit = (vmx_guest_x86_mode(v) == 8);
 
-        decode->type = VMX_INST_MEMREG_TYPE_MEMORY;
+        decode->op[0].type = VMX_INST_MEMREG_TYPE_MEMORY;
 
         if ( info.fields.segment > x86_seg_gs )
             goto gp_fault;
@@ -446,11 +446,13 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
             if ( rc != HVMTRANS_okay )
                 return X86EMUL_EXCEPTION;
         }
-        decode->mem = base;
-        decode->len = size;
+
+        decode->op[0].mem = base;
+        decode->op[0].len = size;
     }
 
-    decode->reg2 = info.fields.reg2;
+    decode->op[1].type = VMX_INST_MEMREG_TYPE_REG;
+    decode->op[1].reg_idx = info.fields.reg2;
 
     return X86EMUL_OKAY;
 
@@ -1782,7 +1784,8 @@ static int nvmx_handle_vmptrst(struct cpu_user_regs *regs)
 
     gpa = nvcpu->nv_vvmcxaddr;
 
-    rc = hvm_copy_to_guest_linear(decode.mem, &gpa, decode.len, 0, &pfinfo);
+    rc = hvm_copy_to_guest_linear(decode.op[0].mem, &gpa,
+                                  decode.op[0].len, 0, &pfinfo);
     if ( rc == HVMTRANS_bad_linear_to_gfn )
         hvm_inject_page_fault(pfinfo.ec, pfinfo.linear);
     if ( rc != HVMTRANS_okay )
@@ -1874,23 +1877,25 @@ static int nvmx_handle_vmread(struct cpu_user_regs *regs)
         return X86EMUL_OKAY;
     }
 
-    rc = get_vvmcs_safe(v, reg_read(regs, decode.reg2), &value);
+    rc = get_vvmcs_safe(v, reg_read(regs, decode.op[1].reg_idx), &value);
     if ( rc != VMX_INSN_SUCCEED )
     {
         vmfail(regs, rc);
         return X86EMUL_OKAY;
     }
 
-    switch ( decode.type ) {
+    switch ( decode.op[0].type )
+    {
     case VMX_INST_MEMREG_TYPE_MEMORY:
-        rc = hvm_copy_to_guest_linear(decode.mem, &value, decode.len, 0, &pfinfo);
+        rc = hvm_copy_to_guest_linear(decode.op[0].mem, &value,
+                                      decode.op[0].len, 0, &pfinfo);
         if ( rc == HVMTRANS_bad_linear_to_gfn )
             hvm_inject_page_fault(pfinfo.ec, pfinfo.linear);
         if ( rc != HVMTRANS_okay )
             return X86EMUL_EXCEPTION;
         break;
     case VMX_INST_MEMREG_TYPE_REG:
-        reg_write(regs, decode.reg1, value);
+        reg_write(regs, decode.op[0].reg_idx, value);
         break;
     }
 
@@ -1917,7 +1922,7 @@ static int nvmx_handle_vmwrite(struct cpu_user_regs *regs)
         return X86EMUL_OKAY;
     }
 
-    vmcs_encoding = reg_read(regs, decode.reg2);
+    vmcs_encoding = reg_read(regs, decode.op[1].reg_idx);
     err = set_vvmcs_safe(v, vmcs_encoding, operand);
     if ( err != VMX_INSN_SUCCEED )
     {
@@ -1952,7 +1957,7 @@ static int nvmx_handle_invept(struct cpu_user_regs *regs)
     if ( (ret = decode_vmx_inst(regs, &decode, &eptp)) != X86EMUL_OKAY )
         return ret;
 
-    switch ( reg_read(regs, decode.reg2) )
+    switch ( reg_read(regs, decode.op[1].reg_idx) )
     {
     case INVEPT_SINGLE_CONTEXT:
     {
@@ -1980,7 +1985,7 @@ static int nvmx_handle_invvpid(struct cpu_user_regs *regs)
     if ( (ret = decode_vmx_inst(regs, &decode, &vpid)) != X86EMUL_OKAY )
         return ret;
 
-    switch ( reg_read(regs, decode.reg2) )
+    switch ( reg_read(regs, decode.op[1].reg_idx) )
     {
     /* Just invalidate all tlb entries for all types! */
     case INVVPID_INDIVIDUAL_ADDR:
