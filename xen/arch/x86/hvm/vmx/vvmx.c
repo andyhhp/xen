@@ -234,7 +234,8 @@ struct vmx_inst_decoded {
         unsigned int bytes;
         union {
             struct {
-                unsigned long mem;
+                enum x86_segment seg;
+                unsigned long offset;
             };
             unsigned int reg_idx;
         };
@@ -403,17 +404,7 @@ static int operand_read(void *buf, struct vmx_inst_op *op,
         return X86EMUL_OKAY;
     }
     else
-    {
-        pagefault_info_t pfinfo;
-        int rc = hvm_copy_from_guest_linear(buf, op->mem, bytes, 0, &pfinfo);
-
-        if ( rc == HVMTRANS_bad_linear_to_gfn )
-            hvm_inject_page_fault(pfinfo.ec, pfinfo.linear);
-        if ( rc != HVMTRANS_okay )
-            return X86EMUL_EXCEPTION;
-
-        return X86EMUL_OKAY;
-    }
+        return hvm_copy_from_guest_virt(buf, op->seg, op->offset, bytes, 0);
 }
 
 static inline u32 __n2_pin_exec_control(struct vcpu *v)
@@ -441,9 +432,8 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
 {
     struct vcpu *v = current;
     union vmx_inst_info info;
-    struct segment_register seg;
-    unsigned long base, index, seg_base, disp, offset;
-    int scale, size;
+    unsigned long base, index, disp, offset;
+    int scale;
     unsigned int bytes = vmx_guest_x86_mode(v);
 
     __vmread(VMX_INSTRUCTION_INFO, &offset);
@@ -456,14 +446,11 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
     }
     else
     {
-        bool mode_64bit = bytes == 8;
-
-        decode->op[0].type = VMX_INST_MEMREG_TYPE_MEMORY;
-
         if ( info.fields.segment > x86_seg_gs )
-            goto gp_fault;
-        hvm_get_segment_register(v, info.fields.segment, &seg);
-        seg_base = seg.base;
+        {
+            ASSERT_UNREACHABLE();
+            return X86EMUL_UNHANDLEABLE;
+        }
 
         base = info.fields.base_reg_invalid ? 0 :
             reg_read(regs, info.fields.base_reg);
@@ -475,19 +462,12 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
 
         __vmread(EXIT_QUALIFICATION, &disp);
 
-        size = 1 << (info.fields.addr_size + 1);
+        decode->op[0].type = VMX_INST_MEMREG_TYPE_MEMORY;
+        decode->op[0].seg = info.fields.segment;
+        decode->op[0].offset = base + index * scale + disp;
+        if ( info.fields.addr_size < 2 )
+            decode->op[0].offset = (uint32_t)decode->op[0].offset;
 
-        offset = base + index * scale + disp;
-        base = !mode_64bit || info.fields.segment >= x86_seg_fs ?
-               seg_base + offset : offset;
-        if ( offset + size - 1 < offset ||
-             (mode_64bit ?
-              !is_canonical_address((long)base < 0 ? base :
-                                    base + size - 1) :
-              offset + size - 1 > seg.limit) )
-            goto gp_fault;
-
-        decode->op[0].mem = base;
         decode->op[0].bytes = bytes;
     }
 
@@ -496,10 +476,6 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
     decode->op[1].bytes = bytes;
 
     return X86EMUL_OKAY;
-
-gp_fault:
-    hvm_inject_hw_exception(TRAP_gp_fault, 0);
-    return X86EMUL_EXCEPTION;
 }
 
 static void vmsucceed(struct cpu_user_regs *regs)
@@ -1880,8 +1856,7 @@ static int nvmx_handle_vmptrst(struct cpu_user_regs *regs)
     struct vcpu *v = current;
     struct vmx_inst_decoded decode;
     struct nestedvcpu *nvcpu = &vcpu_nestedhvm(v);
-    pagefault_info_t pfinfo;
-    unsigned long gpa = 0;
+    uint64_t gpa;
     int rc;
 
     rc = decode_vmx_inst(regs, &decode);
@@ -1890,12 +1865,10 @@ static int nvmx_handle_vmptrst(struct cpu_user_regs *regs)
 
     gpa = nvcpu->nv_vvmcxaddr;
 
-    rc = hvm_copy_to_guest_linear(decode.op[0].mem, &gpa,
-                                  decode.op[0].bytes, 0, &pfinfo);
-    if ( rc == HVMTRANS_bad_linear_to_gfn )
-        hvm_inject_page_fault(pfinfo.ec, pfinfo.linear);
-    if ( rc != HVMTRANS_okay )
-        return X86EMUL_EXCEPTION;
+    rc = hvm_copy_to_guest_virt(decode.op[0].seg, decode.op[0].offset,
+                                &gpa, sizeof(gpa), 0);
+    if ( rc != X86EMUL_OKAY )
+        return rc;
 
     vmsucceed(regs);
     return X86EMUL_OKAY;
@@ -1973,8 +1946,7 @@ static int nvmx_handle_vmread(struct cpu_user_regs *regs)
 {
     struct vcpu *v = current;
     struct vmx_inst_decoded decode;
-    pagefault_info_t pfinfo;
-    u64 value = 0;
+    uint64_t value;
     int rc;
     unsigned long vmcs_encoding = 0;
 
@@ -2002,12 +1974,10 @@ static int nvmx_handle_vmread(struct cpu_user_regs *regs)
     switch ( decode.op[0].type )
     {
     case VMX_INST_MEMREG_TYPE_MEMORY:
-        rc = hvm_copy_to_guest_linear(decode.op[0].mem, &value,
-                                      decode.op[0].bytes, 0, &pfinfo);
-        if ( rc == HVMTRANS_bad_linear_to_gfn )
-            hvm_inject_page_fault(pfinfo.ec, pfinfo.linear);
-        if ( rc != HVMTRANS_okay )
-            return X86EMUL_EXCEPTION;
+        rc = hvm_copy_to_guest_virt(decode.op[0].seg, decode.op[0].offset,
+                                    &value, sizeof(value), 0);
+        if ( rc != X86EMUL_OKAY )
+            return rc;
         break;
     case VMX_INST_MEMREG_TYPE_REG:
         reg_write(regs, decode.op[0].reg_idx, value);
