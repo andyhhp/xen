@@ -363,6 +363,42 @@ static void reg_write(struct cpu_user_regs *regs,
     *decode_gpr(regs, index) = value;
 }
 
+static int operand_read(void *buf, struct vmx_inst_op *op,
+                        struct cpu_user_regs *regs, unsigned int bytes)
+{
+    if ( op->type == VMX_INST_MEMREG_TYPE_REG )
+    {
+        switch ( bytes )
+        {
+        case 4:
+            *(uint32_t *)buf = reg_read(regs, op->reg_idx);
+            break;
+
+        case 8:
+            *(uint64_t *)buf = reg_read(regs, op->reg_idx);
+            break;
+
+        default:
+            ASSERT_UNREACHABLE();
+            return X86EMUL_UNHANDLEABLE;
+        }
+
+        return X86EMUL_OKAY;
+    }
+    else
+    {
+        pagefault_info_t pfinfo;
+        int rc = hvm_copy_from_guest_linear(buf, op->mem, bytes, 0, &pfinfo);
+
+        if ( rc == HVMTRANS_bad_linear_to_gfn )
+            hvm_inject_page_fault(pfinfo.ec, pfinfo.linear);
+        if ( rc != HVMTRANS_okay )
+            return X86EMUL_EXCEPTION;
+
+        return X86EMUL_OKAY;
+    }
+}
+
 static inline u32 __n2_pin_exec_control(struct vcpu *v)
 {
     return get_vvmcs(v, PIN_BASED_VM_EXEC_CONTROL);
@@ -400,7 +436,12 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
         decode->op[0].type = VMX_INST_MEMREG_TYPE_REG;
         decode->op[0].reg_idx = info.fields.reg1;
         if ( poperandS != NULL )
-            *poperandS = reg_read(regs, decode->op[0].reg_idx);
+        {
+            int rc = operand_read(poperandS, &decode->op[0], regs,
+                                  decode->op[0].len);
+            if ( rc != X86EMUL_OKAY )
+                return rc;
+        }
     }
     else
     {
@@ -435,20 +476,16 @@ static int decode_vmx_inst(struct cpu_user_regs *regs,
               offset + size - 1 > seg.limit) )
             goto gp_fault;
 
-        if ( poperandS != NULL )
-        {
-            pagefault_info_t pfinfo;
-            int rc = hvm_copy_from_guest_linear(poperandS, base, size,
-                                                0, &pfinfo);
-
-            if ( rc == HVMTRANS_bad_linear_to_gfn )
-                hvm_inject_page_fault(pfinfo.ec, pfinfo.linear);
-            if ( rc != HVMTRANS_okay )
-                return X86EMUL_EXCEPTION;
-        }
-
         decode->op[0].mem = base;
         decode->op[0].len = size;
+
+        if ( poperandS != NULL )
+        {
+            int rc = operand_read(poperandS, &decode->op[0], regs,
+                                  decode->op[0].len);
+            if ( rc != X86EMUL_OKAY )
+                return rc;
+        }
     }
 
     decode->op[1].type = VMX_INST_MEMREG_TYPE_REG;
