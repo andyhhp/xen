@@ -834,8 +834,6 @@ int arch_set_info_guest(
             return -EINVAL;
     }
 
-    v->fpu_initialised = !!(flags & VGCF_I387_VALID);
-
     v->arch.flags &= ~TF_kernel_mode;
     if ( (flags & VGCF_in_kernel) || is_hvm_domain(d)/*???*/ )
         v->arch.flags |= TF_kernel_mode;
@@ -1626,17 +1624,7 @@ static void __context_switch(void)
     if ( !is_idle_domain(nd) )
     {
         memcpy(stack_regs, &n->arch.user_regs, CTXT_SWITCH_STACK_BYTES);
-        if ( cpu_has_xsave )
-        {
-            u64 xcr0 = n->arch.xcr0 ?: XSTATE_FP_SSE;
-
-            if ( xcr0 != get_xcr0() && !set_xcr0(xcr0) )
-                BUG();
-
-            if ( cpu_has_xsaves && is_hvm_vcpu(n) )
-                set_msr_xss(n->arch.hvm_vcpu.msr_xss);
-        }
-        vcpu_restore_fpu_eager(n);
+        vcpu_restore_fpu(n);
         nd->arch.ctxt_switch->to(n);
     }
 

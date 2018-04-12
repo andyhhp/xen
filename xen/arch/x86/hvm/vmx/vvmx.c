@@ -2276,17 +2276,12 @@ int nvmx_n2_vmexit_handler(struct cpu_user_regs *regs,
         __vmread(VM_EXIT_INTR_INFO, &intr_info);
         vector = intr_info & INTR_INFO_VECTOR_MASK;
         /*
-         * decided by L0 and L1 exception bitmap, if the vetor is set by
-         * both, L0 has priority on #PF and #NM, L1 has priority on others
+         * decided by L0 and L1 exception bitmap, if the vector is set by
+         * both, L0 has priority on #PF, L1 has priority on others
          */
         if ( vector == TRAP_page_fault )
         {
             if ( paging_mode_hap(v->domain) )
-                nvcpu->nv_vmexit_pending = 1;
-        }
-        else if ( vector == TRAP_no_device )
-        {
-            if ( v->fpu_dirtied )
                 nvcpu->nv_vmexit_pending = 1;
         }
         else if ( (intr_info & valid_mask) == valid_mask )

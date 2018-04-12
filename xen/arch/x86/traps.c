@@ -1750,16 +1750,17 @@ void do_device_not_available(struct cpu_user_regs *regs)
     struct vcpu *curr = current;
 
     BUG_ON(!guest_mode(regs));
+    BUG_ON(!(curr->arch.pv_vcpu.ctrlreg[0] & X86_CR0_TS));
 
-    vcpu_restore_fpu_lazy(curr);
+    /*
+     * PV ABI QUIRK: Classic Xen kernels (2.6.18 and SLES 11 SP4's
+     * 3.0) rely on Xen to clear TS. PVOPS kernels (3.0, 3.16 and 4.15
+     * are checked) always clear TS themselves.
+     */
+    clts();
 
-    if ( curr->arch.pv_vcpu.ctrlreg[0] & X86_CR0_TS )
-    {
-        pv_inject_hw_exception(TRAP_no_device, X86_EVENT_NO_EC);
-        curr->arch.pv_vcpu.ctrlreg[0] &= ~X86_CR0_TS;
-    }
-    else
-        TRACE_0D(TRC_PV_MATH_STATE_RESTORE);
+    pv_inject_hw_exception(TRAP_no_device, X86_EVENT_NO_EC);
+    curr->arch.pv_vcpu.ctrlreg[0] &= ~X86_CR0_TS;
 
     return;
 }

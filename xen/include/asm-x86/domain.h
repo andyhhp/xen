@@ -559,9 +559,6 @@ struct arch_vcpu
      * it explicitly enables it via xcr0.
      */
     uint64_t xcr0_accum;
-    /* This variable determines whether nonlazy extended state has been used,
-     * and thus should be saved/restored. */
-    bool_t nonlazy_xstate_used;
 
     struct vmce vmce;
 

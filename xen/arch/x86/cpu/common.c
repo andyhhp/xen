@@ -820,9 +820,6 @@ void cpu_init(void)
 	/* Install correct page table. */
 	write_ptbase(current);
 
-	/* Ensure FPU gets initialised for each domain. */
-	stts();
-
 	/* Clear all 6 debug registers: */
 #define CD(register) asm volatile ( "mov %0,%%db" #register : : "r"(0UL) );
 	CD(0); CD(1); CD(2); CD(3); /* no db4 and db5 */; CD(6); CD(7);

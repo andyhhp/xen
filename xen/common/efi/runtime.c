@@ -89,7 +89,7 @@ struct efi_rs_state efi_rs_enter(void)
         return state;
 
     state.cr3 = read_cr3();
-    save_fpu_enable();
+    vcpu_save_fpu(current);
     asm volatile ( "fnclex; fldcw %0" :: "m" (fcw) );
     asm volatile ( "ldmxcsr %0" :: "m" (mxcsr) );
 
@@ -133,7 +133,7 @@ void efi_rs_leave(struct efi_rs_state *state)
     irq_exit();
     efi_rs_on_cpu = NR_CPUS;
     spin_unlock(&efi_rs_lock);
-    stts();
+    vcpu_restore_fpu(current);
 }
 
 bool efi_rs_using_pgtables(void)

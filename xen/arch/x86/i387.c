@@ -20,7 +20,7 @@
 /*     FPU Restore Functions   */
 /*******************************/
 /* Restore x87 extended state */
-static inline void fpu_xrstor(struct vcpu *v, uint64_t mask)
+static inline void fpu_xrstor(struct vcpu *v)
 {
     bool ok;
 
@@ -28,12 +28,21 @@ static inline void fpu_xrstor(struct vcpu *v, uint64_t mask)
     /*
      * XCR0 normally represents what guest OS set. In case of Xen itself,
      * we set the accumulated feature mask before doing save/restore.
+     *
+     * Combine the outgoing and incoming XCR0 and IA32_XSS before
+     * calling xrstor to make sure any state component used by
+     * outgoing vcpu is cleared. Rewrite XCR0 and IA32_XSS to be the
+     * ones used by incoming vcpu afterwards.
      */
-    ok = set_xcr0(v->arch.xcr0_accum | XSTATE_FP_SSE);
+    ok = set_xcr0(v->arch.xcr0_accum | get_xcr0() | XSTATE_FP_SSE);
     ASSERT(ok);
-    xrstor(v, mask);
+    if ( is_hvm_vcpu(v) )
+        set_msr_xss(v->arch.hvm_vcpu.msr_xss | get_msr_xss());
+    xrstor(v, XSTATE_ALL);
     ok = set_xcr0(v->arch.xcr0 ?: XSTATE_FP_SSE);
     ASSERT(ok);
+    if ( is_hvm_vcpu(v) )
+        set_msr_xss(v->arch.hvm_vcpu.msr_xss);
 }
 
 /* Restore x87 FPU, MMX, SSE and SSE2 state */
@@ -112,33 +121,11 @@ static inline void fpu_fxrstor(struct vcpu *v)
 /*      FPU Save Functions     */
 /*******************************/
 
-static inline uint64_t vcpu_xsave_mask(const struct vcpu *v)
-{
-    if ( v->fpu_dirtied )
-        return v->arch.nonlazy_xstate_used ? XSTATE_ALL : XSTATE_LAZY;
-
-    ASSERT(v->arch.nonlazy_xstate_used);
-
-    /*
-     * The offsets of components which live in the extended region of
-     * compact xsave area are not fixed. Xsave area may be overwritten
-     * when a xsave with v->fpu_dirtied set is followed by one with
-     * v->fpu_dirtied clear.
-     * In such case, if hypervisor uses compact xsave area and guest
-     * has ever used lazy states (checking xcr0_accum excluding
-     * XSTATE_FP_SSE), vcpu_xsave_mask will return XSTATE_ALL. Otherwise
-     * return XSTATE_NONLAZY.
-     */
-    return xstate_all(v) ? XSTATE_ALL : XSTATE_NONLAZY;
-}
-
 /* Save x87 extended state */
 static inline void fpu_xsave(struct vcpu *v)
 {
     bool ok;
-    uint64_t mask = vcpu_xsave_mask(v);
 
-    ASSERT(mask);
     ASSERT(v->arch.xsave_area);
     /*
      * XCR0 normally represents what guest OS set. In case of Xen itself,
@@ -146,7 +133,7 @@ static inline void fpu_xsave(struct vcpu *v)
      */
     ok = set_xcr0(v->arch.xcr0_accum | XSTATE_FP_SSE);
     ASSERT(ok);
-    xsave(v, mask);
+    xsave(v, XSTATE_ALL);
     ok = set_xcr0(v->arch.xcr0 ?: XSTATE_FP_SSE);
     ASSERT(ok);
 }
@@ -204,93 +191,6 @@ static inline void fpu_fxsave(struct vcpu *v)
 /*******************************/
 /*       VCPU FPU Functions    */
 /*******************************/
-/* Restore FPU state whenever VCPU is schduled in. */
-void vcpu_restore_fpu_eager(struct vcpu *v)
-{
-    ASSERT(!is_idle_vcpu(v));
-    
-    /* Restore nonlazy extended state (i.e. parts not tracked by CR0.TS). */
-    if ( !v->arch.nonlazy_xstate_used )
-        return;
-
-    /* Avoid recursion */
-    clts();
-
-    /*
-     * When saving full state even with !v->fpu_dirtied (see vcpu_xsave_mask()
-     * above) we also need to restore full state, to prevent subsequently
-     * saving state belonging to another vCPU.
-     */
-    if ( xstate_all(v) )
-    {
-        fpu_xrstor(v, XSTATE_ALL);
-        v->fpu_initialised = 1;
-        v->fpu_dirtied = 1;
-    }
-    else
-    {
-        fpu_xrstor(v, XSTATE_NONLAZY);
-        stts();
-    }
-}
-
-/* 
- * Restore FPU state when #NM is triggered.
- */
-void vcpu_restore_fpu_lazy(struct vcpu *v)
-{
-    ASSERT(!is_idle_vcpu(v));
-
-    /* Avoid recursion. */
-    clts();
-
-    if ( v->fpu_dirtied )
-        return;
-
-    if ( cpu_has_xsave )
-        fpu_xrstor(v, XSTATE_LAZY);
-    else
-        fpu_fxrstor(v);
-
-    v->fpu_initialised = 1;
-    v->fpu_dirtied = 1;
-}
-
-/* 
- * On each context switch, save the necessary FPU info of VCPU being switch 
- * out. It dispatches saving operation based on CPU's capability.
- */
-static bool _vcpu_save_fpu(struct vcpu *v)
-{
-    if ( !v->fpu_dirtied && !v->arch.nonlazy_xstate_used )
-        return false;
-
-    ASSERT(!is_idle_vcpu(v));
-
-    /* This can happen, if a paravirtualised guest OS has set its CR0.TS. */
-    clts();
-
-    if ( cpu_has_xsave )
-        fpu_xsave(v);
-    else
-        fpu_fxsave(v);
-
-    v->fpu_dirtied = 0;
-
-    return true;
-}
-
-void vcpu_save_fpu(struct vcpu *v)
-{
-    _vcpu_save_fpu(v);
-    stts();
-}
-
-void save_fpu_enable(void)
-{
-    if ( !_vcpu_save_fpu(current) )
-        clts();
-}
 
 /* Initialize FPU's context save area */
 int vcpu_init_fpu(struct vcpu *v)
@@ -328,6 +228,33 @@ void vcpu_destroy_fpu(struct vcpu *v)
         xstate_free_save_area(v);
     else
         xfree(v->arch.fpu_ctxt);
+}
+
+void vcpu_save_fpu(struct vcpu *v)
+{
+    ASSERT(!is_idle_vcpu(v));
+
+    /* This can happen, if a paravirtualised guest OS has set its CR0.TS. */
+    clts();
+
+    if ( cpu_has_xsave )
+        fpu_xsave(v);
+    else
+        fpu_fxsave(v);
+}
+
+void vcpu_restore_fpu(struct vcpu *v)
+{
+    ASSERT(!is_idle_vcpu(v));
+    ASSERT(!(read_cr0() & X86_CR0_TS));
+
+    if ( cpu_has_xsave )
+        fpu_xrstor(v);
+    else
+        fpu_fxrstor(v);
+
+    if ( is_pv_vcpu(v) && (v->arch.pv_vcpu.ctrlreg[0] & X86_CR0_TS) )
+        stts();
 }
 
 /*

@@ -72,7 +72,6 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr,
                                 unsigned int flags);
 static void vmx_update_guest_efer(struct vcpu *v);
 static void vmx_wbinvd_intercept(void);
-static void vmx_fpu_dirty_intercept(void);
 static int vmx_msr_read_intercept(unsigned int msr, uint64_t *msr_content);
 static int vmx_msr_write_intercept(unsigned int msr, uint64_t msr_content);
 static void vmx_invlpg(struct vcpu *v, unsigned long vaddr);
@@ -879,41 +878,6 @@ static int vmx_load_msr(struct vcpu *v, struct hvm_msr *ctxt)
     return err;
 }
 
-static void vmx_fpu_enter(struct vcpu *v)
-{
-    vcpu_restore_fpu_lazy(v);
-    v->arch.hvm_vmx.exception_bitmap &= ~(1u << TRAP_no_device);
-    vmx_update_exception_bitmap(v);
-    v->arch.hvm_vmx.host_cr0 &= ~X86_CR0_TS;
-    __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
-}
-
-static void vmx_fpu_leave(struct vcpu *v)
-{
-    ASSERT(!v->fpu_dirtied);
-    ASSERT(read_cr0() & X86_CR0_TS);
-
-    if ( !(v->arch.hvm_vmx.host_cr0 & X86_CR0_TS) )
-    {
-        v->arch.hvm_vmx.host_cr0 |= X86_CR0_TS;
-        __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
-    }
-
-    /*
-     * If the guest does not have TS enabled then we must cause and handle an
-     * exception on first use of the FPU. If the guest *does* have TS enabled
-     * then this is not necessary: no FPU activity can occur until the guest
-     * clears CR0.TS, and we will initialise the FPU when that happens.
-     */
-    if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
-    {
-        v->arch.hvm_vcpu.hw_cr[0] |= X86_CR0_TS;
-        __vmwrite(GUEST_CR0, v->arch.hvm_vcpu.hw_cr[0]);
-        v->arch.hvm_vmx.exception_bitmap |= (1u << TRAP_no_device);
-        vmx_update_exception_bitmap(v);
-    }
-}
-
 static void vmx_ctxt_switch_from(struct vcpu *v)
 {
     /*
@@ -936,7 +900,6 @@ static void vmx_ctxt_switch_from(struct vcpu *v)
         vmx_vmcs_reload(v);
     }
 
-    vmx_fpu_leave(v);
     vmx_save_guest_msrs(v);
     vmx_restore_host_msrs();
     vmx_save_dr(v);
@@ -1489,14 +1452,6 @@ static void vmx_update_guest_cr(struct vcpu *v, unsigned int cr,
             __vmwrite(CR0_READ_SHADOW, v->arch.hvm_vcpu.guest_cr[0]);
         else
             nvmx_set_cr_read_shadow(v, 0);
-
-        if ( !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
-        {
-            if ( v != current )
-                hw_cr0_mask |= X86_CR0_TS;
-            else if ( v->arch.hvm_vcpu.hw_cr[0] & X86_CR0_TS )
-                vmx_fpu_enter(v);
-        }
 
         realmode = !(v->arch.hvm_vcpu.guest_cr[0] & X86_CR0_PE);
 
@@ -2254,7 +2209,6 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .update_guest_cr      = vmx_update_guest_cr,
     .update_guest_efer    = vmx_update_guest_efer,
     .cpuid_policy_changed = vmx_cpuid_policy_changed,
-    .fpu_leave            = vmx_fpu_leave,
     .set_guest_pat        = vmx_set_guest_pat,
     .get_guest_pat        = vmx_get_guest_pat,
     .set_tsc_offset       = vmx_set_tsc_offset,
@@ -2266,7 +2220,6 @@ static struct hvm_function_table __initdata vmx_function_table = {
     .cpu_up               = vmx_cpu_up,
     .cpu_down             = vmx_cpu_down,
     .wbinvd_intercept     = vmx_wbinvd_intercept,
-    .fpu_dirty_intercept  = vmx_fpu_dirty_intercept,
     .msr_read_intercept   = vmx_msr_read_intercept,
     .msr_write_intercept  = vmx_msr_write_intercept,
     .vmfunc_intercept     = vmx_vmfunc_intercept,
@@ -2484,20 +2437,6 @@ void update_guest_eip(void)
 
     if ( regs->eflags & X86_EFLAGS_TF )
         hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
-}
-
-static void vmx_fpu_dirty_intercept(void)
-{
-    struct vcpu *curr = current;
-
-    vmx_fpu_enter(curr);
-
-    /* Disable TS in guest CR0 unless the guest wants the exception too. */
-    if ( !(curr->arch.hvm_vcpu.guest_cr[0] & X86_CR0_TS) )
-    {
-        curr->arch.hvm_vcpu.hw_cr[0] &= ~X86_CR0_TS;
-        __vmwrite(GUEST_CR0, curr->arch.hvm_vcpu.hw_cr[0]);
-    }
 }
 
 static int vmx_do_cpuid(struct cpu_user_regs *regs)
@@ -3744,10 +3683,6 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
                 v->arch.gdbsx_vcpu_event = TRAP_int3;
                 domain_pause_for_debugger();
             }
-            break;
-        case TRAP_no_device:
-            HVMTRACE_1D(TRAP, vector);
-            vmx_fpu_dirty_intercept();
             break;
         case TRAP_page_fault:
             __vmread(EXIT_QUALIFICATION, &exit_qualification);

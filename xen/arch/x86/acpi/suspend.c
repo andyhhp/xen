@@ -92,8 +92,7 @@ void restore_rest_processor_state(void)
         write_debugreg(7, curr->arch.debugreg[7]);
     }
 
-    /* Reload FPU state on next FPU use. */
-    stts();
+    vcpu_restore_fpu(curr);
 
     if (cpu_has_pat)
         wrmsrl(MSR_IA32_CR_PAT, host_pat);

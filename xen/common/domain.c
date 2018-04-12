@@ -1156,8 +1156,6 @@ int vcpu_reset(struct vcpu *v)
     clear_bit(v->vcpu_id, d->poll_mask);
     v->poll_evtchn = 0;
 
-    v->fpu_initialised = 0;
-    v->fpu_dirtied     = 0;
     v->is_initialised  = 0;
 #ifdef VCPU_TRAP_LAST
     v->async_exception_mask = 0;

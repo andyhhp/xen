@@ -716,7 +716,6 @@ int validate_xstate(u64 xcr0, u64 xcr0_accum, const struct xsave_hdr *hdr)
 int handle_xsetbv(u32 index, u64 new_bv)
 {
     struct vcpu *curr = current;
-    u64 mask;
 
     if ( index != XCR_XFEATURE_ENABLED_MASK )
         return -EOPNOTSUPP;
@@ -731,34 +730,8 @@ int handle_xsetbv(u32 index, u64 new_bv)
     if ( !set_xcr0(new_bv) )
         return -EFAULT;
 
-    mask = new_bv & ~curr->arch.xcr0_accum;
     curr->arch.xcr0 = new_bv;
     curr->arch.xcr0_accum |= new_bv;
-
-    /* LWP sets nonlazy_xstate_used independently. */
-    if ( new_bv & (XSTATE_NONLAZY & ~X86_XCR0_LWP) )
-        curr->arch.nonlazy_xstate_used = 1;
-
-    mask &= curr->fpu_dirtied ? ~XSTATE_FP_SSE : XSTATE_NONLAZY;
-    if ( mask )
-    {
-        unsigned long cr0 = read_cr0();
-
-        clts();
-        if ( curr->fpu_dirtied )
-            asm ( "stmxcsr %0" : "=m" (curr->arch.xsave_area->fpu_sse.mxcsr) );
-        else if ( xstate_all(curr) )
-        {
-            /* See the comment in i387.c:vcpu_restore_fpu_eager(). */
-            mask |= XSTATE_LAZY;
-            curr->fpu_initialised = 1;
-            curr->fpu_dirtied = 1;
-            cr0 &= ~X86_CR0_TS;
-        }
-        xrstor(curr, mask);
-        if ( cr0 & X86_CR0_TS )
-            write_cr0(cr0);
-    }
 
     return 0;
 }

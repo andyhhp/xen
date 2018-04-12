@@ -858,11 +858,8 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         ctxt.ldtr_base = seg.base;
         ctxt.ldtr_arbytes = seg.attr;
 
-        if ( v->fpu_initialised )
-        {
-            memcpy(ctxt.fpu_regs, v->arch.fpu_ctxt, sizeof(ctxt.fpu_regs));
-            ctxt.flags = XEN_X86_FPU_INITIALISED;
-        }
+        memcpy(ctxt.fpu_regs, v->arch.fpu_ctxt, sizeof(ctxt.fpu_regs));
+        ctxt.flags = XEN_X86_FPU_INITIALISED;
 
         ctxt.rax = v->arch.user_regs.rax;
         ctxt.rbx = v->arch.user_regs.rbx;
@@ -1116,8 +1113,7 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     /* Cover xsave-absent save file restoration on xsave-capable host. */
     xsave_area = xsave_enabled(v) ? NULL : v->arch.xsave_area;
 
-    v->fpu_initialised = !!(ctxt.flags & XEN_X86_FPU_INITIALISED);
-    if ( v->fpu_initialised )
+    if ( ctxt.flags & XEN_X86_FPU_INITIALISED )
     {
         memcpy(v->arch.fpu_ctxt, ctxt.fpu_regs, sizeof(ctxt.fpu_regs));
         if ( xsave_area )
@@ -1324,8 +1320,6 @@ static int hvm_load_cpu_xsave_states(struct domain *d, hvm_domain_context_t *h)
 
     v->arch.xcr0 = ctxt->xcr0;
     v->arch.xcr0_accum = ctxt->xcr0_accum;
-    if ( ctxt->xcr0_accum & XSTATE_NONLAZY )
-        v->arch.nonlazy_xstate_used = 1;
     compress_xsave_states(v, &ctxt->save_area,
                           size - offsetof(struct hvm_hw_cpu_xsave, save_area));
 
