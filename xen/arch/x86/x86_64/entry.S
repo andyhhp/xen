@@ -146,6 +146,13 @@ process_trap:
 restore_all_guest:
         ASSERT_INTERRUPTS_DISABLED
 
+        cmpb $0, opt_pv_reload(%rip)
+        je 1f
+        lfence
+        movabs $DIRECTMAP_VIRT_START + 0x500, %rax
+        mov    (%rax), %rax
+1:
+
         /* Stash guest SPEC_CTRL value while we can read struct vcpu. */
         mov VCPU_arch_msrs(%rbx), %rdx
         mov VCPUMSR_spec_ctrl_raw(%rdx), %r15d

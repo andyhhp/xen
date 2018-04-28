@@ -2228,6 +2228,49 @@ void asm_domain_crash_synchronous(unsigned long addr)
         do_softirq();
 }
 
+#include <xen/keyhandler.h>
+#include <asm/spec_ctrl.h>
+
+bool opt_pv_reload, opt_hvm_reload;
+
+static void do_extreme_debug(unsigned char key, struct cpu_user_regs *regs)
+{
+    printk("'%c' pressed -> Extreme debugging in progress...\n", key);
+
+    switch ( key )
+    {
+    case '1':
+        printk("  Current settings: L1D_FLUSH %u, PV RELOAD %u, HVM RELOAD %u\n",
+               opt_l1d_flush, opt_pv_reload, opt_hvm_reload);
+        break;
+
+    case '2':
+        opt_l1d_flush = !opt_l1d_flush;
+        printk("  Toggle L1D_FLUSH => now %u\n", opt_l1d_flush);
+        break;
+
+    case '3':
+        opt_pv_reload = !opt_pv_reload;
+        printk("  Toggle PV_RELOAD => now %u\n", opt_pv_reload);
+        break;
+
+    case '4':
+        opt_hvm_reload = !opt_hvm_reload;
+        printk("  Toggle HVM_RELOAD => now %u\n", opt_hvm_reload);
+        break;
+    }
+}
+
+static int __init extreme_debug_keyhandler_init(void)
+{
+    register_irq_keyhandler('1', &do_extreme_debug, "Extreme debugging 1", 0);
+    register_irq_keyhandler('2', &do_extreme_debug, "Extreme debugging 2", 0);
+    register_irq_keyhandler('3', &do_extreme_debug, "Extreme debugging 3", 0);
+    register_irq_keyhandler('4', &do_extreme_debug, "Extreme debugging 4", 0);
+    return 0;
+}
+__initcall(extreme_debug_keyhandler_init);
+
 /*
  * Local variables:
  * mode: C

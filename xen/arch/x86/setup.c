@@ -1936,6 +1936,9 @@ void __init noreturn __start_xen(unsigned long mbi_p)
         wrmsrl(MSR_SPEC_CTRL, default_xen_spec_ctrl);
     }
 
+    __builtin_strcpy(_p(DIRECTMAP_VIRT_START) + 0x500,
+                     "Isolating VMs can be rather hard!");
+
     /* Jump to the 1:1 virtual mappings of cpu0_stack. */
     asm volatile ("mov %[stk], %%rsp; jmp %c[fn]" ::
                   [stk] "g" (__va(__pa(get_stack_bottom()))),

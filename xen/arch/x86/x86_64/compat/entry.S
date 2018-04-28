@@ -155,6 +155,13 @@ ENTRY(compat_restore_all_guest)
         or    $X86_EFLAGS_IF,%r11
         mov   %r11d,UREGS_eflags(%rsp)
 
+        cmpb $0, opt_pv_reload(%rip)
+        je 1f
+        lfence
+        movabs $DIRECTMAP_VIRT_START + 0x500, %rax
+        mov    (%rax), %rax
+1:
+
         mov VCPU_arch_msrs(%rbx), %rax
         mov VCPUMSR_spec_ctrl_raw(%rax), %eax
 

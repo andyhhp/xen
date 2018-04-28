@@ -55,6 +55,13 @@ __UNLIKELY_END(nsvm_hap)
         mov  %rsp, %rdi
         call svm_vmenter_helper
 
+        cmpb $0, opt_hvm_reload(%rip)
+        je 1f
+        lfence
+        movabs $DIRECTMAP_VIRT_START + 0x500, %rax
+        mov    (%rax), %rax
+1:
+
         mov VCPU_arch_msrs(%rbx), %rax
         mov VCPUMSR_spec_ctrl_raw(%rax), %eax
 
