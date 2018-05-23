@@ -29,20 +29,15 @@ static inline void fpu_xrstor(struct vcpu *v)
      * XCR0 normally represents what guest OS set. In case of Xen itself,
      * we set the accumulated feature mask before doing save/restore.
      *
-     * Combine the outgoing and incoming XCR0 and IA32_XSS before
-     * calling xrstor to make sure any state component used by
-     * outgoing vcpu is cleared. Rewrite XCR0 and IA32_XSS to be the
-     * ones used by incoming vcpu afterwards.
+     * Combine the outgoing and incoming XCR0 before calling xrstor to make
+     * sure any state component used by outgoing vcpu is cleared. Rewrite XCR0
+     * to be the ones used by incoming vcpu afterwards.
      */
     ok = set_xcr0(v->arch.xcr0_accum | get_xcr0() | XSTATE_FP_SSE);
     ASSERT(ok);
-    if ( is_hvm_vcpu(v) )
-        set_msr_xss(v->arch.hvm_vcpu.msr_xss | get_msr_xss());
     xrstor(v, XSTATE_ALL);
     ok = set_xcr0(v->arch.xcr0 ?: XSTATE_FP_SSE);
     ASSERT(ok);
-    if ( is_hvm_vcpu(v) )
-        set_msr_xss(v->arch.hvm_vcpu.msr_xss);
 }
 
 /* Restore x87 FPU, MMX, SSE and SSE2 state */
