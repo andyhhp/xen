@@ -1196,9 +1196,6 @@ static void virtual_vmentry(struct cpu_user_regs *regs)
     regs->rsp = get_vvmcs(v, GUEST_RSP);
     regs->rflags = get_vvmcs(v, GUEST_RFLAGS);
 
-    /* updating host cr0 to sync TS bit */
-    __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
-
     /* Setup virtual ETP for L2 guest*/
     if ( nestedhvm_paging_mode_hap(v) )
         /* This will setup the initial np2m for the nested vCPU */
@@ -1402,9 +1399,6 @@ static void virtual_vmexit(struct cpu_user_regs *regs)
     regs->rsp = get_vvmcs(v, HOST_RSP);
     /* VM exit clears all bits except bit 1 */
     regs->rflags = X86_EFLAGS_MBS;
-
-    /* updating host cr0 to sync TS bit */
-    __vmwrite(HOST_CR0, v->arch.hvm_vmx.host_cr0);
 
     if ( cpu_has_vmx_virtual_intr_delivery )
         nvmx_update_apicv(v);

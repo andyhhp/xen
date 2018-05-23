@@ -139,8 +139,6 @@ struct arch_vmx_struct {
     DECLARE_BITMAP(eoi_exit_bitmap, NR_VECTORS);
     struct pi_desc       pi_desc;
 
-    unsigned long        host_cr0;
-
     /* Do we need to tolerate a spurious EPT_MISCONFIG VM exit? */
     bool_t               ept_spurious_misconfig;
 
