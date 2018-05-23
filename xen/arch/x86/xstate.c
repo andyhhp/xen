@@ -727,6 +727,9 @@ int handle_xsetbv(u32 index, u64 new_bv)
     if ( is_pv_vcpu(curr) && (new_bv & X86_XCR0_PKRU) )
         return -EOPNOTSUPP;
 
+    /* Zero state components before writing new XCR0 */
+    xstate_zero(get_xcr0());
+
     if ( !set_xcr0(new_bv) )
         return -EFAULT;
 
