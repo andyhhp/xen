@@ -95,6 +95,7 @@ uint64_t get_msr_xss(void);
 uint64_t read_bndcfgu(void);
 void xsave(struct vcpu *v, uint64_t mask);
 void xrstor(struct vcpu *v, uint64_t mask);
+void xstate_zero(uint64_t mask);
 void xstate_set_init(uint64_t mask);
 bool xsave_enabled(const struct vcpu *v);
 int __must_check validate_xstate(u64 xcr0, u64 xcr0_accum,

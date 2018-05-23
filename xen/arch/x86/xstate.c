@@ -361,11 +361,12 @@ void xsave(struct vcpu *v, uint64_t mask)
         ptr->fpu_sse.x[FPU_WORD_SIZE_OFFSET] = fip_width;
 }
 
-void xrstor(struct vcpu *v, uint64_t mask)
+/* True -> no error, false -> failed */
+static bool xrstor__(struct xsave_struct *ptr, uint64_t xcr0_accum,
+                     uint64_t mask)
 {
     uint32_t hmask = mask >> 32;
     uint32_t lmask = mask;
-    struct xsave_struct *ptr = v->arch.xsave_area;
     unsigned int faults, prev_faults;
 
     /*
@@ -406,7 +407,7 @@ void xrstor(struct vcpu *v, uint64_t mask)
                          [ptr] "D" (ptr) )
 
 #define XRSTOR(pfx) \
-        if ( v->arch.xcr0_accum & XSTATE_XSAVES_ONLY ) \
+        if ( xcr0_accum & XSTATE_XSAVES_ONLY ) \
         { \
             if ( unlikely(!(ptr->xsave_hdr.xcomp_bv & \
                             XSTATE_COMPACTION_ENABLED)) ) \
@@ -455,7 +456,7 @@ void xrstor(struct vcpu *v, uint64_t mask)
                   ((mask & X86_XCR0_YMM) &&
                    !(ptr->xsave_hdr.xcomp_bv & XSTATE_COMPACTION_ENABLED))) )
                 ptr->fpu_sse.mxcsr &= mxcsr_mask;
-            if ( v->arch.xcr0_accum & XSTATE_XSAVES_ONLY )
+            if ( xcr0_accum & XSTATE_XSAVES_ONLY )
             {
                 ptr->xsave_hdr.xcomp_bv &= this_cpu(xcr0) | this_cpu(xss);
                 ptr->xsave_hdr.xstate_bv &= ptr->xsave_hdr.xcomp_bv;
@@ -472,14 +473,35 @@ void xrstor(struct vcpu *v, uint64_t mask)
         case 2: /* Stage 2: Reset all state. */
             ptr->fpu_sse.mxcsr = MXCSR_DEFAULT;
             ptr->xsave_hdr.xstate_bv = 0;
-            ptr->xsave_hdr.xcomp_bv = v->arch.xcr0_accum & XSTATE_XSAVES_ONLY
+            ptr->xsave_hdr.xcomp_bv = xcr0_accum & XSTATE_XSAVES_ONLY
                                       ? XSTATE_COMPACTION_ENABLED : 0;
             continue;
         }
 
-        domain_crash(current->domain);
-        return;
+        return false;
     }
+
+    return true;
+}
+
+void xrstor(struct vcpu *v, uint64_t mask)
+{
+    if ( !xrstor__(v->arch.xsave_area, v->arch.xcr0_accum, mask) )
+        domain_crash(current->domain);
+}
+
+void xstate_zero(uint64_t mask)
+{
+    bool ok;
+    struct xsave_struct tmp;
+
+    tmp.fpu_sse.mxcsr = MXCSR_DEFAULT;
+    tmp.xsave_hdr.xstate_bv = 0;
+    tmp.xsave_hdr.xcomp_bv = 0;
+    memset(tmp.xsave_hdr.reserved, 0, sizeof(tmp.xsave_hdr.reserved));
+
+    ok = xrstor__(&tmp, mask, mask);
+    ASSERT(ok);
 }
 
 bool xsave_enabled(const struct vcpu *v)
