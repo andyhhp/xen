@@ -2479,7 +2479,7 @@ void update_guest_eip(void)
     }
 
     if ( regs->eflags & X86_EFLAGS_TF )
-        hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+        hvm_inject_debug_exn(X86_DR6_BS);
 }
 
 static void vmx_fpu_dirty_intercept(void)
@@ -3378,7 +3378,7 @@ static int vmx_handle_eoi_write(void)
  * It is the callers responsibility to ensure that this function is only used
  * in the context of an appropriate vmexit.
  */
-static void vmx_propagate_intr(unsigned long intr)
+static void vmx_propagate_intr(unsigned long intr, unsigned long pending_dbg)
 {
     struct x86_event event = {
         .vector = MASK_EXTR(intr, INTR_INFO_VECTOR_MASK),
@@ -3401,6 +3401,9 @@ static void vmx_propagate_intr(unsigned long intr)
     }
     else
         event.insn_len = 0;
+
+    if ( event.vector == TRAP_debug )
+        event.pending_dbg = pending_dbg;
 
     hvm_inject_event(&event);
 }
@@ -3711,7 +3714,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
                 if ( rc < 0 )
                     goto exit_and_crash;
                 if ( !rc )
-                    vmx_propagate_intr(intr_info);
+                    vmx_propagate_intr(intr_info, exit_qualification);
             }
             else
                 domain_pause_for_debugger();
@@ -3732,7 +3735,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
                 if ( rc < 0 )
                     goto exit_and_crash;
                 if ( !rc )
-                    vmx_propagate_intr(intr_info);
+                    vmx_propagate_intr(intr_info, 0 /* N/A */);
             }
             else
             {
@@ -3772,7 +3775,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
             break;
         case TRAP_alignment_check:
             HVMTRACE_1D(TRAP, vector);
-            vmx_propagate_intr(intr_info);
+            vmx_propagate_intr(intr_info, 0 /* N/A */);
             break;
         case TRAP_nmi:
             if ( MASK_EXTR(intr_info, INTR_INFO_INTR_TYPE_MASK) !=

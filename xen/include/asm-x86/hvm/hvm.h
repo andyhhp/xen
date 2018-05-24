@@ -410,13 +410,14 @@ void hvm_inject_event(const struct x86_event *event);
 
 static inline void hvm_inject_exception(
     unsigned int vector, unsigned int type,
-    unsigned int insn_len, int error_code)
+    unsigned int insn_len, int error_code, unsigned long extra)
 {
     struct x86_event event = {
         .vector = vector,
         .type = type,
         .insn_len = insn_len,
         .error_code = error_code,
+        .cr2 = extra, /* Any union field will do. */
     };
 
     hvm_inject_event(&event);
@@ -428,6 +429,18 @@ static inline void hvm_inject_hw_exception(unsigned int vector, int errcode)
         .vector = vector,
         .type = X86_EVENTTYPE_HW_EXCEPTION,
         .error_code = errcode,
+    };
+
+    hvm_inject_event(&event);
+}
+
+static inline void hvm_inject_debug_exn(unsigned long pending_dbg)
+{
+    struct x86_event event = {
+        .vector      = TRAP_debug,
+        .type        = X86_EVENTTYPE_HW_EXCEPTION,
+        .error_code  = X86_EVENT_NO_EC,
+        .pending_dbg = pending_dbg,
     };
 
     hvm_inject_event(&event);

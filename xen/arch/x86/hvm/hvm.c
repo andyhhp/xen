@@ -3115,7 +3115,7 @@ void hvm_task_switch(
     }
 
     if ( (tss.trace & 1) && !exn_raised )
-        hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+        hvm_inject_debug_exn(X86_DR6_BT);
 
  out:
     hvm_unmap_entry(optss_desc);

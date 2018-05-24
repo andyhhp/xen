@@ -648,6 +648,18 @@ static inline void pv_inject_hw_exception(unsigned int vector, int errcode)
     pv_inject_event(&event);
 }
 
+static inline void pv_inject_debug_exn(unsigned long pending_dbg)
+{
+    struct x86_event event = {
+        .vector      = TRAP_debug,
+        .type        = X86_EVENTTYPE_HW_EXCEPTION,
+        .error_code  = X86_EVENT_NO_EC,
+        .pending_dbg = pending_dbg,
+    };
+
+    pv_inject_event(&event);
+}
+
 static inline void pv_inject_page_fault(int errcode, unsigned long cr2)
 {
     const struct x86_event event = {

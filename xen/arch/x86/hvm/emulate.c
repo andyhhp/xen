@@ -15,6 +15,7 @@
 #include <xen/paging.h>
 #include <xen/trace.h>
 #include <xen/vm_event.h>
+#include <asm/debugreg.h>
 #include <asm/event.h>
 #include <asm/i387.h>
 #include <asm/xstate.h>
@@ -2283,7 +2284,7 @@ static int _hvm_emulate_one(struct hvm_emulate_ctxt *hvmemul_ctxt,
     }
 
     if ( hvmemul_ctxt->ctxt.retire.singlestep )
-        hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+        hvm_inject_debug_exn(X86_DR6_BS);
 
     new_intr_shadow = hvmemul_ctxt->intr_shadow;
 

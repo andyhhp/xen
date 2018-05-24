@@ -30,6 +30,7 @@ asm(".file \"" __OBJECT_FILE__ "\"");
 #include <xen/perfc.h>
 #include <xen/domain_page.h>
 #include <xen/iocap.h>
+#include <asm/debugreg.h>
 #include <xsm/xsm.h>
 #include <asm/page.h>
 #include <asm/current.h>
@@ -3453,7 +3454,7 @@ static int sh_page_fault(struct vcpu *v,
 #endif
 
     if ( emul_ctxt.ctxt.retire.singlestep )
-        hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+        hvm_inject_debug_exn(X86_DR6_BS);
 
 #if GUEST_PAGING_LEVELS == 3 /* PAE guest */
     /*
@@ -3494,7 +3495,7 @@ static int sh_page_fault(struct vcpu *v,
                 TRACE_SHADOW_PATH_FLAG(TRCE_SFLAG_EMULATION_LAST_FAILED);
 
                 if ( emul_ctxt.ctxt.retire.singlestep )
-                    hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+                    hvm_inject_debug_exn(X86_DR6_BS);
 
                 break; /* Don't emulate again if we failed! */
             }

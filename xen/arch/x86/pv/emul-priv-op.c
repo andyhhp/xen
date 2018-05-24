@@ -1366,12 +1366,11 @@ int pv_emulate_privileged_op(struct cpu_user_regs *regs)
 
         if ( ctxt.ctxt.retire.singlestep )
             ctxt.bpmatch |= DR_STEP;
-        if ( ctxt.bpmatch )
-        {
-            curr->arch.dr6 |= ctxt.bpmatch | DR_STATUS_RESERVED_ONE;
-            if ( !(curr->arch.pv_vcpu.trap_bounce.flags & TBF_EXCEPTION) )
-                pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
-        }
+
+        if ( ctxt.bpmatch &&
+             !(curr->arch.pv_vcpu.trap_bounce.flags & TBF_EXCEPTION) )
+            pv_inject_debug_exn(ctxt.bpmatch);
+
         /* fall through */
     case X86EMUL_RETRY:
         return EXCRET_fault_fixed;

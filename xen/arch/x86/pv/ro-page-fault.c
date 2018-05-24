@@ -25,6 +25,7 @@
 #include <xen/sched.h>
 #include <xen/trace.h>
 
+#include <asm/debugreg.h>
 #include <asm/domain.h>
 #include <asm/mm.h>
 #include <asm/pci.h>
@@ -387,7 +388,7 @@ int pv_ro_page_fault(unsigned long addr, struct cpu_user_regs *regs)
         /* Fallthrough */
     case X86EMUL_OKAY:
         if ( ctxt.retire.singlestep )
-            pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+            pv_inject_debug_exn(X86_DR6_BS);
 
         /* Fallthrough */
     case X86EMUL_RETRY:

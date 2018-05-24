@@ -76,11 +76,9 @@ void pv_emul_instruction_done(struct cpu_user_regs *regs, unsigned long rip)
 {
     regs->rip = rip;
     regs->eflags &= ~X86_EFLAGS_RF;
+
     if ( regs->eflags & X86_EFLAGS_TF )
-    {
-        current->arch.dr6 |= DR_STEP | DR_STATUS_RESERVED_ONE;
-        pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
-    }
+        pv_inject_debug_exn(X86_DR6_BS);
 }
 
 /*

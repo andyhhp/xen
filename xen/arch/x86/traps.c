@@ -1768,7 +1768,6 @@ void do_device_not_available(struct cpu_user_regs *regs)
 void do_debug(struct cpu_user_regs *regs)
 {
     unsigned long dr6;
-    struct vcpu *v = current;
 
     /* Stash dr6 as early as possible. */
     dr6 = read_debugreg(6);
@@ -1860,11 +1859,7 @@ void do_debug(struct cpu_user_regs *regs)
         return;
     }
 
-    /* Save debug status register where guest OS can peek at it */
-    v->arch.dr6 |= (dr6 & ~X86_DR6_DEFAULT);
-    v->arch.dr6 &= (dr6 | ~X86_DR6_DEFAULT);
-
-    pv_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+    pv_inject_debug_exn(dr6 ^ X86_DR6_DEFAULT);
 }
 
 static void __init noinline __set_intr_gate(unsigned int n,

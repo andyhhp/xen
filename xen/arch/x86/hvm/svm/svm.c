@@ -119,7 +119,7 @@ void __update_guest_eip(struct cpu_user_regs *regs, unsigned int inst_len)
     curr->arch.hvm_svm.vmcb->interrupt_shadow = 0;
 
     if ( regs->eflags & X86_EFLAGS_TF )
-        hvm_inject_hw_exception(TRAP_debug, X86_EVENT_NO_EC);
+        hvm_inject_debug_exn(X86_DR6_BS);
 }
 
 static void svm_cpu_down(void)
@@ -2798,7 +2798,10 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
                 goto unexpected_exit_type;
             if ( !rc )
                 hvm_inject_exception(TRAP_debug,
-                                     trap_type, inst_len, X86_EVENT_NO_EC);
+                                     trap_type, inst_len, X86_EVENT_NO_EC,
+                                     exit_reason == VMEXIT_ICEBP ? 0 :
+                                     /* #DB - Hardware already updated dr6. */
+                                     vmcb_get_dr6(vmcb) ^ X86_DR6_DEFAULT);
         }
         else
             domain_pause_for_debugger();
@@ -2830,7 +2833,7 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
            if ( !rc )
                hvm_inject_exception(TRAP_int3,
                                     X86_EVENTTYPE_SW_EXCEPTION,
-                                    inst_len, X86_EVENT_NO_EC);
+                                    inst_len, X86_EVENT_NO_EC, 0 /* N/A */);
         }
         break;
 

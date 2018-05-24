@@ -26,6 +26,7 @@
 #include <xen/softirq.h>
 
 #include <asm/apic.h>
+#include <asm/debugreg.h>
 #include <asm/shared.h>
 #include <asm/traps.h>
 
@@ -70,9 +71,9 @@ void pv_inject_event(const struct x86_event *event)
     tb->cs    = ti->cs;
     tb->eip   = ti->address;
 
-    if ( event->type == X86_EVENTTYPE_HW_EXCEPTION &&
-         vector == TRAP_page_fault )
+    switch ( vector | -(event->type == X86_EVENTTYPE_SW_INTERRUPT) )
     {
+    case TRAP_page_fault:
         curr->arch.pv_vcpu.ctrlreg[2] = event->cr2;
         arch_set_cr2(curr, event->cr2);
 
@@ -82,9 +83,16 @@ void pv_inject_event(const struct x86_event *event)
             error_code |= PFEC_user_mode;
 
         trace_pv_page_fault(event->cr2, error_code);
-    }
-    else
+        break;
+
+    case TRAP_debug:
+        curr->arch.dr6 |= event->pending_dbg;
+        /* Fallthrough */
+
+    default:
         trace_pv_trap(vector, regs->rip, use_error_code, error_code);
+        break;
+    }
 
     if ( use_error_code )
     {
