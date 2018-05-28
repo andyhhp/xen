@@ -40,6 +40,7 @@
 #include <asm/shadow.h>
 #include <asm/hap.h>
 #include <asm/current.h>
+#include <asm/debugreg.h>
 #include <asm/e820.h>
 #include <asm/io.h>
 #include <asm/regs.h>
@@ -3907,7 +3908,10 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
     v->arch.user_regs.rflags = X86_EFLAGS_MBS;
     v->arch.user_regs.rdx = 0x00000f00;
     v->arch.user_regs.rip = ip;
-    memset(&v->arch.debugreg, 0, sizeof(v->arch.debugreg));
+
+    memset(&v->arch.debugreg, 0, sizeof(v->arch.debugreg) - 16);
+    v->arch.debugreg[6] = X86_DR6_DEFAULT;
+    v->arch.debugreg[7] = X86_DR7_DEFAULT;
 
     v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_ET;
     hvm_update_guest_cr(v, 0);

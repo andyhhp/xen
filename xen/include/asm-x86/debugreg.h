@@ -70,6 +70,8 @@
 #define DR_RTM_ENABLE            (0x00000800ul) /* RTM debugging enable */
 #define DR_GENERAL_DETECT        (0x00002000ul) /* General detect enable */
 
+#define X86_DR7_DEFAULT 0x00000400ul    /* Default %dr7 value. */
+
 #define write_debugreg(reg, val) do {                       \
     unsigned long __val = val;                              \
     asm volatile ( "mov %0,%%db" #reg : : "r" (__val) );    \
