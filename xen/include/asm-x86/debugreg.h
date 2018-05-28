@@ -23,6 +23,12 @@
 #define X86_DR6_BT              (1u << 15)  /* Task switch             */
 #define X86_DR6_RTM             (1u << 16)  /* #DB/#BP in RTM region   */
 
+#define X86_DR6_BP_MASK                                 \
+    (X86_DR6_B0 | X86_DR6_B1 | X86_DR6_B2 | X86_DR6_B3)
+
+#define X86_DR6_KNOWN_MASK                                              \
+    (X86_DR6_BP_MASK | X86_DR6_BD | X86_DR6_BS | X86_DR6_BT | X86_DR6_RTM)
+
 #define DR_TRAP0        (0x1)           /* db0 */
 #define DR_TRAP1        (0x2)           /* db1 */
 #define DR_TRAP2        (0x4)           /* db2 */
@@ -30,7 +36,6 @@
 #define DR_STEP         (0x4000)        /* single-step */
 #define DR_SWITCH       (0x8000)        /* task switch */
 #define DR_NOT_RTM      (0x10000)       /* clear: #BP inside RTM region */
-#define DR_STATUS_RESERVED_ONE  0xffff0ff0ul /* Reserved, read as one */
 
 #define X86_DR6_DEFAULT 0xffff0ff0ul    /* Default %dr6 value. */
 
@@ -101,6 +106,25 @@ static inline unsigned long adjust_dr6_rsvd(unsigned long dr6, bool rtm)
     dr6 &= 0xffffefff;
 
     return dr6;
+}
+
+static inline unsigned long merge_dr6(unsigned long dr6, unsigned long new,
+                                      bool rtm)
+{
+    /* Flip dr6 to have positive polarity. */
+    dr6 ^= X86_DR6_DEFAULT;
+
+    /* Sanity check that only known values are passed in. */
+    ASSERT(!(dr6 & ~X86_DR6_KNOWN_MASK));
+    ASSERT(!(new & ~X86_DR6_KNOWN_MASK));
+
+    /* Breakpoints 0-3 overridden.  BD, BS, BT and RTM accumulate. */
+    dr6 = (dr6 & ~X86_DR6_BP_MASK) | new;
+
+    /* Flip dr6 back to having default polarity. */
+    dr6 ^= X86_DR6_DEFAULT;
+
+    return adjust_dr6_rsvd(dr6, rtm);
 }
 
 static inline unsigned long adjust_dr7_rsvd(unsigned long dr7, bool rtm)

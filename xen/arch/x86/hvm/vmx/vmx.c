@@ -1787,7 +1787,8 @@ static void vmx_inject_event(const struct x86_event *event)
          * All actions are left up to the hypervisor to perform.
          */
         __restore_debug_registers(curr);
-        write_debugreg(6, read_debugreg(6) | event->pending_dbg);
+        write_debugreg(6, merge_dr6(read_debugreg(6), event->pending_dbg,
+                                    curr->domain->arch.cpuid->feat.rtm));
 
         if ( !nestedhvm_vcpu_in_guestmode(curr) ||
              !nvmx_intercepts_exception(curr, TRAP_debug, _event.error_code) )

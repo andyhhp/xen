@@ -86,7 +86,8 @@ void pv_inject_event(const struct x86_event *event)
         break;
 
     case TRAP_debug:
-        curr->arch.dr6 |= event->pending_dbg;
+        curr->arch.dr6 = merge_dr6(curr->arch.dr6, event->pending_dbg,
+                                   curr->domain->arch.cpuid->feat.rtm);
         /* Fallthrough */
 
     default:

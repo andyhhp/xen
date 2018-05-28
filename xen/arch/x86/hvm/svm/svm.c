@@ -1447,7 +1447,8 @@ static void svm_inject_event(const struct x86_event *event)
          * Item 2 is done by hardware when injecting a #DB exception.
          */
         __restore_debug_registers(vmcb, curr);
-        vmcb_set_dr6(vmcb, vmcb_get_dr6(vmcb) | event->pending_dbg);
+        vmcb_set_dr6(vmcb, merge_dr6(vmcb_get_dr6(vmcb), event->pending_dbg,
+                                     curr->domain->arch.cpuid->feat.rtm));
 
         /* fall through */
     case TRAP_int3:
