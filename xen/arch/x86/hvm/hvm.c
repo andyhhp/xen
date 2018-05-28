@@ -883,12 +883,12 @@ static int hvm_save_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
         ctxt.r13 = v->arch.user_regs.r13;
         ctxt.r14 = v->arch.user_regs.r14;
         ctxt.r15 = v->arch.user_regs.r15;
-        ctxt.dr0 = v->arch.debugreg[0];
-        ctxt.dr1 = v->arch.debugreg[1];
-        ctxt.dr2 = v->arch.debugreg[2];
-        ctxt.dr3 = v->arch.debugreg[3];
-        ctxt.dr6 = v->arch.debugreg[6];
-        ctxt.dr7 = v->arch.debugreg[7];
+        ctxt.dr0 = v->arch.dr[0];
+        ctxt.dr1 = v->arch.dr[1];
+        ctxt.dr2 = v->arch.dr[2];
+        ctxt.dr3 = v->arch.dr[3];
+        ctxt.dr6 = v->arch.dr6;
+        ctxt.dr7 = v->arch.dr7;
 
         if ( hvm_save_entry(CPU, v->vcpu_id, h, &ctxt) != 0 )
             return 1; 
@@ -1151,12 +1151,12 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     v->arch.user_regs.r13 = ctxt.r13;
     v->arch.user_regs.r14 = ctxt.r14;
     v->arch.user_regs.r15 = ctxt.r15;
-    v->arch.debugreg[0] = ctxt.dr0;
-    v->arch.debugreg[1] = ctxt.dr1;
-    v->arch.debugreg[2] = ctxt.dr2;
-    v->arch.debugreg[3] = ctxt.dr3;
-    v->arch.debugreg[6] = adjust_dr6_rsvd(ctxt.dr6, cp->feat.rtm);
-    v->arch.debugreg[7] = adjust_dr7_rsvd(ctxt.dr7, cp->feat.rtm);
+    v->arch.dr[0] = ctxt.dr0;
+    v->arch.dr[1] = ctxt.dr1;
+    v->arch.dr[2] = ctxt.dr2;
+    v->arch.dr[3] = ctxt.dr3;
+    v->arch.dr6 = adjust_dr6_rsvd(ctxt.dr6, cp->feat.rtm);
+    v->arch.dr7 = adjust_dr7_rsvd(ctxt.dr7, cp->feat.rtm);
 
     v->arch.vgc_flags = VGCF_online;
 
@@ -3910,9 +3910,9 @@ void hvm_vcpu_reset_state(struct vcpu *v, uint16_t cs, uint16_t ip)
     v->arch.user_regs.rdx = 0x00000f00;
     v->arch.user_regs.rip = ip;
 
-    memset(&v->arch.debugreg, 0, sizeof(v->arch.debugreg) - 16);
-    v->arch.debugreg[6] = X86_DR6_DEFAULT;
-    v->arch.debugreg[7] = X86_DR7_DEFAULT;
+    memset(v->arch.dr, 0, sizeof(v->arch.dr));
+    v->arch.dr6 = X86_DR6_DEFAULT;
+    v->arch.dr7 = X86_DR7_DEFAULT;
 
     v->arch.hvm_vcpu.guest_cr[0] = X86_CR0_ET;
     hvm_update_guest_cr(v, 0);
