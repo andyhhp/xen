@@ -10,9 +10,18 @@
 #define DR_STATUS    6
 #define DR_CONTROL   7
 
-/* Define a few things for the status register.  We can use this to determine
-   which debugging register was responsible for the trap.  The other bits
-   are either reserved or not of interest to us. */
+/*
+ * DR6 status bits.
+ *   N.B. For backwards compatibility, X86_DR6_RTM has inverted polarity.
+ */
+#define X86_DR6_B0              (1u <<  0)  /* Breakpoint 0 triggered  */
+#define X86_DR6_B1              (1u <<  1)  /* Breakpoint 1 triggered  */
+#define X86_DR6_B2              (1u <<  2)  /* Breakpoint 2 triggered  */
+#define X86_DR6_B3              (1u <<  3)  /* Breakpoint 3 triggered  */
+#define X86_DR6_BD              (1u << 13)  /* Debug register accessed */
+#define X86_DR6_BS              (1u << 14)  /* Single step             */
+#define X86_DR6_BT              (1u << 15)  /* Task switch             */
+#define X86_DR6_RTM             (1u << 16)  /* #DB/#BP in RTM region   */
 
 #define DR_TRAP0        (0x1)           /* db0 */
 #define DR_TRAP1        (0x2)           /* db1 */
@@ -21,7 +30,6 @@
 #define DR_STEP         (0x4000)        /* single-step */
 #define DR_SWITCH       (0x8000)        /* task switch */
 #define DR_NOT_RTM      (0x10000)       /* clear: #BP inside RTM region */
-#define DR_STATUS_RESERVED_ZERO (~0xffffeffful) /* Reserved, read as zero */
 #define DR_STATUS_RESERVED_ONE  0xffff0ff0ul /* Reserved, read as one */
 
 #define X86_DR6_DEFAULT 0xffff0ff0ul    /* Default %dr6 value. */
@@ -63,8 +71,6 @@
    We can slow the instruction pipeline for instructions coming via the
    gdt or the ldt if we want to.  I am not sure why this is an advantage */
 
-#define DR_CONTROL_RESERVED_ZERO (~0xffff27fful) /* Reserved, read as zero */
-#define DR_CONTROL_RESERVED_ONE  (0x00000400ul) /* Reserved, read as one */
 #define DR_LOCAL_EXACT_ENABLE    (0x00000100ul) /* Local exact enable */
 #define DR_GLOBAL_EXACT_ENABLE   (0x00000200ul) /* Global exact enable */
 #define DR_RTM_ENABLE            (0x00000800ul) /* RTM debugging enable */
@@ -83,5 +89,31 @@
 })
 long set_debugreg(struct vcpu *, unsigned int reg, unsigned long value);
 void activate_debugregs(const struct vcpu *);
+
+static inline unsigned long adjust_dr6_rsvd(unsigned long dr6, bool rtm)
+{
+    /*
+     * DR6: Bits 4-11,17-31 reserved (set to 1).
+     *      Bit  16 reserved (set to 1) if RTM unavailable.
+     *      Bit  12 reserved (set to 0).
+     */
+    dr6 |= 0xfffe0ff0 | (rtm ? 0 : X86_DR6_RTM);
+    dr6 &= 0xffffefff;
+
+    return dr6;
+}
+
+static inline unsigned long adjust_dr7_rsvd(unsigned long dr7, bool rtm)
+{
+    /*
+     * DR7: Bit  10 reserved (set to 1).
+     *      Bit  11 reserved (set to 0) if RTM unavailable.
+     *      Bits 12,14-15 reserved (set to 0).
+     */
+    dr7 |= 0x00000400;
+    dr7 &= 0xffff23ff & (rtm ? 0 : ~DR_RTM_ENABLE);
+
+    return dr7;
+}
 
 #endif /* _X86_DEBUGREG_H */

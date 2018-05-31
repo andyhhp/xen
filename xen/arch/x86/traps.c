@@ -2057,6 +2057,7 @@ void activate_debugregs(const struct vcpu *curr)
 long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
 {
     struct vcpu *curr = current;
+    const struct cpuid_policy *cp = curr->domain->arch.cpuid;
 
     switch ( reg )
     {
@@ -2086,12 +2087,8 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
         if ( value != (uint32_t)value )
             return -EINVAL;
 
-        /*
-         * DR6: Bits 4-11,16-31 reserved (set to 1).
-         *      Bit 12 reserved (set to 0).
-         */
-        value &= ~DR_STATUS_RESERVED_ZERO; /* reserved bits => 0 */
-        value |=  DR_STATUS_RESERVED_ONE;  /* reserved bits => 1 */
+        value = adjust_dr6_rsvd(value, cp->feat.rtm);
+
         if ( v == curr )
             write_debugreg(6, value);
         break;
@@ -2106,12 +2103,8 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
         if ( value != (uint32_t)value )
             return -EINVAL;
 
-        /*
-         * DR7: Bit 10 reserved (set to 1).
-         *      Bits 11-12,14-15 reserved (set to 0).
-         */
-        value &= ~DR_CONTROL_RESERVED_ZERO; /* reserved bits => 0 */
-        value |=  DR_CONTROL_RESERVED_ONE;  /* reserved bits => 1 */
+        value = adjust_dr7_rsvd(value, cp->feat.rtm);
+
         /*
          * Privileged bits:
          *      GD (bit 13): must be 0.

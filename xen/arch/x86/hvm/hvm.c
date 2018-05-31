@@ -977,6 +977,7 @@ unsigned long hvm_cr4_guest_valid_bits(const struct domain *d, bool restore)
 
 static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
 {
+    const struct cpuid_policy *cp = d->arch.cpuid;
     int vcpuid;
     struct vcpu *v;
     struct hvm_hw_cpu ctxt;
@@ -1154,8 +1155,8 @@ static int hvm_load_cpu_ctxt(struct domain *d, hvm_domain_context_t *h)
     v->arch.debugreg[1] = ctxt.dr1;
     v->arch.debugreg[2] = ctxt.dr2;
     v->arch.debugreg[3] = ctxt.dr3;
-    v->arch.debugreg[6] = ctxt.dr6;
-    v->arch.debugreg[7] = ctxt.dr7;
+    v->arch.debugreg[6] = adjust_dr6_rsvd(ctxt.dr6, cp->feat.rtm);
+    v->arch.debugreg[7] = adjust_dr7_rsvd(ctxt.dr7, cp->feat.rtm);
 
     v->arch.vgc_flags = VGCF_online;
 

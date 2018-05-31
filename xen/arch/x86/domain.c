@@ -783,6 +783,7 @@ int arch_set_info_guest(
     struct vcpu *v, vcpu_guest_context_u c)
 {
     struct domain *d = v->domain;
+    const struct cpuid_policy *cp = d->arch.cpuid;
     unsigned long cr3_gfn;
     struct page_info *cr3_page;
     unsigned long flags, cr4;
@@ -894,8 +895,10 @@ int arch_set_info_guest(
 
     if ( is_hvm_domain(d) )
     {
-        for ( i = 0; i < ARRAY_SIZE(v->arch.debugreg); ++i )
+        for ( i = 0; i < ARRAY_SIZE(v->arch.debugreg) - 2; ++i )
             v->arch.debugreg[i] = c(debugreg[i]);
+        v->arch.debugreg[6] = adjust_dr6_rsvd(c(debugreg[6]), cp->feat.rtm);
+        v->arch.debugreg[7] = adjust_dr7_rsvd(c(debugreg[7]), cp->feat.rtm);
 
         hvm_set_info_guest(v);
         goto out;
