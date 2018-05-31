@@ -1774,15 +1774,21 @@ static void vmx_inject_event(const struct x86_event *event)
     unsigned long intr_info;
     struct vcpu *curr = current;
     struct x86_event _event = *event;
+    struct cpu_user_regs *regs = guest_cpu_user_regs();
 
     switch ( _event.vector | -(_event.type == X86_EVENTTYPE_SW_INTERRUPT) )
     {
     case TRAP_debug:
-        if ( guest_cpu_user_regs()->eflags & X86_EFLAGS_TF )
-        {
-            __restore_debug_registers(curr);
-            write_debugreg(6, read_debugreg(6) | DR_STEP);
-        }
+        /*
+         * On Intel hardware, a #DB exception:
+         *  1) Merges new status bits into %dr6
+         *  2) Clears %dr7.gd and MSR_DEBUGCTL.LBR
+         *
+         * All actions are left up to the hypervisor to perform.
+         */
+        __restore_debug_registers(curr);
+        write_debugreg(6, read_debugreg(6) | event->pending_dbg);
+
         if ( !nestedhvm_vcpu_in_guestmode(curr) ||
              !nvmx_intercepts_exception(curr, TRAP_debug, _event.error_code) )
         {
@@ -1793,15 +1799,38 @@ static void vmx_inject_event(const struct x86_event *event)
             __vmread(GUEST_IA32_DEBUGCTL, &val);
             __vmwrite(GUEST_IA32_DEBUGCTL, val & ~IA32_DEBUGCTLMSR_LBR);
         }
-        if ( cpu_has_monitor_trap_flag )
-            break;
+
         /* fall through */
     case TRAP_int3:
         if ( curr->domain->debugger_attached )
         {
             /* Debug/Int3: Trap to debugger. */
+            if ( _event.vector == TRAP_int3 )
+            {
+                /* N.B. Can't use __update_guest_eip() for risk of recusion. */
+                regs->rip += _event.insn_len;
+                regs->eflags &= ~X86_EFLAGS_RF;
+                curr->arch.gdbsx_vcpu_event = TRAP_int3;
+            }
+
             domain_pause_for_debugger();
             return;
+        }
+        else
+        {
+            int rc = hvm_monitor_debug(regs->rip,
+                                       _event.vector == TRAP_debug
+                                       ? HVM_MONITOR_DEBUG_EXCEPTION
+                                       : HVM_MONITOR_SOFTWARE_BREAKPOINT,
+                                       _event.type, _event.insn_len);
+            if ( rc < 0 )
+            {
+                gprintk(XENLOG_ERR, "Monitor debug error %d\n", rc);
+                domain_crash(curr->domain);
+                return;
+            }
+            if ( rc )
+                return; /* VCPU paused.  Wait for monitor. */
         }
         break;
 
@@ -3689,61 +3718,17 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
         switch ( vector )
         {
         case TRAP_debug:
-            /*
-             * Updates DR6 where debugger can peek (See 3B 23.2.1,
-             * Table 23-1, "Exit Qualification for Debug Exceptions").
-             */
             __vmread(EXIT_QUALIFICATION, &exit_qualification);
             HVMTRACE_1D(TRAP_DEBUG, exit_qualification);
-            __restore_debug_registers(v);
-            write_debugreg(6, exit_qualification | DR_STATUS_RESERVED_ONE);
-            if ( !v->domain->debugger_attached )
-            {
-                unsigned long insn_len = 0;
-                int rc;
-                unsigned long trap_type = MASK_EXTR(intr_info,
-                                                    INTR_INFO_INTR_TYPE_MASK);
-
-                if ( trap_type >= X86_EVENTTYPE_SW_INTERRUPT )
-                    __vmread(VM_EXIT_INSTRUCTION_LEN, &insn_len);
-
-                rc = hvm_monitor_debug(regs->rip,
-                                       HVM_MONITOR_DEBUG_EXCEPTION,
-                                       trap_type, insn_len);
-
-                if ( rc < 0 )
-                    goto exit_and_crash;
-                if ( !rc )
-                    vmx_propagate_intr(intr_info, exit_qualification);
-            }
-            else
-                domain_pause_for_debugger();
+            vmx_propagate_intr(intr_info, exit_qualification);
             break;
+
         case TRAP_int3:
+        case TRAP_alignment_check:
             HVMTRACE_1D(TRAP, vector);
-            if ( !v->domain->debugger_attached )
-            {
-                unsigned long insn_len;
-                int rc;
-
-                __vmread(VM_EXIT_INSTRUCTION_LEN, &insn_len);
-                rc = hvm_monitor_debug(regs->rip,
-                                       HVM_MONITOR_SOFTWARE_BREAKPOINT,
-                                       X86_EVENTTYPE_SW_EXCEPTION,
-                                       insn_len);
-
-                if ( rc < 0 )
-                    goto exit_and_crash;
-                if ( !rc )
-                    vmx_propagate_intr(intr_info, 0 /* N/A */);
-            }
-            else
-            {
-                update_guest_eip(); /* Safe: INT3 */
-                v->arch.gdbsx_vcpu_event = TRAP_int3;
-                domain_pause_for_debugger();
-            }
+            vmx_propagate_intr(intr_info, 0 /* N/A */);
             break;
+
         case TRAP_no_device:
             HVMTRACE_1D(TRAP, vector);
             vmx_fpu_dirty_intercept();
@@ -3773,10 +3758,7 @@ void vmx_vmexit_handler(struct cpu_user_regs *regs)
 
             hvm_inject_page_fault(regs->error_code, exit_qualification);
             break;
-        case TRAP_alignment_check:
-            HVMTRACE_1D(TRAP, vector);
-            vmx_propagate_intr(intr_info, 0 /* N/A */);
-            break;
+
         case TRAP_nmi:
             if ( MASK_EXTR(intr_info, INTR_INFO_INTR_TYPE_MASK) !=
                  X86_EVENTTYPE_NMI )

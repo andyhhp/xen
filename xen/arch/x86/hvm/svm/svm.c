@@ -1437,18 +1437,48 @@ static void svm_inject_event(const struct x86_event *event)
     switch ( _event.vector | -(_event.type == X86_EVENTTYPE_SW_INTERRUPT) )
     {
     case TRAP_debug:
-        if ( regs->eflags & X86_EFLAGS_TF )
-        {
-            __restore_debug_registers(vmcb, curr);
-            vmcb_set_dr6(vmcb, vmcb_get_dr6(vmcb) | DR_STEP);
-        }
+        /*
+         * On AMD hardware, a #DB exception:
+         *  1) Merges new status bits into %dr6
+         *  2) Clears %dr7.gd and MSR_DEBUGCTL.{LBR,BTF}
+         *
+         * Item 1 is done by hardware before a #DB intercepted vmexit, but we
+         * may end up here from emulation so have to repeat it ourselves.
+         * Item 2 is done by hardware when injecting a #DB exception.
+         */
+        __restore_debug_registers(vmcb, curr);
+        vmcb_set_dr6(vmcb, vmcb_get_dr6(vmcb) | event->pending_dbg);
+
         /* fall through */
     case TRAP_int3:
         if ( curr->domain->debugger_attached )
         {
             /* Debug/Int3: Trap to debugger. */
+            if ( _event.vector == TRAP_int3 )
+            {
+                /* N.B. Can't use __update_guest_eip() for risk of recusion. */
+                regs->rip += _event.insn_len;
+                regs->eflags &= ~X86_EFLAGS_RF;
+                curr->arch.gdbsx_vcpu_event = TRAP_int3;
+            }
+
             domain_pause_for_debugger();
             return;
+        }
+        else
+        {
+            int rc = hvm_monitor_debug(regs->rip,
+                                       _event.vector == TRAP_debug
+                                       ? HVM_MONITOR_DEBUG_EXCEPTION
+                                       : HVM_MONITOR_SOFTWARE_BREAKPOINT,
+                                       _event.type, _event.insn_len);
+            if ( rc < 0 )
+            {
+                gprintk(XENLOG_ERR, "Monitor debug error %d\n", rc);
+                return svm_crash_or_fault(curr);
+            }
+            if ( rc )
+                return; /* VCPU paused.  Wait for monitor. */
         }
         break;
 
@@ -2775,67 +2805,46 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
 
     case VMEXIT_ICEBP:
     case VMEXIT_EXCEPTION_DB:
-        if ( !v->domain->debugger_attached )
-        {
-            int rc;
-            unsigned int trap_type;
-
-            if ( likely(exit_reason != VMEXIT_ICEBP) )
-            {
-                trap_type = X86_EVENTTYPE_HW_EXCEPTION;
-                inst_len = 0;
-            }
-            else
-            {
-                trap_type = X86_EVENTTYPE_PRI_SW_EXCEPTION;
-                inst_len = __get_instruction_length(v, INSTR_ICEBP);
-            }
-
-            rc = hvm_monitor_debug(regs->rip,
-                                   HVM_MONITOR_DEBUG_EXCEPTION,
-                                   trap_type, inst_len);
-            if ( rc < 0 )
-                goto unexpected_exit_type;
-            if ( !rc )
-                hvm_inject_exception(TRAP_debug,
-                                     trap_type, inst_len, X86_EVENT_NO_EC,
-                                     exit_reason == VMEXIT_ICEBP ? 0 :
-                                     /* #DB - Hardware already updated dr6. */
-                                     vmcb_get_dr6(vmcb) ^ X86_DR6_DEFAULT);
-        }
-        else
-            domain_pause_for_debugger();
-        break;
-
     case VMEXIT_EXCEPTION_BP:
-        inst_len = __get_instruction_length(v, INSTR_INT3);
+    {
+        unsigned int vec, type, len, extra;
 
-        if ( inst_len == 0 )
-             break;
-
-        if ( v->domain->debugger_attached )
+        switch ( exit_reason )
         {
-            /* AMD Vol2, 15.11: INT3, INTO, BOUND intercepts do not update RIP. */
-            __update_guest_eip(regs, inst_len);
-            current->arch.gdbsx_vcpu_event = TRAP_int3;
-            domain_pause_for_debugger();
-        }
-        else
-        {
-           int rc;
+        case VMEXIT_ICEBP:
+            vec   = TRAP_debug;
+            type  = X86_EVENTTYPE_PRI_SW_EXCEPTION;
+            len   = __get_instruction_length(v, INSTR_ICEBP);
+            extra = 0;
+            break;
 
-           rc = hvm_monitor_debug(regs->rip,
-                                  HVM_MONITOR_SOFTWARE_BREAKPOINT,
-                                  X86_EVENTTYPE_SW_EXCEPTION,
-                                  inst_len);
-           if ( rc < 0 )
-               goto unexpected_exit_type;
-           if ( !rc )
-               hvm_inject_exception(TRAP_int3,
-                                    X86_EVENTTYPE_SW_EXCEPTION,
-                                    inst_len, X86_EVENT_NO_EC, 0 /* N/A */);
+        case VMEXIT_EXCEPTION_DB:
+            vec   = TRAP_debug;
+            type  = X86_EVENTTYPE_HW_EXCEPTION;
+            len   = 0;
+            /* #DB - Hardware has already updated %dr6 for us. */
+            extra = vmcb_get_dr6(vmcb) ^ X86_DR6_DEFAULT;
+            break;
+
+        case VMEXIT_EXCEPTION_BP:
+            vec   = TRAP_int3;
+            type  = X86_EVENTTYPE_SW_EXCEPTION;
+            len   = __get_instruction_length(v, INSTR_INT3);
+            extra = 0; /* N/A */
+            break;
+
+        default:
+            ASSERT_UNREACHABLE();
+            goto unexpected_exit_type;
         }
+
+        /* __get_instruction_length() failure.  #GP queued up. */
+        if ( type >= X86_EVENTTYPE_SW_INTERRUPT && !len )
+            break;
+
+        hvm_inject_exception(vec, type, len, X86_EVENT_NO_EC, extra);
         break;
+    }
 
     case VMEXIT_EXCEPTION_NM:
         svm_fpu_dirty_intercept();
