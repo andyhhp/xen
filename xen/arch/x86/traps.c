@@ -1830,7 +1830,7 @@ void do_debug(struct cpu_user_regs *regs)
             fatal_trap(regs, 0);
         }
 
-        if ( dr6 & (DR_TRAP3 | DR_TRAP2 | DR_TRAP1 | DR_TRAP0) )
+        if ( dr6 & X86_DR6_BP_MASK )
         {
             unsigned int bp, dr7 = read_debugreg(7) >> DR_CONTROL_SHIFT;
 

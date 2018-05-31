@@ -1,15 +1,6 @@
 #ifndef _X86_DEBUGREG_H
 #define _X86_DEBUGREG_H
 
-
-/* Indicate the register numbers for a number of the specific
-   debug registers.  Registers 0-3 contain the addresses we wish to trap on */
-
-#define DR_FIRSTADDR 0
-#define DR_LASTADDR  3
-#define DR_STATUS    6
-#define DR_CONTROL   7
-
 /*
  * DR6 status bits.
  *   N.B. For backwards compatibility, X86_DR6_RTM has inverted polarity.
@@ -28,14 +19,6 @@
 
 #define X86_DR6_KNOWN_MASK                                              \
     (X86_DR6_BP_MASK | X86_DR6_BD | X86_DR6_BS | X86_DR6_BT | X86_DR6_RTM)
-
-#define DR_TRAP0        (0x1)           /* db0 */
-#define DR_TRAP1        (0x2)           /* db1 */
-#define DR_TRAP2        (0x4)           /* db2 */
-#define DR_TRAP3        (0x8)           /* db3 */
-#define DR_STEP         (0x4000)        /* single-step */
-#define DR_SWITCH       (0x8000)        /* task switch */
-#define DR_NOT_RTM      (0x10000)       /* clear: #BP inside RTM region */
 
 #define X86_DR6_DEFAULT 0xffff0ff0ul    /* Default %dr6 value. */
 

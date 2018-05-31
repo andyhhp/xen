@@ -1365,7 +1365,7 @@ int pv_emulate_privileged_op(struct cpu_user_regs *regs)
         }
 
         if ( ctxt.ctxt.retire.singlestep )
-            ctxt.bpmatch |= DR_STEP;
+            ctxt.bpmatch |= X86_DR6_BS;
 
         if ( ctxt.bpmatch &&
              !(curr->arch.pv_vcpu.trap_bounce.flags & TBF_EXCEPTION) )
