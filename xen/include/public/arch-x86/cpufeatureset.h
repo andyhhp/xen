@@ -238,6 +238,11 @@ XEN_CPUFEATURE(EFRO,          7*32+10) /*   APERF/MPERF Read Only interface */
 /* AMD-defined CPU features, CPUID level 0x80000008.ebx, word 8 */
 XEN_CPUFEATURE(CLZERO,        8*32+ 0) /*A  CLZERO instruction */
 XEN_CPUFEATURE(IBPB,          8*32+12) /*A  IBPB support only (no IBRS, used by AMD) */
+XEN_CPUFEATURE(AMD_IBRS,      8*32+14) /*   MSR_SPEC_CTRL.IBRS available */
+XEN_CPUFEATURE(AMD_STIBP,     8*32+15) /*   MSR_SPEC_CTRL.STIBP available */
+XEN_CPUFEATURE(AMD_SSBD,      8*32+24) /*   MSR_SPEC_CTRL.SSBD available */
+XEN_CPUFEATURE(VIRT_SC_SSBD,  8*32+25) /*   MSR_VIRT_SPEC_CTRL.SSBD available. */
+XEN_CPUFEATURE(AMD_SSB_NO,    8*32+26) /*   Hardware not vulnerable to SSB */
 
 /* Intel-defined CPU features, CPUID level 0x00000007:0.edx, word 9 */
 XEN_CPUFEATURE(AVX512_4VNNIW, 9*32+ 2) /*A  AVX512 Neural Network Instructions */

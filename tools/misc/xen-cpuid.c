@@ -140,6 +140,10 @@ static const char *str_e8b[32] =
     [ 0] = "clzero",
 
     [12] = "ibpb",
+    [14] = "amd_ibrs",      [15] = "amd_stibp",
+
+    [24] = "amd_ssbd",      [25] = "virt_sc_ssbd",
+    [26] = "amd_ssb_no",
 };
 
 static const char *str_7d0[32] =

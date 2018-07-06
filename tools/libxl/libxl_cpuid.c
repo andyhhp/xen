@@ -245,6 +245,11 @@ int libxl_cpuid_parse_config(libxl_cpuid_policy_list *cpuid, const char* str)
         {"invtsc",       0x80000007, NA, CPUID_REG_EDX,  8,  1},
 
         {"ibpb",         0x80000008, NA, CPUID_REG_EBX, 12,  1},
+        {"amd_ibrs",     0x80000008, NA, CPUID_REG_EBX, 14,  1},
+        {"amd_stibp",    0x80000008, NA, CPUID_REG_EBX, 15,  1},
+        {"amd_ssbd",     0x80000008, NA, CPUID_REG_EBX, 24,  1},
+        {"virt_sc_ssbd", 0x80000008, NA, CPUID_REG_EBX, 25,  1},
+        {"amd_ssb_no",   0x80000008, NA, CPUID_REG_EBX, 26,  1},
         {"nc",           0x80000008, NA, CPUID_REG_ECX,  0,  8},
         {"apicidsize",   0x80000008, NA, CPUID_REG_ECX, 12,  4},
 
