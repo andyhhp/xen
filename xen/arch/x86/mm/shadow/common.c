@@ -3340,7 +3340,7 @@ int shadow_track_dirty_vram(struct domain *d,
 
         /* Iterate over VRAM to track dirty bits. */
         for ( i = 0; i < nr; i++ ) {
-            mfn_t mfn = get_gfn_query_unlocked(d, begin_pfn + i, &t);
+            mfn_t mfn = get_gfn_query_unlocked(d, _gfn(begin_pfn + i), &t);
             struct page_info *page;
             int dirty = 0;
             paddr_t sl1ma = dirty_vram->sl1ma[i];
@@ -3420,7 +3420,8 @@ int shadow_track_dirty_vram(struct domain *d,
              * write access */
             for ( i = begin_pfn; i < end_pfn; i++ )
             {
-                mfn_t mfn = get_gfn_query_unlocked(d, i, &t);
+                mfn_t mfn = get_gfn_query_unlocked(d, _gfn(i), &t);
+
                 if ( !mfn_eq(mfn, INVALID_MFN) )
                     flush_tlb |= sh_remove_write_access(d, mfn, 1, 0);
             }

@@ -1469,9 +1469,6 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
             struct domain *d;
             struct mcinfo_msr *msr;
             unsigned int i;
-            paddr_t gaddr;
-            unsigned long gfn, mfn;
-            p2m_type_t t;
 
             domid = (mc_msrinject->mcinj_domid == DOMID_SELF) ?
                     current->domain->domain_id : mc_msrinject->mcinj_domid;
@@ -1489,11 +1486,12 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
                   i < mc_msrinject->mcinj_count;
                   i++, msr++ )
             {
-                gaddr = msr->value;
-                gfn = PFN_DOWN(gaddr);
-                mfn = mfn_x(get_gfn(d, gfn, &t));
+                p2m_type_t t;
+                paddr_t gaddr = msr->value;
+                gfn_t gfn = gaddr_to_gfn(gaddr);
+                mfn_t mfn = get_gfn(d, gfn, &t);
 
-                if ( mfn == mfn_x(INVALID_MFN) )
+                if ( mfn_eq(mfn, INVALID_MFN) )
                 {
                     put_gfn(d, gfn);
                     put_domain(d);
@@ -1501,7 +1499,7 @@ long do_mca(XEN_GUEST_HANDLE_PARAM(xen_mc_t) u_xen_mc)
                                      -EINVAL, gfn, domid);
                 }
 
-                msr->value = pfn_to_paddr(mfn) | (gaddr & (PAGE_SIZE - 1));
+                msr->value = mfn_to_maddr(mfn) | (gaddr & (PAGE_SIZE - 1));
 
                 put_gfn(d, gfn);
             }

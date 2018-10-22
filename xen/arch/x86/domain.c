@@ -686,7 +686,7 @@ int arch_domain_soft_reset(struct domain *d)
     int ret = 0;
     struct domain *owner;
     mfn_t mfn;
-    unsigned long gfn;
+    gfn_t gfn;
     p2m_type_t p2mt;
     unsigned int i;
 
@@ -720,19 +720,19 @@ int arch_domain_soft_reset(struct domain *d)
     ASSERT( owner == d );
 
     mfn = page_to_mfn(page);
-    gfn = mfn_to_gmfn(d, mfn_x(mfn));
+    gfn = _gfn(mfn_to_gmfn(d, mfn_x(mfn)));
 
     /*
      * gfn == INVALID_GFN indicates that the shared_info page was never mapped
      * to the domain's address space and there is nothing to replace.
      */
-    if ( gfn == gfn_x(INVALID_GFN) )
+    if ( gfn_eq(gfn, INVALID_GFN) )
         goto exit_put_page;
 
     if ( !mfn_eq(get_gfn_query(d, gfn, &p2mt), mfn) )
     {
         printk(XENLOG_G_ERR "Failed to get Dom%d's shared_info GFN (%lx)\n",
-               d->domain_id, gfn);
+               d->domain_id, gfn_x(gfn));
         ret = -EINVAL;
         goto exit_put_gfn;
     }
@@ -741,26 +741,25 @@ int arch_domain_soft_reset(struct domain *d)
     if ( !new_page )
     {
         printk(XENLOG_G_ERR "Failed to alloc a page to replace"
-               " Dom%d's shared_info frame %lx\n", d->domain_id, gfn);
+               " Dom%d's shared_info frame %lx\n", d->domain_id, gfn_x(gfn));
         ret = -ENOMEM;
         goto exit_put_gfn;
     }
 
-    ret = guest_physmap_remove_page(d, _gfn(gfn), mfn, PAGE_ORDER_4K);
+    ret = guest_physmap_remove_page(d, gfn, mfn, PAGE_ORDER_4K);
     if ( ret )
     {
         printk(XENLOG_G_ERR "Failed to remove Dom%d's shared_info frame %lx\n",
-               d->domain_id, gfn);
+               d->domain_id, gfn_x(gfn));
         free_domheap_page(new_page);
         goto exit_put_gfn;
     }
 
-    ret = guest_physmap_add_page(d, _gfn(gfn), page_to_mfn(new_page),
-                                 PAGE_ORDER_4K);
+    ret = guest_physmap_add_page(d, gfn, page_to_mfn(new_page), PAGE_ORDER_4K);
     if ( ret )
     {
         printk(XENLOG_G_ERR "Failed to add a page to replace"
-               " Dom%d's shared_info frame %lx\n", d->domain_id, gfn);
+               " Dom%d's shared_info frame %lx\n", d->domain_id, gfn_x(gfn));
         free_domheap_page(new_page);
     }
  exit_put_gfn:

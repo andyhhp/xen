@@ -152,12 +152,12 @@ nestedhap_walk_L0_p2m(struct p2m_domain *p2m, paddr_t L1_gpa, paddr_t *L0_gpa,
                       unsigned int *page_order,
                       bool_t access_r, bool_t access_w, bool_t access_x)
 {
+    gfn_t l1_gfn = gaddr_to_gfn(L1_gpa);
     mfn_t mfn;
     int rc;
 
     /* walk L0 P2M table */
-    mfn = get_gfn_type_access(p2m, L1_gpa >> PAGE_SHIFT, p2mt, p2ma,
-                              0, page_order);
+    mfn = get_gfn_type_access(p2m, l1_gfn, p2mt, p2ma, 0, page_order);
 
     rc = NESTEDHVM_PAGEFAULT_DIRECT_MMIO;
     if ( *p2mt == p2m_mmio_direct )
@@ -180,7 +180,7 @@ nestedhap_walk_L0_p2m(struct p2m_domain *p2m, paddr_t L1_gpa, paddr_t *L0_gpa,
 direct_mmio_out:
     *L0_gpa = (mfn_x(mfn) << PAGE_SHIFT) + (L1_gpa & ~PAGE_MASK);
 out:
-    __put_gfn(p2m, L1_gpa >> PAGE_SHIFT);
+    __put_gfn(p2m, l1_gfn);
     return rc;
 }
 

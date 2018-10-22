@@ -431,7 +431,7 @@ void p2m_unlock_and_tlb_flush(struct p2m_domain *p2m);
  * put_gfn. ****/
 
 mfn_t __nonnull(3, 4) __get_gfn_type_access(
-    struct p2m_domain *p2m, unsigned long gfn, p2m_type_t *t,
+    struct p2m_domain *p2m, gfn_t gfn, p2m_type_t *t,
     p2m_access_t *a, p2m_query_t q, unsigned int *page_order, bool_t locked);
 
 /*
@@ -444,7 +444,7 @@ mfn_t __nonnull(3, 4) __get_gfn_type_access(
  * the entry was found in.
  */
 static inline mfn_t __nonnull(3, 4) get_gfn_type_access(
-    struct p2m_domain *p2m, unsigned long gfn, p2m_type_t *t,
+    struct p2m_domain *p2m, gfn_t gfn, p2m_type_t *t,
     p2m_access_t *a, p2m_query_t q, unsigned int *page_order)
 {
     return __get_gfn_type_access(p2m, gfn, t, a, q, page_order, true);
@@ -452,22 +452,21 @@ static inline mfn_t __nonnull(3, 4) get_gfn_type_access(
 
 /* General conversion function from gfn to mfn */
 static inline mfn_t __nonnull(3) get_gfn_type(
-    struct domain *d, unsigned long gfn, p2m_type_t *t, p2m_query_t q)
+    struct domain *d, gfn_t gfn, p2m_type_t *t, p2m_query_t q)
 {
     p2m_access_t a;
     return get_gfn_type_access(p2m_get_hostp2m(d), gfn, t, &a, q, NULL);
 }
 
 /* Syntactic sugar: most callers will use one of these. */
-#define get_gfn(d, g, t)         get_gfn_type((d), (g), (t), P2M_ALLOC)
-#define get_gfn_query(d, g, t)   get_gfn_type((d), (g), (t), 0)
-#define get_gfn_unshare(d, g, t) get_gfn_type((d), (g), (t), \
-                                              P2M_ALLOC | P2M_UNSHARE)
+#define get_gfn(d, g, t)         get_gfn_type(d, g, t, P2M_ALLOC)
+#define get_gfn_query(d, g, t)   get_gfn_type(d, g, t, 0)
+#define get_gfn_unshare(d, g, t) get_gfn_type(d, g, t, P2M_ALLOC | P2M_UNSHARE)
 
 /* Will release the p2m_lock for this gfn entry. */
-void __put_gfn(struct p2m_domain *p2m, unsigned long gfn);
+void __put_gfn(struct p2m_domain *p2m, gfn_t gfn);
 
-#define put_gfn(d, gfn) __put_gfn(p2m_get_hostp2m((d)), (gfn))
+#define put_gfn(d, g) __put_gfn(p2m_get_hostp2m(d), g)
 
 /*
  * The intent of the "unlocked" accessor is to have the caller not worry about
@@ -484,9 +483,8 @@ void __put_gfn(struct p2m_domain *p2m, unsigned long gfn);
  * Any other type of query can cause a change in the p2m and may need to
  * perform locking.
  */
-static inline mfn_t get_gfn_query_unlocked(struct domain *d,
-                                           unsigned long gfn,
-                                           p2m_type_t *t)
+static inline mfn_t get_gfn_query_unlocked(
+    struct domain *d, gfn_t gfn, p2m_type_t *t)
 {
     p2m_access_t a;
     return __get_gfn_type_access(p2m_get_hostp2m(d), gfn, t, &a, 0, NULL, 0);
@@ -583,9 +581,9 @@ do {                                                    \
 
     /* Now do the gets */
     *first_mfn  = get_gfn_type_access(p2m_get_hostp2m(rval->first_domain),
-                                      gfn_x(rval->first_gfn), first_t, first_a, q, NULL);
+                                      rval->first_gfn, first_t, first_a, q, NULL);
     *second_mfn = get_gfn_type_access(p2m_get_hostp2m(rval->second_domain),
-                                      gfn_x(rval->second_gfn), second_t, second_a, q, NULL);
+                                      rval->second_gfn, second_t, second_a, q, NULL);
 }
 
 static inline void put_two_gfns(struct two_gfns *arg)
@@ -593,8 +591,8 @@ static inline void put_two_gfns(struct two_gfns *arg)
     if ( !arg )
         return;
 
-    put_gfn(arg->second_domain, gfn_x(arg->second_gfn));
-    put_gfn(arg->first_domain,  gfn_x(arg->first_gfn));
+    put_gfn(arg->second_domain, arg->second_gfn);
+    put_gfn(arg->first_domain,  arg->first_gfn);
 }
 
 /* Init the datastructures for later use by the p2m code */

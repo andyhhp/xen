@@ -255,13 +255,13 @@ static int hvmemul_do_io(
          * so the device model side needs to check the incoming ioreq event.
          */
         struct hvm_ioreq_server *s = NULL;
-        p2m_type_t p2mt = p2m_invalid;
 
         if ( is_mmio )
         {
-            unsigned long gmfn = paddr_to_pfn(addr);
+            p2m_type_t p2mt = p2m_invalid;
+            gfn_t gfn = gaddr_to_gfn(addr);
 
-            get_gfn_query_unlocked(currd, gmfn, &p2mt);
+            get_gfn_query_unlocked(currd, gfn, &p2mt);
 
             if ( p2mt == p2m_ioreq_server )
             {
@@ -1614,7 +1614,7 @@ static int hvmemul_rep_ins(
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    (void) get_gfn_query_unlocked(current->domain, gpa >> PAGE_SHIFT, &p2mt);
+    get_gfn_query_unlocked(current->domain, gaddr_to_gfn(gpa), &p2mt);
     if ( p2mt == p2m_mmio_direct || p2mt == p2m_mmio_dm )
         return X86EMUL_UNHANDLEABLE;
 
@@ -1695,7 +1695,7 @@ static int hvmemul_rep_outs(
     if ( rc != X86EMUL_OKAY )
         return rc;
 
-    (void) get_gfn_query_unlocked(current->domain, gpa >> PAGE_SHIFT, &p2mt);
+    get_gfn_query_unlocked(current->domain, gaddr_to_gfn(gpa), &p2mt);
     if ( p2mt == p2m_mmio_direct || p2mt == p2m_mmio_dm )
         return X86EMUL_UNHANDLEABLE;
 
@@ -1774,8 +1774,8 @@ static int hvmemul_rep_movs(
     }
 
     /* Check for MMIO ops */
-    (void) get_gfn_query_unlocked(current->domain, sgpa >> PAGE_SHIFT, &sp2mt);
-    (void) get_gfn_query_unlocked(current->domain, dgpa >> PAGE_SHIFT, &dp2mt);
+    get_gfn_query_unlocked(current->domain, gaddr_to_gfn(sgpa), &sp2mt);
+    get_gfn_query_unlocked(current->domain, gaddr_to_gfn(dgpa), &dp2mt);
 
     if ( sp2mt == p2m_mmio_direct || dp2mt == p2m_mmio_direct ||
          (sp2mt == p2m_mmio_dm && dp2mt == p2m_mmio_dm) )
@@ -1902,7 +1902,7 @@ static int hvmemul_rep_stos(
     }
 
     /* Check for MMIO op */
-    (void)get_gfn_query_unlocked(current->domain, gpa >> PAGE_SHIFT, &p2mt);
+    get_gfn_query_unlocked(current->domain, gaddr_to_gfn(gpa), &p2mt);
 
     switch ( p2mt )
     {

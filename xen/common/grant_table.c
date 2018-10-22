@@ -2125,7 +2125,7 @@ gnttab_transfer(
         {
             p2m_type_t p2mt;
 
-            mfn = get_gfn_unshare(d, gop.mfn, &p2mt);
+            mfn = get_gfn_unshare(d, _gfn(gop.mfn), &p2mt);
             if ( p2m_is_shared(p2mt) || !p2m_is_valid(p2mt) )
                 mfn = INVALID_MFN;
         }
@@ -2137,7 +2137,7 @@ gnttab_transfer(
         if ( unlikely(!mfn_valid(mfn)) )
         {
 #ifdef CONFIG_X86
-            put_gfn(d, gop.mfn);
+            put_gfn(d, _gfn(gop.mfn));
 #endif
             gdprintk(XENLOG_INFO, "out-of-range %lx\n", (unsigned long)gop.mfn);
             gop.status = GNTST_bad_page;
@@ -2148,7 +2148,7 @@ gnttab_transfer(
         if ( (rc = steal_page(d, page, 0)) < 0 )
         {
 #ifdef CONFIG_X86
-            put_gfn(d, gop.mfn);
+            put_gfn(d, _gfn(gop.mfn));
 #endif
             gop.status = rc == -EINVAL ? GNTST_bad_page : GNTST_general_error;
             goto copyback;
@@ -2180,7 +2180,7 @@ gnttab_transfer(
             rcu_unlock_domain(e);
         put_gfn_and_copyback:
 #ifdef CONFIG_X86
-            put_gfn(d, gop.mfn);
+            put_gfn(d, _gfn(gop.mfn));
 #endif
             /* The count_info has already been cleaned */
             free_domheap_page(page);
@@ -2271,7 +2271,7 @@ gnttab_transfer(
         }
 
 #ifdef CONFIG_X86
-        put_gfn(d, gop.mfn);
+        put_gfn(d, _gfn(gop.mfn));
 #endif
 
         TRACE_1D(TRC_MEM_PAGE_GRANT_TRANSFER, e->domain_id);

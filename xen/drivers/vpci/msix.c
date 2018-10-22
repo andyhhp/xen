@@ -414,7 +414,7 @@ int vpci_make_msix_hole(const struct pci_dev *pdev)
         for ( ; start <= end; start++ )
         {
             p2m_type_t t;
-            mfn_t mfn = get_gfn_query(d, start, &t);
+            mfn_t mfn = get_gfn_query(d, _gfn(start), &t);
 
             switch ( t )
             {
@@ -429,7 +429,7 @@ int vpci_make_msix_hole(const struct pci_dev *pdev)
                 }
                 /* fallthrough. */
             default:
-                put_gfn(d, start);
+                put_gfn(d, _gfn(start));
                 gprintk(XENLOG_WARNING,
                         "%04x:%02x:%02x.%u: existing mapping (mfn: %" PRI_mfn
                         "type: %d) at %#lx clobbers MSIX MMIO area\n",
@@ -437,7 +437,7 @@ int vpci_make_msix_hole(const struct pci_dev *pdev)
                         PCI_FUNC(pdev->devfn), mfn_x(mfn), t, start);
                 return -EEXIST;
             }
-            put_gfn(d, start);
+            put_gfn(d, _gfn(start));
         }
     }
 

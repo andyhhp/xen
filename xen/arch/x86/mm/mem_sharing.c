@@ -499,7 +499,7 @@ static int audit(void)
                 errors++;
                 continue;
             }
-            o_mfn = get_gfn_query_unlocked(d, g->gfn, &t); 
+            o_mfn = get_gfn_query_unlocked(d, _gfn(g->gfn), &t);
             if ( !mfn_eq(o_mfn, mfn) )
             {
                 MEM_SHARING_DEBUG("Incorrect P2M for d=%hu, PFN=%lx."
@@ -732,12 +732,12 @@ static int debug_gfn(struct domain *d, gfn_t gfn)
     mfn_t mfn;
     int num_refs;
 
-    mfn = get_gfn_query(d, gfn_x(gfn), &p2mt);
+    mfn = get_gfn_query(d, gfn, &p2mt);
 
     MEM_SHARING_DEBUG("Debug for dom%d, gfn=%" PRI_gfn "\n", 
                       d->domain_id, gfn_x(gfn));
     num_refs = debug_mfn(mfn);
-    put_gfn(d, gfn_x(gfn));
+    put_gfn(d, gfn);
 
     return num_refs;
 }
@@ -775,7 +775,7 @@ static int nominate_page(struct domain *d, gfn_t gfn,
 
     *phandle = 0UL;
 
-    mfn = get_gfn_type_access(hp2m, gfn_x(gfn), &p2mt, &p2ma, 0, NULL);
+    mfn = get_gfn_type_access(hp2m, gfn, &p2mt, &p2ma, 0, NULL);
 
     /* Check if mfn is valid */
     ret = -EINVAL;
@@ -820,7 +820,7 @@ static int nominate_page(struct domain *d, gfn_t gfn,
             if ( !ap2m )
                 continue;
 
-            amfn = __get_gfn_type_access(ap2m, gfn_x(gfn), &ap2mt, &ap2ma,
+            amfn = __get_gfn_type_access(ap2m, gfn, &ap2mt, &ap2ma,
                                          0, NULL, false);
             if ( mfn_valid(amfn) && (!mfn_eq(amfn, mfn) || ap2ma != p2ma) )
             {
@@ -885,7 +885,7 @@ static int nominate_page(struct domain *d, gfn_t gfn,
     ret = 0;
 
 out:
-    put_gfn(d, gfn_x(gfn));
+    put_gfn(d, gfn);
     return ret;
 }
 
@@ -1122,11 +1122,11 @@ int __mem_sharing_unshare_page(struct domain *d,
     int last_gfn;
     gfn_info_t *gfn_info = NULL;
    
-    mfn = get_gfn(d, gfn, &p2mt);
+    mfn = get_gfn(d, _gfn(gfn), &p2mt);
     
     /* Has someone already unshared it? */
     if ( !p2m_is_shared(p2mt) ) {
-        put_gfn(d, gfn);
+        put_gfn(d, _gfn(gfn));
         return 0;
     }
 
@@ -1173,7 +1173,7 @@ int __mem_sharing_unshare_page(struct domain *d,
         {
             if ( !get_page(page, dom_cow) )
             {
-                put_gfn(d, gfn);
+                put_gfn(d, _gfn(gfn));
                 domain_crash(d);
                 return -EOVERFLOW;
             }
@@ -1181,7 +1181,7 @@ int __mem_sharing_unshare_page(struct domain *d,
                 put_page(page);
             put_page(page);
         }
-        put_gfn(d, gfn);
+        put_gfn(d, _gfn(gfn));
 
         return 0;
     }
@@ -1200,7 +1200,7 @@ int __mem_sharing_unshare_page(struct domain *d,
         /* Undo dec of nr_saved_mfns, as the retry will decrease again. */
         atomic_inc(&nr_saved_mfns);
         mem_sharing_page_unlock(old_page);
-        put_gfn(d, gfn);
+        put_gfn(d, _gfn(gfn));
         /* Caller is responsible for placing an event
          * in the ring */
         return -ENOMEM;
@@ -1228,7 +1228,7 @@ private_page_found:
      * marking dirty is feasible */
     paging_mark_dirty(d, page_to_mfn(page));
     /* We do not need to unlock a private page */
-    put_gfn(d, gfn);
+    put_gfn(d, _gfn(gfn));
     return 0;
 }
 

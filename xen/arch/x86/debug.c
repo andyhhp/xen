@@ -58,7 +58,7 @@ dbg_hvm_va2mfn(dbgva_t vaddr, struct domain *dp, int toaddr, gfn_t *gfn)
         return INVALID_MFN;
     }
 
-    mfn = get_gfn(dp, gfn_x(*gfn), &gfntype);
+    mfn = get_gfn(dp, *gfn, &gfntype);
     if ( p2m_is_readonly(gfntype) && toaddr )
     {
         DBGP2("kdb:p2m_is_readonly: gfntype:%x\n", gfntype);
@@ -70,7 +70,7 @@ dbg_hvm_va2mfn(dbgva_t vaddr, struct domain *dp, int toaddr, gfn_t *gfn)
 
     if ( mfn_eq(mfn, INVALID_MFN) )
     {
-        put_gfn(dp, gfn_x(*gfn));
+        put_gfn(dp, *gfn);
         *gfn = INVALID_GFN;
     }
 
@@ -189,7 +189,7 @@ static unsigned int dbg_rw_guest_mem(struct domain *dp, void * __user gaddr,
 
         unmap_domain_page(va);
         if ( !gfn_eq(gfn, INVALID_GFN) )
-            put_gfn(dp, gfn_x(gfn));
+            put_gfn(dp, gfn);
 
         addr += pagecnt;
         buf += pagecnt;

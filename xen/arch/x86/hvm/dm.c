@@ -269,14 +269,14 @@ static int set_mem_type(struct domain *d,
 
     while ( iter < data->nr )
     {
-        unsigned long pfn = data->first_pfn + iter;
+        gfn_t gfn = _gfn(data->first_pfn + iter);
         p2m_type_t t;
 
-        get_gfn_unshare(d, pfn, &t);
+        get_gfn_unshare(d, gfn, &t);
         if ( p2m_is_paging(t) )
         {
-            put_gfn(d, pfn);
-            p2m_mem_paging_populate(d, pfn);
+            put_gfn(d, gfn);
+            p2m_mem_paging_populate(d, gfn_x(gfn));
             return -EAGAIN;
         }
 
@@ -285,9 +285,9 @@ static int set_mem_type(struct domain *d,
         else if ( !allow_p2m_type_change(t, memtype[mem_type]) )
             rc = -EINVAL;
         else
-            rc = p2m_change_type_one(d, pfn, t, memtype[mem_type]);
+            rc = p2m_change_type_one(d, gfn_x(gfn), t, memtype[mem_type]);
 
-        put_gfn(d, pfn);
+        put_gfn(d, gfn);
 
         if ( rc )
             break;

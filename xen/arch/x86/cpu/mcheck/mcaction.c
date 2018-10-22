@@ -89,7 +89,7 @@ mc_memerr_dhandler(struct mca_binfo *binfo,
                 ASSERT(d);
                 gfn = get_gpfn_from_mfn((bank->mc_addr) >> PAGE_SHIFT);
 
-                if ( unmmap_broken_page(d, _mfn(mfn), gfn) )
+                if ( unmap_broken_page(d, _mfn(mfn), _gfn(gfn)) )
                 {
                     printk("Unmap broken memory %lx for DOM%d failed\n",
                            mfn, d->domain_id);

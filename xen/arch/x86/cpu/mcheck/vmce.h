@@ -9,7 +9,7 @@ int vmce_init(struct cpuinfo_x86 *c);
         && hardware_domain->vcpu[0] \
         && guest_enabled_event(hardware_domain->vcpu[0], VIRQ_MCA))
 
-int unmmap_broken_page(struct domain *d, mfn_t mfn, unsigned long gfn);
+int unmap_broken_page(struct domain *d, mfn_t mfn, gfn_t gfn);
 
 int vmce_intel_rdmsr(const struct vcpu *, uint32_t msr, uint64_t *val);
 int vmce_intel_wrmsr(struct vcpu *, uint32_t msr, uint64_t val);

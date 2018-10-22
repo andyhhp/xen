@@ -512,7 +512,7 @@ int fill_vmsr_data(struct mcinfo_bank *mc_bank, struct domain *d,
  * XXX following situation missed:
  * PoD, Foreign mapped, Granted, Shared
  */
-int unmmap_broken_page(struct domain *d, mfn_t mfn, unsigned long gfn)
+int unmap_broken_page(struct domain *d, mfn_t mfn, gfn_t gfn)
 {
     mfn_t r_mfn;
     p2m_type_t pt;
@@ -533,7 +533,7 @@ int unmmap_broken_page(struct domain *d, mfn_t mfn, unsigned long gfn)
     if ( p2m_to_mask(pt) & P2M_UNMAP_TYPES)
     {
         ASSERT(mfn_eq(r_mfn, mfn));
-        rc = p2m_change_type_one(d, gfn, pt, p2m_ram_broken);
+        rc = p2m_change_type_one(d, gfn_x(gfn), pt, p2m_ram_broken);
     }
     put_gfn(d, gfn);
 

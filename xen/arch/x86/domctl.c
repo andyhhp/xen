@@ -1253,15 +1253,15 @@ long arch_do_domctl(
     case XEN_DOMCTL_set_broken_page_p2m:
     {
         p2m_type_t pt;
-        unsigned long pfn = domctl->u.set_broken_page_p2m.pfn;
-        mfn_t mfn = get_gfn_query(d, pfn, &pt);
+        gfn_t gfn = _gfn(domctl->u.set_broken_page_p2m.pfn);
+        mfn_t mfn = get_gfn_query(d, gfn, &pt);
 
         if ( unlikely(!mfn_valid(mfn)) || unlikely(!p2m_is_ram(pt)) )
             ret = -EINVAL;
         else
-            ret = p2m_change_type_one(d, pfn, pt, p2m_ram_broken);
+            ret = p2m_change_type_one(d, gfn_x(gfn), pt, p2m_ram_broken);
 
-        put_gfn(d, pfn);
+        put_gfn(d, gfn);
         break;
     }
 

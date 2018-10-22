@@ -193,10 +193,6 @@ static inline shadow_l4e_t shadow_l4e_from_mfn(mfn_t mfn, u32 flags)
 })
 #endif
 
- /* Override get_gfn to work with gfn_t */
-#undef get_gfn_query
-#define get_gfn_query(d, g, t) get_gfn_type((d), gfn_x(g), (t), 0)
-
 /* The shadow types needed for the various levels. */
 
 #if GUEST_PAGING_LEVELS == 2

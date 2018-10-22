@@ -38,10 +38,6 @@ gfn_to_paddr(gfn_t gfn)
     return ((paddr_t)gfn_x(gfn)) << PAGE_SHIFT;
 }
 
-/* Override get_gfn to work with gfn_t */
-#undef get_gfn
-#define get_gfn(d, g, t) get_gfn_type((d), gfn_x(g), (t), P2M_ALLOC)
-
 /* Mask covering the reserved bits from superpage alignment. */
 #define SUPERPAGE_RSVD(bit)                                             \
     (((1ul << (bit)) - 1) & ~(_PAGE_PSE_PAT | (_PAGE_PSE_PAT - 1ul)))

@@ -681,7 +681,7 @@ hap_paging_get_mode(struct vcpu *v)
 static void hap_update_paging_modes(struct vcpu *v)
 {
     struct domain *d = v->domain;
-    unsigned long cr3_gfn = v->arch.hvm.guest_cr[3] >> PAGE_SHIFT;
+    gfn_t cr3_gfn = gaddr_to_gfn(v->arch.hvm.guest_cr[3]);
     p2m_type_t t;
 
     /* We hold onto the cr3 as it may be modified later, and

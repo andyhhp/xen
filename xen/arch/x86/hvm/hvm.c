@@ -1681,7 +1681,7 @@ void hvm_inject_event(const struct x86_event *event)
 int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
                               struct npfec npfec)
 {
-    unsigned long gfn = gpa >> PAGE_SHIFT;
+    gfn_t gfn = gaddr_to_gfn(gpa);
     p2m_type_t p2mt;
     p2m_access_t p2ma;
     mfn_t mfn;
@@ -1731,7 +1731,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
             return 1;
         case NESTEDHVM_PAGEFAULT_L0_ERROR:
             /* gpa is now translated to l1 guest address, update gfn. */
-            gfn = gpa >> PAGE_SHIFT;
+            gfn = gaddr_to_gfn(gpa);
             break;
         }
     }
@@ -1819,7 +1819,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
             {
                 bool_t sve;
 
-                p2m->get_entry(p2m, _gfn(gfn), &p2mt, &p2ma, 0, NULL, &sve);
+                p2m->get_entry(p2m, gfn, &p2mt, &p2ma, 0, NULL, &sve);
 
                 if ( !sve && altp2m_vcpu_emulate_ve(curr) )
                 {
@@ -1864,7 +1864,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
     {
         ASSERT(p2m_is_hostp2m(p2m));
         sharing_enomem = 
-            (mem_sharing_unshare_page(currd, gfn, 0) < 0);
+            (mem_sharing_unshare_page(currd, gfn_x(gfn), 0) < 0);
         rc = 1;
         goto out_put_gfn;
     }
@@ -1880,7 +1880,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
          */
         if ( npfec.write_access )
         {
-            paging_mark_pfn_dirty(currd, _pfn(gfn));
+            paging_mark_pfn_dirty(currd, _pfn(gfn_x(gfn)));
             /*
              * If p2m is really an altp2m, unlock it before changing the type,
              * as p2m_altp2m_propagate_change() needs to acquire the
@@ -1888,7 +1888,7 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
              */
             if ( p2m != hostp2m )
                 __put_gfn(p2m, gfn);
-            p2m_change_type_one(currd, gfn, p2m_ram_logdirty, p2m_ram_rw);
+            p2m_change_type_one(currd, gfn_x(gfn), p2m_ram_logdirty, p2m_ram_rw);
             __put_gfn(hostp2m, gfn);
 
             goto out;
@@ -1918,16 +1918,16 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
      * sleep on event ring wait queues, and we must not hold
      * locks in such circumstance */
     if ( paged )
-        p2m_mem_paging_populate(currd, gfn);
+        p2m_mem_paging_populate(currd, gfn_x(gfn));
     if ( sharing_enomem )
     {
         int rv;
 
-        if ( (rv = mem_sharing_notify_enomem(currd, gfn, true)) < 0 )
+        if ( (rv = mem_sharing_notify_enomem(currd, gfn_x(gfn), true)) < 0 )
         {
             gdprintk(XENLOG_ERR, "Domain %hu attempt to unshare "
                      "gfn %lx, ENOMEM and no helper (rc %d)\n",
-                     currd->domain_id, gfn, rv);
+                     currd->domain_id, gfn_x(gfn), rv);
             /* Crash the domain */
             rc = 0;
         }
@@ -4869,7 +4869,7 @@ static int hvmop_get_mem_type(
      * type, not in allocating or unsharing. That'll happen
      * on access.
      */
-    get_gfn_query_unlocked(d, a.pfn, &t);
+    get_gfn_query_unlocked(d, _gfn(a.pfn), &t);
     if ( p2m_is_mmio(t) )
         a.mem_type =  HVMMEM_mmio_dm;
     else if ( t == p2m_ioreq_server )
