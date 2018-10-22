@@ -2431,24 +2431,29 @@ bool_t p2m_altp2m_lazy_copy(struct vcpu *v, paddr_t gpa,
     unsigned long mask;
     mfn_t mfn;
     int rv;
+    bool ret;
 
     *ap2m = p2m_get_altp2m(v);
 
     mfn = get_gfn_type_access(*ap2m, gfn_x(gfn), &p2mt, &p2ma,
                               0, &page_order);
-    __put_gfn(*ap2m, gfn_x(gfn));
 
+    /* Entry already present in ap2m?  Caller should handle the fault. */
     if ( !mfn_eq(mfn, INVALID_MFN) )
-        return 0;
+    {
+        ret = false;
+        goto put_ap2m;
+    }
 
     mfn = get_gfn_type_access(hp2m, gfn_x(gfn), &p2mt, &p2ma,
                               P2M_ALLOC, &page_order);
-    __put_gfn(hp2m, gfn_x(gfn));
 
+    /* Entry not present in hp2m?  Caller should handle the fault. */
     if ( mfn_eq(mfn, INVALID_MFN) )
-        return 0;
-
-    p2m_lock(*ap2m);
+    {
+        ret = false;
+        goto put_hp2m;
+    }
 
     /*
      * If this is a superpage mapping, round down both frame numbers
@@ -2458,6 +2463,7 @@ bool_t p2m_altp2m_lazy_copy(struct vcpu *v, paddr_t gpa,
     mfn = _mfn(mfn_x(mfn) & mask);
     gfn = _gfn(gfn_x(gfn) & mask);
 
+    p2m_lock(*ap2m);
     rv = p2m_set_entry(*ap2m, gfn, mfn, page_order, p2mt, p2ma);
     p2m_unlock(*ap2m);
 
@@ -2469,7 +2475,14 @@ bool_t p2m_altp2m_lazy_copy(struct vcpu *v, paddr_t gpa,
         domain_crash(hp2m->domain);
     }
 
-    return 1;
+    ret = true;
+
+ put_hp2m:
+    __put_gfn(hp2m, gfn_x(gfn));
+ put_ap2m:
+    __put_gfn(*ap2m, gfn_x(gfn));
+
+    return ret;
 }
 
 enum altp2m_reset_type {
