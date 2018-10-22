@@ -529,17 +529,15 @@ static inline unsigned long mfn_to_gfn(struct domain *d, mfn_t mfn)
 
 /* Deadlock-avoidance scheme when calling get_gfn on different gfn's */
 struct two_gfns {
-    struct domain  *first_domain;
-    unsigned long   first_gfn;
-    struct domain  *second_domain;
-    unsigned long   second_gfn;
+    struct domain *first_domain, *second_domain;
+    gfn_t          first_gfn,     second_gfn;
 };
 
 /* Returns mfn, type and access for potential caller consumption, but any
  * of those can be NULL */
-static inline void get_two_gfns(struct domain *rd, unsigned long rgfn,
+static inline void get_two_gfns(struct domain *rd, gfn_t rgfn,
         p2m_type_t *rt, p2m_access_t *ra, mfn_t *rmfn, struct domain *ld,
-        unsigned long lgfn, p2m_type_t *lt, p2m_access_t *la, mfn_t *lmfn,
+        gfn_t lgfn, p2m_type_t *lt, p2m_access_t *la, mfn_t *lmfn,
         p2m_query_t q, struct two_gfns *rval)
 {
     mfn_t           *first_mfn, *second_mfn, scratch_mfn;
@@ -557,7 +555,8 @@ do {                                                    \
     dest ## _t   = (source ## t)   ?: &scratch_t;       \
 } while (0)
 
-    if ( (rd->domain_id <= ld->domain_id) || ((rd == ld) && (rgfn <= lgfn)) )
+    if ( (rd->domain_id <= ld->domain_id) ||
+         ((rd == ld) && (gfn_x(rgfn) <= gfn_x(lgfn))) )
     {
         assign_pointers(first, r);
         assign_pointers(second, l);
@@ -570,9 +569,9 @@ do {                                                    \
 
     /* Now do the gets */
     *first_mfn  = get_gfn_type_access(p2m_get_hostp2m(rval->first_domain),
-                                      rval->first_gfn, first_t, first_a, q, NULL);
+                                      gfn_x(rval->first_gfn), first_t, first_a, q, NULL);
     *second_mfn = get_gfn_type_access(p2m_get_hostp2m(rval->second_domain),
-                                      rval->second_gfn, second_t, second_a, q, NULL);
+                                      gfn_x(rval->second_gfn), second_t, second_a, q, NULL);
 }
 
 static inline void put_two_gfns(struct two_gfns *arg)
@@ -580,8 +579,8 @@ static inline void put_two_gfns(struct two_gfns *arg)
     if ( !arg )
         return;
 
-    put_gfn(arg->second_domain, arg->second_gfn);
-    put_gfn(arg->first_domain, arg->first_gfn);
+    put_gfn(arg->second_domain, gfn_x(arg->second_gfn));
+    put_gfn(arg->first_domain,  gfn_x(arg->first_gfn));
 }
 
 /* Init the datastructures for later use by the p2m code */
