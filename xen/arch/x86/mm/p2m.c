@@ -444,7 +444,7 @@ mfn_t __get_gfn_type_access(struct p2m_domain *p2m, unsigned long gfn_l,
         mfn = p2m->get_entry(p2m, gfn, t, a, q, page_order, NULL);
     }
 
-    if (unlikely((p2m_is_broken(*t))))
+    if ( unlikely(p2m_is_broken(*t)) )
     {
         /* Return invalid_mfn to avoid caller's access */
         mfn = INVALID_MFN;
@@ -669,7 +669,7 @@ void p2m_teardown(struct p2m_domain *p2m)
     struct page_info *pg;
     struct domain *d;
 
-    if (p2m == NULL)
+    if ( p2m == NULL )
         return;
 
     d = p2m->domain;
@@ -776,7 +776,7 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
                               &a, 0, NULL, NULL);
         if ( p2m_is_shared(ot) )
         {
-            /* Do an unshare to cleanly take care of all corner 
+            /* Do an unshare to cleanly take care of all corner
              * cases. */
             int rc;
             rc = mem_sharing_unshare_page(p2m->domain,
@@ -793,7 +793,7 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
                  * However, all current (changeset 3432abcf9380) code
                  * paths avoid this unsavoury situation. For now.
                  *
-                 * Foreign domains are okay to place an event as they 
+                 * Foreign domains are okay to place an event as they
                  * won't go to sleep. */
                 (void)mem_sharing_notify_enomem(p2m->domain,
                                                 gfn_x(gfn_add(gfn, i)), false);
@@ -808,7 +808,7 @@ guest_physmap_add_entry(struct domain *d, gfn_t gfn, mfn_t mfn,
             /* Really shouldn't be unmapping grant/foreign maps this way */
             domain_crash(d);
             p2m_unlock(p2m);
-            
+
             return -EINVAL;
         }
         else if ( p2m_is_ram(ot) && !p2m_is_paged(ot) )
@@ -934,7 +934,7 @@ int p2m_change_type_one(struct domain *d, unsigned long gfn_l,
 }
 
 /* Modify the p2m type of a range of gfns from ot to nt. */
-void p2m_change_type_range(struct domain *d, 
+void p2m_change_type_range(struct domain *d,
                            unsigned long start, unsigned long end,
                            p2m_type_t ot, p2m_type_t nt)
 {
@@ -1568,7 +1568,7 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn_l, uint64_t buffer)
 
     if ( user_ptr )
         /* Sanity check the buffer and bail out early if trouble */
-        if ( (buffer & (PAGE_SIZE - 1)) || 
+        if ( (buffer & (PAGE_SIZE - 1)) ||
              (!access_ok(user_ptr, PAGE_SIZE)) )
             return -EINVAL;
 
@@ -1613,7 +1613,7 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn_l, uint64_t buffer)
                                  "bytes left %d\n", gfn_l, d->domain_id, rc);
             ret = -EFAULT;
             put_page(page); /* Don't leak pages */
-            goto out;            
+            goto out;
         }
     }
 
@@ -1685,7 +1685,7 @@ static struct p2m_domain *
 p2m_getlru_nestedp2m(struct domain *d, struct p2m_domain *p2m)
 {
     struct list_head *lru_list = &p2m_get_hostp2m(d)->np2m_list;
-    
+
     ASSERT(!list_empty(lru_list));
 
     if ( p2m == NULL )
@@ -1825,13 +1825,12 @@ p2m_get_nestedp2m_locked(struct vcpu *v)
     /* Mask out low bits; this avoids collisions with P2M_BASE_EADDR */
     np2m_base &= ~(0xfffull);
 
-    if (nv->nv_flushp2m && nv->nv_p2m) {
+    if ( nv->nv_flushp2m && nv->nv_p2m )
         nv->nv_p2m = NULL;
-    }
 
     nestedp2m_lock(d);
     p2m = nv->nv_p2m;
-    if ( p2m ) 
+    if ( p2m )
     {
         p2m_lock(p2m);
         if ( p2m->np2m_base == np2m_base )
@@ -1889,7 +1888,7 @@ struct p2m_domain *p2m_get_nestedp2m(struct vcpu *v)
 struct p2m_domain *
 p2m_get_p2m(struct vcpu *v)
 {
-    if (!nestedhvm_is_n2(v))
+    if ( !nestedhvm_is_n2(v) )
         return p2m_get_hostp2m(v->domain);
 
     return p2m_get_nestedp2m(v);
@@ -2554,7 +2553,7 @@ void audit_p2m(struct domain *d,
     p2m_lock(p2m);
     pod_lock(p2m);
 
-    if (p2m->audit_p2m)
+    if ( p2m->audit_p2m )
         pmbad = p2m->audit_p2m(p2m);
 
     /* Audit part two: walk the domain's page allocation list, checking
@@ -2615,7 +2614,7 @@ void audit_p2m(struct domain *d,
 
     pod_unlock(p2m);
     p2m_unlock(p2m);
- 
+
     P2M_PRINTK("p2m audit complete\n");
     if ( orphans_count | mpbad | pmbad )
         P2M_PRINTK("p2m audit found %lu orphans\n", orphans_count);
