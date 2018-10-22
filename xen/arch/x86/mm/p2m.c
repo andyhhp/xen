@@ -2419,23 +2419,23 @@ bool_t p2m_switch_vcpu_altp2m_by_id(struct vcpu *v, unsigned int idx)
  *     indicate that outer handler should handle fault
  */
 
-bool_t p2m_altp2m_lazy_copy(struct vcpu *v, paddr_t gpa,
-                            unsigned long gla, struct npfec npfec,
-                            struct p2m_domain **ap2m)
+bool p2m_altp2m_lazy_copy(struct vcpu *v, paddr_t gpa,
+                          unsigned long gla, struct npfec npfec)
 {
     struct p2m_domain *hp2m = p2m_get_hostp2m(v->domain);
+    struct p2m_domain *ap2m = p2m_get_altp2m(v);
     p2m_type_t p2mt;
     p2m_access_t p2ma;
     unsigned int page_order;
-    gfn_t gfn = _gfn(paddr_to_pfn(gpa));
+    gfn_t gfn = gaddr_to_gfn(gpa);
     unsigned long mask;
     mfn_t mfn;
     int rv;
     bool ret;
 
-    *ap2m = p2m_get_altp2m(v);
+    ASSERT(p2m_locked_by_me(hp2m));
 
-    mfn = get_gfn_type_access(*ap2m, gfn_x(gfn), &p2mt, &p2ma,
+    mfn = get_gfn_type_access(ap2m, gfn_x(gfn), &p2mt, &p2ma,
                               0, &page_order);
 
     /* Entry already present in ap2m?  Caller should handle the fault. */
@@ -2463,15 +2463,15 @@ bool_t p2m_altp2m_lazy_copy(struct vcpu *v, paddr_t gpa,
     mfn = _mfn(mfn_x(mfn) & mask);
     gfn = _gfn(gfn_x(gfn) & mask);
 
-    p2m_lock(*ap2m);
-    rv = p2m_set_entry(*ap2m, gfn, mfn, page_order, p2mt, p2ma);
-    p2m_unlock(*ap2m);
+    p2m_lock(ap2m);
+    rv = p2m_set_entry(ap2m, gfn, mfn, page_order, p2mt, p2ma);
+    p2m_unlock(ap2m);
 
     if ( rv )
     {
         gdprintk(XENLOG_ERR,
-	    "failed to set entry for %#"PRIx64" -> %#"PRIx64" p2m %#"PRIx64"\n",
-	    gfn_x(gfn), mfn_x(mfn), (unsigned long)*ap2m);
+	    "failed to set entry for %#"PRIx64" -> %#"PRIx64"\n",
+	    gfn_x(gfn), mfn_x(mfn));
         domain_crash(hp2m->domain);
     }
 
@@ -2480,7 +2480,7 @@ bool_t p2m_altp2m_lazy_copy(struct vcpu *v, paddr_t gpa,
  put_hp2m:
     __put_gfn(hp2m, gfn_x(gfn));
  put_ap2m:
-    __put_gfn(*ap2m, gfn_x(gfn));
+    __put_gfn(ap2m, gfn_x(gfn));
 
     return ret;
 }

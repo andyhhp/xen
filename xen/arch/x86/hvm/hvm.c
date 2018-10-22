@@ -1762,7 +1762,9 @@ int hvm_hap_nested_page_fault(paddr_t gpa, unsigned long gla,
 
     if ( ap2m_active )
     {
-        if ( p2m_altp2m_lazy_copy(curr, gpa, gla, npfec, &p2m) )
+        p2m = p2m_get_altp2m(curr);
+
+        if ( p2m_altp2m_lazy_copy(curr, gpa, gla, npfec) )
         {
             /* entry was lazily copied from host -- retry */
             __put_gfn(hostp2m, gfn);
