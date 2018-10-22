@@ -34,9 +34,9 @@
 extern bool_t opt_hap_1gb, opt_hap_2mb;
 
 /*
- * The upper levels of the p2m pagetable always contain full rights; all 
+ * The upper levels of the p2m pagetable always contain full rights; all
  * variation in the access control bits is made in the level-1 PTEs.
- * 
+ *
  * In addition to the phys-to-machine translation, each p2m PTE contains
  * *type* information about the gfn it translates, helping Xen to decide
  * on the correct course of action when handling a page-fault to that
@@ -47,8 +47,8 @@ extern bool_t opt_hap_1gb, opt_hap_2mb;
  */
 
 /*
- * AMD IOMMU: When we share p2m table with iommu, bit 52 -bit 58 in pte 
- * cannot be non-zero, otherwise, hardware generates io page faults when 
+ * AMD IOMMU: When we share p2m table with iommu, bit 52 -bit 58 in pte
+ * cannot be non-zero, otherwise, hardware generates io page faults when
  * device access those pages. Therefore, p2m_ram_rw has to be defined as 0.
  */
 typedef enum {
@@ -212,9 +212,11 @@ struct p2m_domain {
     uint64_t           np2m_base;
     uint64_t           np2m_generation;
 
-    /* Nested p2ms: linked list of n2pms allocated to this domain. 
-     * The host p2m hasolds the head of the list and the np2ms are 
-     * threaded on in LRU order. */
+    /*
+     * Nested p2ms: linked list of n2pms allocated to this domain.
+     * The host p2m hasolds the head of the list and the np2ms are
+     * threaded on in LRU order.
+     */
     struct list_head   np2m_list;
 #endif
 
@@ -224,10 +226,12 @@ struct p2m_domain {
     /* Host p2m: Global log-dirty mode enabled for the domain. */
     bool               global_logdirty;
 
-    /* Host p2m: when this flag is set, don't flush all the nested-p2m 
-     * tables on every host-p2m change.  The setter of this flag 
+    /*
+     * Host p2m: when this flag is set, don't flush all the nested-p2m
+     * tables on every host-p2m change.  The setter of this flag
      * is responsible for performing the full flush before releasing the
-     * host p2m's lock. */
+     * host p2m's lock.
+     */
     int                defer_nested_flush;
 
 #ifdef CONFIG_HVM
@@ -264,7 +268,7 @@ struct p2m_domain {
                                                   unsigned long first_gfn,
                                                   unsigned long last_gfn);
     void               (*memory_type_changed)(struct p2m_domain *p2m);
-    
+
     int                (*write_p2m_entry)(struct p2m_domain *p2m,
                                           unsigned long gfn, l1_pgentry_t *p,
                                           l1_pgentry_t new, unsigned int level);
@@ -291,8 +295,10 @@ struct p2m_domain {
      * retyped get this access type.  See definition of p2m_access_t. */
     p2m_access_t default_access;
 
-    /* If true, and an access fault comes in and there is no vm_event listener, 
-     * pause domain.  Otherwise, remove access restrictions. */
+    /*
+     * If true, and an access fault comes in and there is no vm_event listener,
+     * pause domain.  Otherwise, remove access restrictions.
+     */
     bool_t       access_required;
 
     /* Highest guest frame that's ever been mapped in the p2m */
@@ -310,13 +316,15 @@ struct p2m_domain {
     unsigned long next_shared_gfn_to_relinquish;
 
 #ifdef CONFIG_HVM
-    /* Populate-on-demand variables
+    /*
+     * Populate-on-demand variables
      * All variables are protected with the pod lock. We cannot rely on
      * the p2m lock if it's turned into a fine-grained lock.
-     * We only use the domain page_alloc lock for additions and 
+     * We only use the domain page_alloc lock for additions and
      * deletions to the domain's page list. Because we use it nested
      * within the PoD lock, we enforce it's ordering (by remembering
-     * the unlock level in the arch_domain sub struct). */
+     * the unlock level in the arch_domain sub struct).
+     */
     struct {
         struct page_list_head super,   /* List of superpages                */
                          single;       /* Non-super lists                   */
@@ -426,13 +434,15 @@ mfn_t __nonnull(3, 4) __get_gfn_type_access(
     struct p2m_domain *p2m, unsigned long gfn, p2m_type_t *t,
     p2m_access_t *a, p2m_query_t q, unsigned int *page_order, bool_t locked);
 
-/* Read a particular P2M table, mapping pages as we go.  Most callers
+/*
+ * Read a particular P2M table, mapping pages as we go.  Most callers
  * should _not_ call this directly; use the other get_gfn* functions
  * below unless you know you want to walk a p2m that isn't a domain's
  * main one.
- * If the lookup succeeds, the return value is != INVALID_MFN and 
+ * If the lookup succeeds, the return value is != INVALID_MFN and
  * *page_order is filled in with the order of the superpage (if any) that
- * the entry was found in.  */
+ * the entry was found in.
+ */
 static inline mfn_t __nonnull(3, 4) get_gfn_type_access(
     struct p2m_domain *p2m, unsigned long gfn, p2m_type_t *t,
     p2m_access_t *a, p2m_query_t q, unsigned int *page_order)
@@ -459,10 +469,11 @@ void __put_gfn(struct p2m_domain *p2m, unsigned long gfn);
 
 #define put_gfn(d, gfn) __put_gfn(p2m_get_hostp2m((d)), (gfn))
 
-/* The intent of the "unlocked" accessor is to have the caller not worry about
- * put_gfn. They apply to very specific situations: debug printk's, dumps 
- * during a domain crash, or to peek at a p2m entry/type. Caller is not 
- * holding the p2m entry exclusively during or after calling this. 
+/*
+ * The intent of the "unlocked" accessor is to have the caller not worry about
+ * put_gfn. They apply to very specific situations: debug printk's, dumps
+ * during a domain crash, or to peek at a p2m entry/type. Caller is not
+ * holding the p2m entry exclusively during or after calling this.
  *
  * This is also used in the shadow code whenever the paging lock is
  * held -- in those cases, the caller is protected against concurrent
@@ -473,19 +484,21 @@ void __put_gfn(struct p2m_domain *p2m, unsigned long gfn);
  * Any other type of query can cause a change in the p2m and may need to
  * perform locking.
  */
-static inline mfn_t get_gfn_query_unlocked(struct domain *d, 
-                                           unsigned long gfn, 
+static inline mfn_t get_gfn_query_unlocked(struct domain *d,
+                                           unsigned long gfn,
                                            p2m_type_t *t)
 {
     p2m_access_t a;
     return __get_gfn_type_access(p2m_get_hostp2m(d), gfn, t, &a, 0, NULL, 0);
 }
 
-/* Atomically look up a GFN and take a reference count on the backing page.
+/*
+ * Atomically look up a GFN and take a reference count on the backing page.
  * This makes sure the page doesn't get freed (or shared) underfoot,
  * and should be used by any path that intends to write to the backing page.
  * Returns NULL if the page is not backed by RAM.
- * The caller is responsible for calling put_page() afterwards. */
+ * The caller is responsible for calling put_page() afterwards.
+ */
 struct page_info *p2m_get_page_from_gfn(struct p2m_domain *p2m, gfn_t gfn,
                                         p2m_type_t *t, p2m_access_t *a,
                                         p2m_query_t q);
@@ -587,9 +600,7 @@ static inline void put_two_gfns(struct two_gfns *arg)
 /* Init the datastructures for later use by the p2m code */
 int p2m_init(struct domain *d);
 
-/* Allocate a new p2m table for a domain. 
- *
- * Returns 0 for success or -errno. */
+/* Allocate a new p2m table for a domain.  Returns 0 for success or -errno. */
 int p2m_alloc_table(struct p2m_domain *p2m);
 
 /* Return all the p2m resources to Xen. */
@@ -618,11 +629,11 @@ void p2m_disable_hardware_log_dirty(struct domain *d);
 void p2m_flush_hardware_cached_dirty(struct domain *d);
 
 /* Change types across all p2m entries in a domain */
-void p2m_change_entry_type_global(struct domain *d, 
+void p2m_change_entry_type_global(struct domain *d,
                                   p2m_type_t ot, p2m_type_t nt);
 
 /* Change types across a range of p2m entries (start ... end-1) */
-void p2m_change_type_range(struct domain *d, 
+void p2m_change_type_range(struct domain *d,
                            unsigned long start, unsigned long end,
                            p2m_type_t ot, p2m_type_t nt);
 
@@ -656,7 +667,7 @@ int clear_identity_p2m_entry(struct domain *d, unsigned long gfn);
 int p2m_add_foreign(struct domain *tdom, unsigned long fgfn,
                     unsigned long gpfn, domid_t foreign_domid);
 
-/* 
+/*
  * Populate-on-demand
  */
 
@@ -740,7 +751,7 @@ int p2m_mem_paging_nominate(struct domain *d, unsigned long gfn);
 /* Evict a frame */
 int p2m_mem_paging_evict(struct domain *d, unsigned long gfn);
 /* Tell xenpaging to drop a paged out frame */
-void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn, 
+void p2m_mem_paging_drop_page(struct domain *d, unsigned long gfn,
                                 p2m_type_t p2mt);
 /* Start populating a paged out frame */
 void p2m_mem_paging_populate(struct domain *d, unsigned long gfn);
@@ -749,7 +760,7 @@ int p2m_mem_paging_prep(struct domain *d, unsigned long gfn, uint64_t buffer);
 /* Resume normal operation (in case a domain was paused) */
 void p2m_mem_paging_resume(struct domain *d, vm_event_response_t *rsp);
 
-/* 
+/*
  * Internal functions, only called by other p2m code
  */
 
@@ -804,7 +815,7 @@ static inline p2m_type_t p2m_flags_to_type(unsigned long flags)
 {
     /* For AMD IOMMUs we need to use type 0 for plain RAM, but we need
      * to make sure that an entirely empty PTE doesn't have RAM type */
-    if ( flags == 0 ) 
+    if ( flags == 0 )
         return p2m_invalid;
     /* AMD IOMMUs use bits 9-11 to encode next io page level and bits
      * 59-62 for iommu flags so we can't use them to store p2m type info. */
@@ -836,7 +847,7 @@ static inline p2m_type_t p2m_recalc_type(bool recalc, p2m_type_t t,
 int p2m_pt_handle_deferred_changes(uint64_t gpa);
 
 /*
- * Nested p2m: shadow p2m tables used for nested HVM virtualization 
+ * Nested p2m: shadow p2m tables used for nested HVM virtualization
  */
 
 /* Flushes specified p2m table */
