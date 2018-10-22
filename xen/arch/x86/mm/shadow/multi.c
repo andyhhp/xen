@@ -2126,7 +2126,8 @@ static int validate_gl4e(struct vcpu *v, void *new_ge, mfn_t sl4mfn, void *se)
          !guest_l4e_rsvd_bits(v, new_gl4e) )
     {
         gfn_t gl3gfn = guest_l4e_get_gfn(new_gl4e);
-        mfn_t gl3mfn = get_gfn_query_unlocked(d, gfn_x(gl3gfn), &p2mt);
+        mfn_t gl3mfn = get_gfn_query_unlocked(d, gl3gfn, &p2mt);
+
         if ( p2m_is_ram(p2mt) )
             sl3mfn = get_shadow_status(d, gl3mfn, SH_type_l3_shadow);
         else if ( p2mt != p2m_populate_on_demand )
@@ -2185,7 +2186,8 @@ static int validate_gl3e(struct vcpu *v, void *new_ge, mfn_t sl3mfn, void *se)
          !guest_l3e_rsvd_bits(v, new_gl3e) )
     {
         gfn_t gl2gfn = guest_l3e_get_gfn(new_gl3e);
-        mfn_t gl2mfn = get_gfn_query_unlocked(d, gfn_x(gl2gfn), &p2mt);
+        mfn_t gl2mfn = get_gfn_query_unlocked(d, gl2gfn, &p2mt);
+
         if ( p2m_is_ram(p2mt) )
             sl2mfn = get_shadow_status(d, gl2mfn, SH_type_l2_shadow);
         else if ( p2mt != p2m_populate_on_demand )
@@ -2236,7 +2238,8 @@ static int validate_gl2e(struct vcpu *v, void *new_ge, mfn_t sl2mfn, void *se)
         }
         else
         {
-            mfn_t gl1mfn = get_gfn_query_unlocked(d, gfn_x(gl1gfn), &p2mt);
+            mfn_t gl1mfn = get_gfn_query_unlocked(d, gl1gfn, &p2mt);
+
             if ( p2m_is_ram(p2mt) )
                 sl1mfn = get_shadow_status(d, gl1mfn, SH_type_l1_shadow);
             else if ( p2mt != p2m_populate_on_demand )
@@ -2270,7 +2273,7 @@ static int validate_gl1e(struct vcpu *v, void *new_ge, mfn_t sl1mfn, void *se)
          !guest_l1e_rsvd_bits(v, new_gl1e) )
     {
         gfn = guest_l1e_get_gfn(new_gl1e);
-        gmfn = get_gfn_query_unlocked(d, gfn_x(gfn), &p2mt);
+        gmfn = get_gfn_query_unlocked(d, gfn, &p2mt);
     }
 
     l1e_propagate_from_guest(v, new_gl1e, gmfn, &new_sl1e, ft_prefetch, p2mt);
@@ -2335,7 +2338,7 @@ void sh_resync_l1(struct vcpu *v, mfn_t gl1mfn, mfn_t snpmfn)
                  !guest_l1e_rsvd_bits(v, gl1e) )
             {
                 gfn = guest_l1e_get_gfn(gl1e);
-                gmfn = get_gfn_query_unlocked(d, gfn_x(gfn), &p2mt);
+                gmfn = get_gfn_query_unlocked(d, gfn, &p2mt);
             }
 
             l1e_propagate_from_guest(v, gl1e, gmfn, &nsl1e, ft_prefetch, p2mt);
@@ -2615,7 +2618,7 @@ static void sh_prefetch(struct vcpu *v, walk_t *gw,
              !guest_l1e_rsvd_bits(v, gl1e) )
         {
             gfn = guest_l1e_get_gfn(gl1e);
-            gmfn = get_gfn_query_unlocked(d, gfn_x(gfn), &p2mt);
+            gmfn = get_gfn_query_unlocked(d, gfn, &p2mt);
         }
         else
         {
@@ -3071,7 +3074,7 @@ static int sh_page_fault(struct vcpu *v,
         SHADOW_PRINTK("BAD gfn=%"SH_PRI_gfn" gmfn=%"PRI_mfn"\n",
                       gfn_x(gfn), mfn_x(gmfn));
         sh_reset_early_unshadow(v);
-        put_gfn(d, gfn_x(gfn));
+        put_gfn(d, gfn);
         goto propagate;
     }
 
@@ -3117,7 +3120,7 @@ static int sh_page_fault(struct vcpu *v,
     if ( rc & GW_RMWR_REWALK )
     {
         paging_unlock(d);
-        put_gfn(d, gfn_x(gfn));
+        put_gfn(d, gfn);
         goto rewalk;
     }
 #endif /* OOS */
@@ -3126,7 +3129,7 @@ static int sh_page_fault(struct vcpu *v,
     {
         perfc_incr(shadow_inconsistent_gwalk);
         paging_unlock(d);
-        put_gfn(d, gfn_x(gfn));
+        put_gfn(d, gfn);
         goto rewalk;
     }
 
@@ -3153,7 +3156,7 @@ static int sh_page_fault(struct vcpu *v,
         ASSERT(d->is_shutting_down);
 #endif
         paging_unlock(d);
-        put_gfn(d, gfn_x(gfn));
+        put_gfn(d, gfn);
         trace_shadow_gen(TRC_SHADOW_DOMF_DYING, va);
         return 0;
     }
@@ -3171,7 +3174,7 @@ static int sh_page_fault(struct vcpu *v,
          * failed. We cannot safely continue since some page is still
          * OOS but not in the hash table anymore. */
         paging_unlock(d);
-        put_gfn(d, gfn_x(gfn));
+        put_gfn(d, gfn);
         return 0;
     }
 
@@ -3181,7 +3184,7 @@ static int sh_page_fault(struct vcpu *v,
     {
         perfc_incr(shadow_inconsistent_gwalk);
         paging_unlock(d);
-        put_gfn(d, gfn_x(gfn));
+        put_gfn(d, gfn);
         goto rewalk;
     }
 #endif /* OOS */
@@ -3267,7 +3270,7 @@ static int sh_page_fault(struct vcpu *v,
     SHADOW_PRINTK("fixed\n");
     shadow_audit_tables(v);
     paging_unlock(d);
-    put_gfn(d, gfn_x(gfn));
+    put_gfn(d, gfn);
     return EXCRET_fault_fixed;
 
  emulate:
@@ -3337,7 +3340,7 @@ static int sh_page_fault(struct vcpu *v,
     sh_audit_gw(v, &gw);
     shadow_audit_tables(v);
     paging_unlock(d);
-    put_gfn(d, gfn_x(gfn));
+    put_gfn(d, gfn);
 
     this_cpu(trace_emulate_write_val) = 0;
 
@@ -3521,7 +3524,7 @@ static int sh_page_fault(struct vcpu *v,
     shadow_audit_tables(v);
     sh_reset_early_unshadow(v);
     paging_unlock(d);
-    put_gfn(d, gfn_x(gfn));
+    put_gfn(d, gfn);
     trace_shadow_gen(TRC_SHADOW_MMIO, va);
     return (handle_mmio_with_translation(va, gpa >> PAGE_SHIFT, access)
             ? EXCRET_fault_fixed : 0);
@@ -3535,7 +3538,7 @@ static int sh_page_fault(struct vcpu *v,
     shadow_audit_tables(v);
     sh_reset_early_unshadow(v);
     paging_unlock(d);
-    put_gfn(d, gfn_x(gfn));
+    put_gfn(d, gfn);
 
 propagate:
     trace_not_shadow_fault(gw.l1e, va);
@@ -4116,7 +4119,7 @@ sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
             if ( guest_l3e_get_flags(gl3e[i]) & _PAGE_PRESENT )
             {
                 gl2gfn = guest_l3e_get_gfn(gl3e[i]);
-                gl2mfn = get_gfn_query_unlocked(d, gfn_x(gl2gfn), &p2mt);
+                gl2mfn = get_gfn_query_unlocked(d, gl2gfn, &p2mt);
                 if ( p2m_is_ram(p2mt) )
                     flush |= sh_remove_write_access(d, gl2mfn, 2, 0);
             }
@@ -4129,7 +4132,7 @@ sh_update_cr3(struct vcpu *v, int do_locking, bool noflush)
             if ( guest_l3e_get_flags(gl3e[i]) & _PAGE_PRESENT )
             {
                 gl2gfn = guest_l3e_get_gfn(gl3e[i]);
-                gl2mfn = get_gfn_query_unlocked(d, gfn_x(gl2gfn), &p2mt);
+                gl2mfn = get_gfn_query_unlocked(d, gl2gfn, &p2mt);
                 if ( p2m_is_ram(p2mt) )
                     sh_set_toplevel_shadow(v, i, gl2mfn, (i == 3)
                                            ? SH_type_l2h_shadow
@@ -4536,7 +4539,7 @@ static void sh_pagetable_dying(paddr_t gpa)
     p2m_type_t p2mt;
     char *gl3pa = NULL;
     guest_l3e_t *gl3e = NULL;
-    unsigned long l3gfn;
+    gfn_t l3gfn;
     mfn_t l3mfn;
 
     gcr3 = v->arch.hvm.guest_cr[3];
@@ -4544,8 +4547,8 @@ static void sh_pagetable_dying(paddr_t gpa)
     if ( gcr3 == gpa )
         fast_path = 1;
 
-    l3gfn = gpa >> PAGE_SHIFT;
-    l3mfn = get_gfn_query(d, _gfn(l3gfn), &p2mt);
+    l3gfn = gaddr_to_gfn(gpa);
+    l3mfn = get_gfn_query(d, l3gfn, &p2mt);
     if ( !mfn_valid(l3mfn) || !p2m_is_ram(p2mt) )
     {
         printk(XENLOG_DEBUG "sh_pagetable_dying: gpa not valid %"PRIpaddr"\n",
@@ -4573,8 +4576,7 @@ static void sh_pagetable_dying(paddr_t gpa)
         else
         {
             /* retrieving the l2s */
-            gmfn = get_gfn_query_unlocked(d, gfn_x(guest_l3e_get_gfn(gl3e[i])),
-                                          &p2mt);
+            gmfn = get_gfn_query_unlocked(d, guest_l3e_get_gfn(gl3e[i]), &p2mt);
             smfn = unlikely(mfn_eq(gmfn, INVALID_MFN))
                    ? INVALID_MFN
                    : shadow_hash_lookup(d, mfn_x(gmfn), SH_type_l2_pae_shadow);
@@ -4609,10 +4611,11 @@ static void sh_pagetable_dying(paddr_t gpa)
 {
     struct vcpu *v = current;
     struct domain *d = v->domain;
+    gfn_t gfn = gaddr_to_gfn(gpa);
     mfn_t smfn, gmfn;
     p2m_type_t p2mt;
 
-    gmfn = get_gfn_query(d, _gfn(gpa >> PAGE_SHIFT), &p2mt);
+    gmfn = get_gfn_query(d, gfn, &p2mt);
     paging_lock(d);
 
 #if GUEST_PAGING_LEVELS == 2
@@ -4637,7 +4640,7 @@ static void sh_pagetable_dying(paddr_t gpa)
     v->arch.paging.shadow.pagetable_dying = 1;
 
     paging_unlock(d);
-    put_gfn(d, gpa >> PAGE_SHIFT);
+    put_gfn(d, gfn);
 }
 #endif
 
@@ -4759,7 +4762,7 @@ int sh_audit_l1_table(struct vcpu *v, mfn_t sl1mfn, mfn_t x)
             {
                 gfn = guest_l1e_get_gfn(*gl1e);
                 mfn = shadow_l1e_get_mfn(*sl1e);
-                gmfn = get_gfn_query_unlocked(v->domain, gfn_x(gfn), &p2mt);
+                gmfn = get_gfn_query_unlocked(v->domain, gfn, &p2mt);
                 if ( !p2m_is_grant(p2mt) && !mfn_eq(gmfn, mfn) )
                     AUDIT_FAIL(1, "bad translation: gfn %" SH_PRI_gfn
                                " --> %" PRI_mfn " != mfn %" PRI_mfn,
@@ -4832,16 +4835,15 @@ int sh_audit_l2_table(struct vcpu *v, mfn_t sl2mfn, mfn_t x)
             gmfn = (guest_l2e_get_flags(*gl2e) & _PAGE_PSE)
                 ? get_fl1_shadow_status(d, gfn)
                 : get_shadow_status(d,
-                    get_gfn_query_unlocked(d, gfn_x(gfn),
-                                        &p2mt), SH_type_l1_shadow);
+                    get_gfn_query_unlocked(d, gfn, &p2mt), SH_type_l1_shadow);
             if ( !mfn_eq(gmfn, mfn) )
                 AUDIT_FAIL(2, "bad translation: gfn %" SH_PRI_gfn
                            " (--> %" PRI_mfn ")"
                            " --> %" PRI_mfn " != mfn %" PRI_mfn,
                            gfn_x(gfn),
                            (guest_l2e_get_flags(*gl2e) & _PAGE_PSE) ? 0
-                           : mfn_x(get_gfn_query_unlocked(d,
-                                   gfn_x(gfn), &p2mt)), mfn_x(gmfn), mfn_x(mfn));
+                           : mfn_x(get_gfn_query_unlocked(d, gfn, &p2mt)),
+                           mfn_x(gmfn), mfn_x(mfn));
         }
     });
     unmap_domain_page(gp);
@@ -4881,8 +4883,7 @@ int sh_audit_l3_table(struct vcpu *v, mfn_t sl3mfn, mfn_t x)
         {
             gfn = guest_l3e_get_gfn(*gl3e);
             mfn = shadow_l3e_get_mfn(*sl3e);
-            gmfn = get_shadow_status(d, get_gfn_query_unlocked(
-                                        d, gfn_x(gfn), &p2mt),
+            gmfn = get_shadow_status(d, get_gfn_query_unlocked(d, gfn, &p2mt),
                                      ((GUEST_PAGING_LEVELS == 3 ||
                                        is_pv_32bit_domain(d))
                                       && !shadow_mode_external(d)
@@ -4931,8 +4932,7 @@ int sh_audit_l4_table(struct vcpu *v, mfn_t sl4mfn, mfn_t x)
         {
             gfn = guest_l4e_get_gfn(*gl4e);
             mfn = shadow_l4e_get_mfn(*sl4e);
-            gmfn = get_shadow_status(d, get_gfn_query_unlocked(
-                                     d, gfn_x(gfn), &p2mt),
+            gmfn = get_shadow_status(d, get_gfn_query_unlocked(d, gfn, &p2mt),
                                      SH_type_l3_shadow);
             if ( !mfn_eq(gmfn, mfn) )
                 AUDIT_FAIL(4, "bad translation: gfn %" SH_PRI_gfn

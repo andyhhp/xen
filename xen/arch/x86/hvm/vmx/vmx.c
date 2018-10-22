@@ -2199,7 +2199,8 @@ static void vmx_vcpu_update_vmfunc_ve(struct vcpu *v)
             p2m_type_t t;
             mfn_t mfn;
 
-            mfn = get_gfn_query_unlocked(d, gfn_x(vcpu_altp2m(v).veinfo_gfn), &t);
+            /* TODO: This is a security issue... */
+            mfn = get_gfn_query_unlocked(d, vcpu_altp2m(v).veinfo_gfn, &t);
 
             if ( !mfn_eq(mfn, INVALID_MFN) )
             {
@@ -3328,7 +3329,7 @@ static void ept_handle_violation(ept_qual_t q, paddr_t gpa)
 
         _d.gpa = gpa;
         _d.qualification = q.raw;
-        _d.mfn = mfn_x(get_gfn_query_unlocked(d, gfn, &_d.p2mt));
+        _d.mfn = mfn_x(get_gfn_query_unlocked(d, _gfn(gfn), &_d.p2mt));
 
         __trace_var(TRC_HVM_NPF, 0, sizeof(_d), &_d);
     }
@@ -3358,7 +3359,7 @@ static void ept_handle_violation(ept_qual_t q, paddr_t gpa)
     }
 
     /* Everything else is an error. */
-    mfn = get_gfn_query_unlocked(d, gfn, &p2mt);
+    mfn = get_gfn_query_unlocked(d, _gfn(gfn), &p2mt);
     gprintk(XENLOG_ERR,
             "EPT violation %#lx (%c%c%c/%c%c%c) gpa %#"PRIpaddr" mfn %#lx type %i\n",
             q.raw,

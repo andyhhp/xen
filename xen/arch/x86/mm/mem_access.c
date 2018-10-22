@@ -263,7 +263,6 @@ int p2m_set_altp2m_mem_access(struct domain *d, struct p2m_domain *hp2m,
     p2m_type_t t;
     p2m_access_t old_a;
     unsigned int page_order;
-    unsigned long gfn_l = gfn_x(gfn);
     int rc;
 
     mfn = ap2m->get_entry(ap2m, gfn, &t, &old_a, 0, NULL, NULL);
@@ -272,7 +271,7 @@ int p2m_set_altp2m_mem_access(struct domain *d, struct p2m_domain *hp2m,
     if ( !mfn_valid(mfn) )
     {
 
-        mfn = __get_gfn_type_access(hp2m, gfn_l, &t, &old_a,
+        mfn = __get_gfn_type_access(hp2m, gfn, &t, &old_a,
                                     P2M_ALLOC | P2M_UNSHARE, &page_order, 0);
 
         rc = -ESRCH;
@@ -283,7 +282,7 @@ int p2m_set_altp2m_mem_access(struct domain *d, struct p2m_domain *hp2m,
         if ( page_order != PAGE_ORDER_4K )
         {
             unsigned long mask = ~((1UL << page_order) - 1);
-            gfn_t gfn2 = _gfn(gfn_l & mask);
+            gfn_t gfn2 = _gfn(gfn_x(gfn) & mask);
             mfn_t mfn2 = _mfn(mfn_x(mfn) & mask);
 
             rc = ap2m->set_entry(ap2m, gfn2, mfn2, page_order, t, old_a, 1);

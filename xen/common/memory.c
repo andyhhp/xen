@@ -303,10 +303,10 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     int rc;
 
 #ifdef CONFIG_X86
-    mfn = get_gfn_query(d, gmfn, &p2mt);
+    mfn = get_gfn_query(d, _gfn(gmfn), &p2mt);
     if ( unlikely(p2mt == p2m_invalid) || unlikely(p2mt == p2m_mmio_dm) )
     {
-        put_gfn(d, gmfn);
+        put_gfn(d, _gfn(gmfn));
 
         return -ENOENT;
     }
@@ -336,7 +336,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
             goto out_put_gfn;
         }
 
-        put_gfn(d, gmfn);
+        put_gfn(d, _gfn(gmfn));
 
         if ( page )
         {
@@ -359,7 +359,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     if ( unlikely(!mfn_valid(mfn)) )
     {
 #ifdef CONFIG_X86
-        put_gfn(d, gmfn);
+        put_gfn(d, _gfn(gmfn));
 #endif
         gdprintk(XENLOG_INFO, "Domain %u page number %lx invalid\n",
                 d->domain_id, gmfn);
@@ -382,7 +382,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
             goto out_put_gfn;
         }
         /* Maybe the mfn changed */
-        mfn = get_gfn_query_unlocked(d, gmfn, &p2mt);
+        mfn = get_gfn_query_unlocked(d, _gfn(gmfn), &p2mt);
         ASSERT(!p2m_is_shared(p2mt));
     }
 #endif /* CONFIG_X86 */
@@ -391,7 +391,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
     if ( unlikely(!get_page(page, d)) )
     {
 #ifdef CONFIG_X86
-        put_gfn(d, gmfn);
+        put_gfn(d, _gfn(gmfn));
 #endif
         gdprintk(XENLOG_INFO, "Bad page free for domain %u\n", d->domain_id);
 
@@ -416,7 +416,7 @@ int guest_remove_page(struct domain *d, unsigned long gmfn)
 
 #ifdef CONFIG_X86
  out_put_gfn:
-    put_gfn(d, gmfn);
+    put_gfn(d, _gfn(gmfn));
 #endif
 
     /*
@@ -651,10 +651,10 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
                 p2m_type_t p2mt;
 
                 /* Shared pages cannot be exchanged */
-                mfn = get_gfn_unshare(d, gmfn + k, &p2mt);
+                mfn = get_gfn_unshare(d, _gfn(gmfn + k), &p2mt);
                 if ( p2m_is_shared(p2mt) )
                 {
-                    put_gfn(d, gmfn + k);
+                    put_gfn(d, _gfn(gmfn + k));
                     rc = -ENOMEM;
                     goto fail; 
                 }
@@ -664,7 +664,7 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
                 if ( unlikely(!mfn_valid(mfn)) )
                 {
 #ifdef CONFIG_X86
-                    put_gfn(d, gmfn + k);
+                    put_gfn(d, _gfn(gmfn + k));
 #endif
                     rc = -EINVAL;
                     goto fail;
@@ -676,14 +676,14 @@ static long memory_exchange(XEN_GUEST_HANDLE_PARAM(xen_memory_exchange_t) arg)
                 if ( unlikely(rc) )
                 {
 #ifdef CONFIG_X86
-                    put_gfn(d, gmfn + k);
+                    put_gfn(d, _gfn(gmfn + k));
 #endif
                     goto fail;
                 }
 
                 page_list_add(page, &in_chunk_list);
 #ifdef CONFIG_X86
-                put_gfn(d, gmfn + k);
+                put_gfn(d, _gfn(gmfn + k));
 #endif
             }
         }

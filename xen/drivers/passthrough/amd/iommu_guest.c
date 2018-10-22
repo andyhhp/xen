@@ -21,14 +21,6 @@
 #include <asm/amd-iommu.h>
 #include <asm/hvm/svm/amd-iommu-proto.h>
 
-/* Override {get,put}_gfn to work with gfn_t */
-#undef get_gfn
-#define get_gfn(d, g, t) get_gfn_type(d, gfn_x(g), t, P2M_ALLOC)
-#undef get_gfn_query
-#define get_gfn_query(d, g, t) get_gfn_type(d, gfn_x(g), t, 0)
-#undef put_gfn
-#define put_gfn(d, g) __put_gfn(p2m_get_hostp2m(d), gfn_x(g))
-
 #define IOMMU_MMIO_SIZE                         0x8000
 #define IOMMU_MMIO_PAGE_NR                      0x8
 #define RING_BF_LENGTH_MASK                     0x0F000000

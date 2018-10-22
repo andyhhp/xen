@@ -1762,7 +1762,7 @@ static void svm_do_nested_pgfault(struct vcpu *v,
     struct cpu_user_regs *regs, uint64_t pfec, paddr_t gpa)
 {
     int ret;
-    unsigned long gfn = gpa >> PAGE_SHIFT;
+    gfn_t gfn = gaddr_to_gfn(gpa);
     mfn_t mfn;
     p2m_type_t p2mt;
     p2m_access_t p2ma;

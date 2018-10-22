@@ -51,7 +51,7 @@ int create_grant_p2m_mapping(uint64_t addr, mfn_t frame,
 int replace_grant_p2m_mapping(uint64_t addr, mfn_t frame,
                               uint64_t new_addr, unsigned int flags)
 {
-    unsigned long gfn = (unsigned long)(addr >> PAGE_SHIFT);
+    gfn_t gfn = gaddr_to_gfn(addr);
     p2m_type_t type;
     mfn_t old_mfn;
     struct domain *d = current->domain;
@@ -68,7 +68,7 @@ int replace_grant_p2m_mapping(uint64_t addr, mfn_t frame,
                  type, mfn_x(old_mfn), mfn_x(frame));
         return GNTST_general_error;
     }
-    if ( guest_physmap_remove_page(d, _gfn(gfn), frame, PAGE_ORDER_4K) )
+    if ( guest_physmap_remove_page(d, gfn, frame, PAGE_ORDER_4K) )
     {
         put_gfn(d, gfn);
         return GNTST_general_error;
