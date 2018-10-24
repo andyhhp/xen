@@ -101,7 +101,7 @@ static int __init allocate_cachealigned_memnodemap(void)
     unsigned long size = PFN_UP(memnodemapsize * sizeof(*memnodemap));
     unsigned long mfn = mfn_x(alloc_boot_pages(size, 1));
 
-    memnodemap = mfn_to_virt(mfn);
+    memnodemap = mfn_to_virt(_mfn(mfn));
     mfn <<= PAGE_SHIFT;
     size <<= PAGE_SHIFT;
     printk(KERN_DEBUG "NUMA: Allocated memnodemap from %lx - %lx\n",

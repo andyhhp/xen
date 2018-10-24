@@ -1366,10 +1366,10 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
         return -EINVAL;
     }
 
-    i = virt_to_mfn(HYPERVISOR_VIRT_END - 1) + 1;
+    i = mfn_x(virt_to_mfn(HYPERVISOR_VIRT_END - 1)) + 1;
     if ( spfn < i )
     {
-        ret = map_pages_to_xen((unsigned long)mfn_to_virt(spfn), _mfn(spfn),
+        ret = map_pages_to_xen((unsigned long)mfn_to_virt(_mfn(spfn)), _mfn(spfn),
                                min(epfn, i) - spfn, PAGE_HYPERVISOR);
         if ( ret )
             goto destroy_directmap;
@@ -1378,7 +1378,7 @@ int memory_add(unsigned long spfn, unsigned long epfn, unsigned int pxm)
     {
         if ( i < spfn )
             i = spfn;
-        ret = map_pages_to_xen((unsigned long)mfn_to_virt(i), _mfn(i),
+        ret = map_pages_to_xen((unsigned long)mfn_to_virt(_mfn(i)), _mfn(i),
                                epfn - i, __PAGE_HYPERVISOR_RW);
         if ( ret )
             goto destroy_directmap;
@@ -1470,8 +1470,8 @@ destroy_frametable:
     NODE_DATA(node)->node_start_pfn = old_node_start;
     NODE_DATA(node)->node_spanned_pages = old_node_span;
  destroy_directmap:
-    destroy_xen_mappings((unsigned long)mfn_to_virt(spfn),
-                         (unsigned long)mfn_to_virt(epfn));
+    destroy_xen_mappings((unsigned long)mfn_to_virt(_mfn(spfn)),
+                         (unsigned long)mfn_to_virt(_mfn(epfn)));
 
     return ret;
 }

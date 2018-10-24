@@ -260,8 +260,8 @@ void copy_page_sse2(void *, const void *);
  * overridden in various source files while underscored versions remain intact.
  */
 #define mfn_valid(mfn)      __mfn_valid(mfn_x(mfn))
-#define virt_to_mfn(va)     __virt_to_mfn(va)
-#define mfn_to_virt(mfn)    __mfn_to_virt(mfn)
+#define virt_to_mfn(va)     _mfn(__virt_to_mfn(va))
+#define mfn_to_virt(mfn)    __mfn_to_virt(mfn_x(mfn))
 #define virt_to_maddr(va)   __virt_to_maddr((unsigned long)(va))
 #define maddr_to_virt(ma)   __maddr_to_virt((unsigned long)(ma))
 #define maddr_to_page(ma)   __maddr_to_page(ma)

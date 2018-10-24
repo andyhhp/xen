@@ -264,7 +264,7 @@ static void __init bootmem_region_add(unsigned long s, unsigned long e)
     unsigned int i;
 
     if ( (bootmem_region_list == NULL) && (s < e) )
-        bootmem_region_list = mfn_to_virt(s++);
+        bootmem_region_list = mfn_to_virt(_mfn(s++));
 
     if ( s >= e )
         return;
@@ -587,8 +587,8 @@ static unsigned long init_node_heap(int node, unsigned long mfn,
               (!xenheap_bits ||
                !((mfn + nr - 1) >> (xenheap_bits - PAGE_SHIFT))) )
     {
-        _heap[node] = mfn_to_virt(mfn + nr - needed);
-        avail[node] = mfn_to_virt(mfn + nr - 1) +
+        _heap[node] = mfn_to_virt(_mfn(mfn + nr - needed));
+        avail[node] = mfn_to_virt(_mfn(mfn + nr - 1)) +
                       PAGE_SIZE - sizeof(**avail) * NR_ZONES;
     }
     else if ( nr >= needed &&
@@ -596,8 +596,8 @@ static unsigned long init_node_heap(int node, unsigned long mfn,
               (!xenheap_bits ||
                !((mfn + needed - 1) >> (xenheap_bits - PAGE_SHIFT))) )
     {
-        _heap[node] = mfn_to_virt(mfn);
-        avail[node] = mfn_to_virt(mfn + needed - 1) +
+        _heap[node] = mfn_to_virt(_mfn(mfn));
+        avail[node] = mfn_to_virt(_mfn(mfn + needed - 1)) +
                       PAGE_SIZE - sizeof(**avail) * NR_ZONES;
         *use_tail = false;
     }

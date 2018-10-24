@@ -130,7 +130,7 @@ static int map_vcpuinfo(void)
         return 0;
     }
 
-    info.mfn = virt_to_mfn(&vcpu_info[vcpu]);
+    info.mfn = __virt_to_mfn(&vcpu_info[vcpu]);
     info.offset = (unsigned long)&vcpu_info[vcpu] & ~PAGE_MASK;
     rc = xen_hypercall_vcpu_op(VCPUOP_register_vcpu_info, vcpu, &info);
     if ( rc )

@@ -150,10 +150,6 @@
 #include "pv/mm.h"
 #endif
 
-/* Override macros from asm/page.h to make them work with mfn_t */
-#undef virt_to_mfn
-#define virt_to_mfn(v) _mfn(__virt_to_mfn(v))
-
 /* Mapping of the fixmap space needed early. */
 l1_pgentry_t __section(".bss.page_aligned") __aligned(PAGE_SIZE)
     l1_fixmap[L1_PAGETABLE_ENTRIES];
@@ -348,8 +344,8 @@ void __init arch_init_memory(void)
         iostart_pfn = max_t(unsigned long, pfn, 1UL << (20 - PAGE_SHIFT));
         ioend_pfn = min(rstart_pfn, 16UL << (20 - PAGE_SHIFT));
         if ( iostart_pfn < ioend_pfn )
-            destroy_xen_mappings((unsigned long)mfn_to_virt(iostart_pfn),
-                                 (unsigned long)mfn_to_virt(ioend_pfn));
+            destroy_xen_mappings((unsigned long)mfn_to_virt(_mfn(iostart_pfn)),
+                                 (unsigned long)mfn_to_virt(_mfn(ioend_pfn)));
 
         /* Mark as I/O up to next RAM region. */
         for ( ; pfn < rstart_pfn; pfn++ )
@@ -827,8 +823,9 @@ static int update_xen_mappings(unsigned long mfn, unsigned int cacheattr)
     if ( unlikely(alias) && cacheattr )
         err = map_pages_to_xen(xen_va, _mfn(mfn), 1, 0);
     if ( !err )
-        err = map_pages_to_xen((unsigned long)mfn_to_virt(mfn), _mfn(mfn), 1,
-                     PAGE_HYPERVISOR | cacheattr_to_pte_flags(cacheattr));
+        err = map_pages_to_xen(
+            (unsigned long)mfn_to_virt(_mfn(mfn)), _mfn(mfn), 1,
+            PAGE_HYPERVISOR | cacheattr_to_pte_flags(cacheattr));
     if ( unlikely(alias) && !cacheattr && !err )
         err = map_pages_to_xen(xen_va, _mfn(mfn), 1, PAGE_HYPERVISOR);
     return err;
@@ -4885,7 +4882,7 @@ void *alloc_xen_pagetable(void)
         return ptr;
     }
 
-    return mfn_to_virt(mfn_x(alloc_boot_pages(1, 1)));
+    return mfn_to_virt(alloc_boot_pages(1, 1));
 }
 
 void free_xen_pagetable(void *v)

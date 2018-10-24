@@ -1677,7 +1677,7 @@ static void __context_switch(void)
                                     per_cpu(compat_gdt_table, cpu);
     if ( need_full_gdt(nd) )
     {
-        unsigned long mfn = virt_to_mfn(gdt);
+        unsigned long mfn = mfn_x(virt_to_mfn(gdt));
         l1_pgentry_t *pl1e = pv_gdt_ptes(n);
         unsigned int i;
 
