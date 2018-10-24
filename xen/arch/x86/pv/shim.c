@@ -37,9 +37,6 @@
 
 #include <compat/grant_table.h>
 
-#undef virt_to_mfn
-#define virt_to_mfn(va) _mfn(__virt_to_mfn(va))
-
 #ifndef CONFIG_PV_SHIM_EXCLUSIVE
 bool pv_shim;
 boolean_param("pv-shim", pv_shim);

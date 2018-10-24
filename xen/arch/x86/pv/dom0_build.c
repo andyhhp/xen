@@ -528,7 +528,7 @@ int __init dom0_construct_pv(struct domain *d,
                     free_domheap_pages(page, order);
                     page += 1UL << order;
                 }
-            memcpy(page_to_virt(page), mfn_to_virt(initrd->mod_start),
+            memcpy(page_to_virt(page), __mfn_to_virt(initrd->mod_start),
                    initrd_len);
             mpt_alloc = (paddr_t)initrd->mod_start << PAGE_SHIFT;
             init_domheap_pages(mpt_alloc,
@@ -617,8 +617,7 @@ int __init dom0_construct_pv(struct domain *d,
         l3start = __va(mpt_alloc); mpt_alloc += PAGE_SIZE;
     }
     clear_page(l4tab);
-    init_xen_l4_slots(l4tab, _mfn(virt_to_mfn(l4start)),
-                      d, INVALID_MFN, true);
+    init_xen_l4_slots(l4tab, virt_to_mfn(l4start), d, INVALID_MFN, true);
     v->arch.guest_table = pagetable_from_paddr(__pa(l4start));
     if ( is_pv_32bit_domain(d) )
         v->arch.guest_table_user = v->arch.guest_table;

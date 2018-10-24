@@ -34,10 +34,6 @@
 #include <asm/livepatch.h>
 #include <asm/page.h>
 
-/* Override macros from asm/page.h to make them work with mfn_t */
-#undef virt_to_mfn
-#define virt_to_mfn(va) _mfn(__virt_to_mfn(va))
-
 extern const struct alt_instr __alt_instructions[], __alt_instructions_end[];
 
 struct alt_region {

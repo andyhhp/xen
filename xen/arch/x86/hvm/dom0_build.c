@@ -403,7 +403,7 @@ static int __init pvh_setup_p2m(struct domain *d)
                                  d->arch.e820[i].addr + d->arch.e820[i].size);
             enum hvm_translation_result res =
                  hvm_copy_to_guest_phys(mfn_to_maddr(_mfn(addr)),
-                                        mfn_to_virt(addr),
+                                        mfn_to_virt(_mfn(addr)),
                                         d->arch.e820[i].addr - end,
                                         v);
 
@@ -489,7 +489,7 @@ static int __init pvh_load_kernel(struct domain *d, const module_t *image,
 
     if ( initrd != NULL )
     {
-        rc = hvm_copy_to_guest_phys(last_addr, mfn_to_virt(initrd->mod_start),
+        rc = hvm_copy_to_guest_phys(last_addr, __mfn_to_virt(initrd->mod_start),
                                     initrd->mod_end, v);
         if ( rc )
         {

@@ -3835,7 +3835,7 @@ static int gnttab_get_status_frame_mfn(struct domain *d,
             return -EINVAL;
     }
 
-    *mfn = _mfn(virt_to_mfn(gt->status[idx]));
+    *mfn = virt_to_mfn(gt->status[idx]);
     return 0;
 }
 
@@ -3864,7 +3864,7 @@ static int gnttab_get_shared_frame_mfn(struct domain *d,
             return -EINVAL;
     }
 
-    *mfn = _mfn(virt_to_mfn(gt->shared_raw[idx]));
+    *mfn = virt_to_mfn(gt->shared_raw[idx]);
     return 0;
 }
 

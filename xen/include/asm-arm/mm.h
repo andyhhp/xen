@@ -288,8 +288,8 @@ static inline uint64_t gvirt_to_maddr(vaddr_t va, paddr_t *pa,
  * These are overriden in various source files while underscored version
  * remain intact.
  */
-#define virt_to_mfn(va)     __virt_to_mfn(va)
-#define mfn_to_virt(mfn)    __mfn_to_virt(mfn)
+#define virt_to_mfn(va)     _mfn(__virt_to_mfn(va))
+#define mfn_to_virt(mfn)    __mfn_to_virt(mfn_x(mfn))
 
 /* Convert between Xen-heap virtual addresses and page-info structures. */
 static inline struct page_info *virt_to_page(const void *v)
@@ -307,7 +307,7 @@ static inline struct page_info *virt_to_page(const void *v)
 
 static inline void *page_to_virt(const struct page_info *pg)
 {
-    return mfn_to_virt(mfn_x(page_to_mfn(pg)));
+    return mfn_to_virt(page_to_mfn(pg));
 }
 
 struct page_info *get_page_from_gva(struct vcpu *v, vaddr_t va,
