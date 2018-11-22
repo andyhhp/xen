@@ -450,7 +450,9 @@ void amd_ctxt_switch_legacy_ssbd(const struct vcpu *next)
 {
 	static DEFINE_PER_CPU(bool, ssbd);
 	bool *this_ssbd = &this_cpu(ssbd);
-	bool disable = opt_ssbd;
+	bool disable = opt_ssbd ?:
+            (next && !is_idle_vcpu(next) &&
+             (next->arch.msrs->virt_spec_ctrl & SPEC_CTRL_SSBD));
 	struct cpuinfo_x86 *c = &current_cpu_data;
 	unsigned int socket = c->phys_proc_id, core = c->cpu_core_id;
 	struct ssbd_ls_cfg *cfg;

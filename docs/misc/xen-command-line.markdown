@@ -1904,10 +1904,15 @@ option can be used to force (the default) or prevent Xen from issuing branch
 prediction barriers on vcpu context switches.
 
 On hardware supporting SSBD (Speculative Store Bypass Disable), the `ssbd=`
-option can be used to force or prevent Xen using the feature itself.  On AMD
-hardware, this is a global option applied at boot, and not virtualised for
-guest use.  On Intel hardware, the feature is virtualised for guests,
-independently of Xen's choice of setting.
+option can be used to force or prevent Xen using the feature itself.
+
+* On hardware supporting SSBD in MSR\_SPEC\_CTRL, Xen maintains distinct guest
+  and host state, and will virtualise SSBD for guests.
+
+* On some AMD hardware where only legacy LS\_CFG is available, Xen offers the
+  MSR\_VIRT\_SPEC\_CTRL interface to guests, but is unable to maintain
+  distinct guest and host state.  The value set in hardware is the logical OR
+  of the Xen and guest settings.
 
 On all hardware, the `eager-fpu=` option can be used to force or prevent Xen
 from using fully eager FPU context switches.  This is currently implemented as

@@ -1801,6 +1801,8 @@ void context_switch(struct vcpu *prev, struct vcpu *next)
             load_segments(next);
 
         ctxt_switch_levelling(next);
+        if ( cpu_has_legacy_ssbd )
+            amd_ctxt_switch_legacy_ssbd(next);
 
         if ( opt_ibpb && !is_idle_domain(nextd) )
         {

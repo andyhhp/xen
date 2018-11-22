@@ -1274,6 +1274,7 @@ long arch_do_domctl(
         static const uint32_t msrs_to_send[] = {
             MSR_SPEC_CTRL,
             MSR_INTEL_MISC_FEATURES_ENABLES,
+            MSR_VIRT_SPEC_CTRL,
             MSR_AMD64_DR0_ADDRESS_MASK,
             MSR_AMD64_DR1_ADDRESS_MASK,
             MSR_AMD64_DR2_ADDRESS_MASK,

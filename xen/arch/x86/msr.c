@@ -183,6 +183,13 @@ int guest_rdmsr(const struct vcpu *v, uint32_t msr, uint64_t *val)
                                    ARRAY_SIZE(msrs->dr_mask))];
         break;
 
+    case MSR_VIRT_SPEC_CTRL:
+        if ( !cp->extd.virt_sc_ssbd )
+            goto gp_fault;
+
+        *val = msrs->virt_spec_ctrl;
+        break;
+
     default:
         return X86EMUL_UNHANDLEABLE;
     }
@@ -321,6 +328,16 @@ int guest_wrmsr(struct vcpu *v, uint32_t msr, uint64_t val)
 
         if ( v == curr && (curr->arch.dr7 & DR7_ACTIVE_MASK) )
             wrmsrl(msr, val);
+        break;
+
+    case MSR_VIRT_SPEC_CTRL:
+        if ( !cp->extd.virt_sc_ssbd )
+            goto gp_fault;
+
+        msrs->virt_spec_ctrl = (val & SPEC_CTRL_SSBD);
+
+        if ( v == curr )
+            amd_ctxt_switch_legacy_ssbd(curr);
         break;
 
     default:

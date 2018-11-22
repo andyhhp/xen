@@ -289,6 +289,15 @@ struct vcpu_msrs
     } misc_features_enables;
 
     /*
+     * 0xc001011f - MSR_VIRT_SPEC_CTRL
+     *
+     * For the subset of bits implemented, functionality shared with
+     * MSR_SPEC_CTRL, but the MSR is expected to be intercepted.  For
+     * compatibility, unsupported bits are write-discard/read-as-zero.
+     */
+    uint32_t virt_spec_ctrl;
+
+    /*
      * 0xc00110{27,19-1b} MSR_AMD64_DR{0-3}_ADDRESS_MASK
      *
      * Loaded into hardware for guests which have active %dr7 settings.
