@@ -18,9 +18,34 @@ static const uint32_t hvm_shadow_featuremask[] = INIT_HVM_SHADOW_FEATURES;
 static const uint32_t hvm_hap_featuremask[] = INIT_HVM_HAP_FEATURES;
 static const uint32_t deep_features[] = INIT_DEEP_FEATURES;
 
+/*
+ * Works like strcmp(), but customised specifically for this usecase.  'name'
+ * is a NUL terminated string.  's' is considered to match 'name' if the NUL
+ * terminator of 'name' match punctiation in 's'.
+ */
+static int __init cpuid_name_cmp(const char *s, const char *name)
+{
+    int res;
+
+    /* Basic strcmp(). */
+    for ( ; *name != '\0'; ++name, ++s )
+        if ( (res = (*s - *name)) != 0 )
+            break;
+
+    /* If a failure, but only because '=' or ',', override to success. */
+    if ( res && *name == '\0' && (*s == '=' || *s == ',') )
+        res = 0;
+
+    return res;
+}
+
 static int __init parse_xen_cpuid(const char *s)
 {
-    const char *ss;
+    static const struct feature {
+        const char *name;
+        unsigned int bit;
+    } features[] __initconst = INIT_FEATURE_NAMES, *lhs, *mid, *rhs;
+    const char *ss, *feat;
     int val, rc = 0;
 
     do {
@@ -28,32 +53,48 @@ static int __init parse_xen_cpuid(const char *s)
         if ( !ss )
             ss = strchr(s, '\0');
 
-        if ( (val = parse_boolean("ibpb", s, ss)) >= 0 )
+        /* Skip the 'no-' prefix for name comparisons. */
+        feat = s;
+        if ( strncmp(s, "no-", 3) == 0 )
+            feat += 3;
+
+        /* (Re)initalise lhs and rhs for binary search. */
+        lhs = features;
+        rhs = features + ARRAY_SIZE(features);
+
+        while ( lhs < rhs )
         {
-            if ( !val )
-                setup_clear_cpu_cap(X86_FEATURE_IBPB);
+            int res;
+
+            mid = lhs + (rhs - lhs) / 2;
+            res = cpuid_name_cmp(feat, mid->name);
+
+            if ( res < 0 )
+            {
+                rhs = mid;
+                continue;
+            }
+            if ( res > 0 )
+            {
+                lhs = mid + 1;
+                continue;
+            }
+
+            if ( (val = parse_boolean(mid->name, s, ss)) >= 0 )
+            {
+                if ( !val )
+                    setup_clear_cpu_cap(mid->bit);
+                mid = NULL;
+            }
+
+            break;
         }
-        else if ( (val = parse_boolean("ibrsb", s, ss)) >= 0 )
-        {
-            if ( !val )
-                setup_clear_cpu_cap(X86_FEATURE_IBRSB);
-        }
-        else if ( (val = parse_boolean("stibp", s, ss)) >= 0 )
-        {
-            if ( !val )
-                setup_clear_cpu_cap(X86_FEATURE_STIBP);
-        }
-        else if ( (val = parse_boolean("l1d-flush", s, ss)) >= 0 )
-        {
-            if ( !val )
-                setup_clear_cpu_cap(X86_FEATURE_L1D_FLUSH);
-        }
-        else if ( (val = parse_boolean("ssbd", s, ss)) >= 0 )
-        {
-            if ( !val )
-                setup_clear_cpu_cap(X86_FEATURE_SSBD);
-        }
-        else
+
+        /*
+         * Mid being NULL means that the name search failed, or that
+         * parse_boolean() failed.
+         */
+        if ( mid )
             rc = -EINVAL;
 
         s = ss + 1;
