@@ -419,6 +419,97 @@ static void __init noinline amd_probe_legacy_ssbd(void)
 }
 
 /*
+ * This is all a gross hack, but Xen really doesn't have flexible-enough
+ * per-cpu infrastructure to do it properly.  For Zen(v1) with SMT active,
+ * MSR_AMD64_LS_CFG is per-core rather than per-thread, so we need a per-core
+ * spinlock to synchronise updates of the MSR.
+ *
+ * We can't use per-cpu state because taking one CPU offline would free state
+ * under the feet of another.  Ideally, we'd allocate memory on the AP boot
+ * path, but by the time the sibling information is calculated sufficiently
+ * for us to locate the per-core state, it's too late to fail the AP boot.
+ *
+ * We also can't afford to end up in a heterogeneous scenario with some CPUs
+ * unable to safely use LS_CFG.
+ *
+ * Therefore, we have to allocate for the worse-case scenario, which is
+ * believed to be 4 sockets.  Any allocation failure cause us to turn LS_CFG
+ * off, as this is fractionally better than failing to boot.
+ */
+static struct ssbd_ls_cfg {
+	spinlock_t lock;
+	unsigned int disable_count;
+} *ssbd_ls_cfg[4];
+static unsigned int ssbd_max_cores;
+
+static int __init amd_init_legacy_ssbd(void)
+{
+	const struct cpuinfo_x86 *c = &boot_cpu_data;
+	unsigned int socket, core;
+
+	/* No legacy SSBD interface?  Nothing to do. */
+	if (!cpu_has_legacy_ssbd)
+		return 0;
+
+	/*
+	 * No setup required for:
+	 *  - Using MSR_VIRT_SPEC_CTRL
+	 *  - Pre-Fam17h hardware
+	 *  - Fam17h with SMT disabled
+	 */
+	if (cpu_has_virt_sc_ssbd || c->x86 < 0x17 || c->x86_num_siblings == 1)
+		return 0;
+
+	/*
+	 * One could be forgiven for thinking that c->x86_max_cores is the
+	 * correct value to use here.
+	 *
+	 * However, that value is derived from the current configuration, and
+	 * c->cpu_core_id is sparse on all but the top end CPUs.  Derive
+	 * max_cpus from ApicIdCoreIdSize which will cover any sparseness.
+	 */
+	if (c->extended_cpuid_level >= 0x80000008) {
+		ssbd_max_cores = 1u << MASK_EXTR(cpuid_ecx(0x80000008), 0xf000);
+		ssbd_max_cores /= c->x86_num_siblings;
+	}
+
+	if (ssbd_max_cores == 0) {
+		printk(XENLOG_WARNING
+		       "Failed to calculate max_cores. Disabling LEGACY_SSBD\n");
+		setup_clear_cpu_cap(X86_FEATURE_LEGACY_SSBD);
+
+		return 0;
+	}
+
+	/*
+	 * Allocate the worse case cores-per-socket worth of state, as
+	 * described by hardware.
+	 */
+	for (socket = 0; socket < ARRAY_SIZE(ssbd_ls_cfg); ++socket) {
+		ssbd_ls_cfg[socket] =
+			xzalloc_array(struct ssbd_ls_cfg, ssbd_max_cores);
+
+		if (!ssbd_ls_cfg[socket]) {
+			/*
+			 * Memory allocation failure.  Backtrack and pretend
+			 * that the LEGACY_SSBD interface isn't available.
+			 */
+			printk(XENLOG_WARNING
+			       "Out of memory.  Disabling LEGACY_SSBD\n");
+			setup_clear_cpu_cap(X86_FEATURE_LEGACY_SSBD);
+
+			return 0;
+		}
+
+		for (core = 0; core < ssbd_max_cores; ++core)
+			spin_lock_init(&ssbd_ls_cfg[socket][core].lock);
+	}
+
+	return 0;
+}
+presmp_initcall(amd_init_legacy_ssbd);
+
+/*
  * Check for the presence of an AMD erratum. Arguments are defined in amd.h 
  * for each known erratum. Return 1 if erratum is found.
  */
