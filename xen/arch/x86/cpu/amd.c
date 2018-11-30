@@ -442,6 +442,74 @@ static struct ssbd_ls_cfg {
 } *ssbd_ls_cfg[4];
 static unsigned int ssbd_max_cores;
 
+/*
+ * Must only be called when the LEGACY_SSBD is in used.  Called with NULL to
+ * switch back to Xen's default value.
+ */
+void amd_ctxt_switch_legacy_ssbd(const struct vcpu *next)
+{
+	static DEFINE_PER_CPU(bool, ssbd);
+	bool *this_ssbd = &this_cpu(ssbd);
+	bool disable = opt_ssbd;
+	struct cpuinfo_x86 *c = &current_cpu_data;
+	unsigned int socket = c->phys_proc_id, core = c->cpu_core_id;
+	struct ssbd_ls_cfg *cfg;
+	uint64_t val;
+
+	ASSERT(cpu_has_legacy_ssbd);
+
+	/*
+	 * Update hardware lazily, as these MSRs are expensive.  However, on
+	 * the boot paths which pass NULL, force a write to set a consistent
+	 * initial state.
+	 */
+	if (*this_ssbd == disable && next)
+		return;
+
+	if (cpu_has_virt_sc_ssbd) {
+		wrmsrl(MSR_VIRT_SPEC_CTRL,
+		       disable ? SPEC_CTRL_SSBD : 0);
+		goto done;
+	}
+
+	val = ls_cfg_base | (disable ? ls_cfg_ssbd_mask : 0);
+
+	if (c->x86 < 0x17 || c->x86_num_siblings == 1) {
+		/* No threads to be concerned with. */
+		wrmsrl(MSR_AMD64_LS_CFG, val);
+		goto done;
+	}
+
+	/* Check that we won't overflow the worse-case allocation. */
+	BUG_ON(socket >= ARRAY_SIZE(ssbd_ls_cfg));
+	BUG_ON(core   >= ssbd_max_cores);
+
+	cfg = &ssbd_ls_cfg[socket][core];
+
+	if (disable) {
+		spin_lock(&cfg->lock);
+
+		/* First sibling to disable updates hardware. */
+		if (!cfg->disable_count)
+			wrmsrl(MSR_AMD64_LS_CFG, val);
+		cfg->disable_count++;
+
+		spin_unlock(&cfg->lock);
+	} else {
+		spin_lock(&cfg->lock);
+
+		/* Last sibling to enable updates hardware. */
+		cfg->disable_count--;
+		if (!cfg->disable_count)
+			wrmsrl(MSR_AMD64_LS_CFG, val);
+
+		spin_unlock(&cfg->lock);
+	}
+
+ done:
+	*this_ssbd = disable;
+}
+
 static int __init amd_init_legacy_ssbd(void)
 {
 	const struct cpuinfo_x86 *c = &boot_cpu_data;
@@ -504,6 +572,8 @@ static int __init amd_init_legacy_ssbd(void)
 		for (core = 0; core < ssbd_max_cores; ++core)
 			spin_lock_init(&ssbd_ls_cfg[socket][core].lock);
 	}
+
+	amd_ctxt_switch_legacy_ssbd(NULL);
 
 	return 0;
 }
@@ -752,25 +822,6 @@ static void init_amd(struct cpuinfo_x86 *c)
 
 	if (c == &boot_cpu_data)
 		amd_probe_legacy_ssbd();
-
-	/*
-	 * If the user has explicitly chosen to disable Memory Disambiguation
-	 * to mitigiate Speculative Store Bypass, poke the appropriate MSR.
-	 */
-	if (opt_ssbd) {
-		int bit = -1;
-
-		switch (c->x86) {
-		case 0x15: bit = 54; break;
-		case 0x16: bit = 33; break;
-		case 0x17: bit = 10; break;
-		}
-
-		if (bit >= 0 && !rdmsr_safe(MSR_AMD64_LS_CFG, value)) {
-			value |= 1ull << bit;
-			wrmsr_safe(MSR_AMD64_LS_CFG, value);
-		}
-	}
 
 	/* MFENCE stops RDTSC speculation */
 	if (!cpu_has_lfence_dispatch)

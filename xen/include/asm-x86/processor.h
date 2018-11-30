@@ -151,6 +151,8 @@ extern bool probe_cpuid_faulting(void);
 extern void ctxt_switch_levelling(const struct vcpu *next);
 extern void (*ctxt_switch_masking)(const struct vcpu *next);
 
+extern void amd_ctxt_switch_legacy_ssbd(const struct vcpu *next);
+
 extern bool_t opt_cpu_info;
 extern u32 cpuid_ext_features;
 extern u64 trampoline_misc_enable_off;

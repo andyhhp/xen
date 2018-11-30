@@ -376,6 +376,9 @@ void start_secondary(void *unused)
     if ( boot_cpu_has(X86_FEATURE_IBRSB) )
         wrmsrl(MSR_SPEC_CTRL, default_xen_spec_ctrl);
 
+    if ( cpu_has_legacy_ssbd )
+        amd_ctxt_switch_legacy_ssbd(NULL);
+
     if ( xen_guest )
         hypervisor_ap_setup();
 
