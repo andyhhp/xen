@@ -260,7 +260,8 @@ static void __init print_details(enum ind_thunk thunk, uint64_t caps)
            thunk == THUNK_JMP       ? "JMP" : "?",
            !boot_cpu_has(X86_FEATURE_IBRSB)          ? "No" :
            (default_xen_spec_ctrl & SPEC_CTRL_IBRS)  ? "IBRS+" :  "IBRS-",
-           !boot_cpu_has(X86_FEATURE_SSBD)           ? "" :
+           !boot_cpu_has(X86_FEATURE_SSBD)           ?
+           cpu_has_legacy_ssbd                       ? " LEGACY_SSBD" : "" :
            (default_xen_spec_ctrl & SPEC_CTRL_SSBD)  ? " SSBD+" : " SSBD-",
            opt_ibpb                                  ? " IBPB"  : "",
            opt_l1d_flush                             ? " L1D_FLUSH" : "");

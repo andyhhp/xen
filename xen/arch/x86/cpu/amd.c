@@ -362,6 +362,62 @@ static void __init noinline amd_init_levelling(void)
 		ctxt_switch_masking = amd_ctxt_switch_masking;
 }
 
+/* Cached once on boot. */
+static uint64_t __read_mostly ls_cfg_base, __read_mostly ls_cfg_ssbd_mask;
+
+static void __init noinline amd_probe_legacy_ssbd(void)
+{
+	uint64_t new;
+
+	/*
+	 * Search for mechanisms of controlling Memory Disambiguation.
+	 *
+	 * If the CPU reports that it is fixed, there is nothing to do.  If we
+	 * have an architectural MSR_SPEC_CTRL.SSBD control, leave everything
+	 * to the common code.
+	 */
+	if (cpu_has_amd_ssb_no || cpu_has_amd_ssbd)
+		return;
+
+	/* Use MSR_VIRT_SPEC_CTRL if our hypervisor offers it. */
+	if (cpu_has_virt_sc_ssbd) {
+		setup_force_cpu_cap(X86_FEATURE_LEGACY_SSBD);
+		return;
+	}
+
+	/* Probe for LS_CFG settings. */
+	switch (boot_cpu_data.x86) {
+	default: return; /* No known LS_CFG settings. */
+	case 0x15: ls_cfg_ssbd_mask = 1ull << 54; break;
+	case 0x16: ls_cfg_ssbd_mask = 1ull << 33; break;
+	case 0x17: ls_cfg_ssbd_mask = 1ull << 10; break;
+	}
+
+	/*
+	 * MSR_AMD64_LS_CFG isn't architectural, and may not be virtualised
+	 * fully.  Check that we can actually flip the bit before concluding
+	 * that LS_CFG is available for use.
+	 */
+	if (rdmsr_safe(MSR_AMD64_LS_CFG, ls_cfg_base) ||
+	    wrmsr_safe(MSR_AMD64_LS_CFG, ls_cfg_base ^ ls_cfg_ssbd_mask))
+		return;
+
+	rdmsrl(MSR_AMD64_LS_CFG, new);
+	if (new != (ls_cfg_base ^ ls_cfg_ssbd_mask))
+		return;
+
+	/*
+	 * Leave ls_cfg_base with the bit clear.  This is Xen's overall
+	 * default, and it simplifies the context switch logic.
+	 */
+	ls_cfg_base &= ~ls_cfg_ssbd_mask;
+	if ((new != ls_cfg_base) && wrmsr_safe(MSR_AMD64_LS_CFG, ls_cfg_base))
+		return;
+
+	/* LS_CFG appears to work fully.  Lets choose to use it. */
+	setup_force_cpu_cap(X86_FEATURE_LEGACY_SSBD);
+}
+
 /*
  * Check for the presence of an AMD erratum. Arguments are defined in amd.h 
  * for each known erratum. Return 1 if erratum is found.
@@ -602,6 +658,9 @@ static void init_amd(struct cpuinfo_x86 *c)
 			__set_bit(X86_FEATURE_LFENCE_DISPATCH,
 				  c->x86_capability);
 	}
+
+	if (c == &boot_cpu_data)
+		amd_probe_legacy_ssbd();
 
 	/*
 	 * If the user has explicitly chosen to disable Memory Disambiguation

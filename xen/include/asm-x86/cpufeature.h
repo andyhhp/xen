@@ -110,11 +110,17 @@
 /* CPUID level 0x80000007.edx */
 #define cpu_has_itsc            boot_cpu_has(X86_FEATURE_ITSC)
 
+/* CPUID level 0x80000008.ebx */
+#define cpu_has_amd_ssbd        boot_cpu_has(X86_FEATURE_AMD_SSBD)
+#define cpu_has_virt_sc_ssbd    boot_cpu_has(X86_FEATURE_VIRT_SC_SSBD)
+#define cpu_has_amd_ssb_no      boot_cpu_has(X86_FEATURE_AMD_SSB_NO)
+
 /* Synthesized. */
 #define cpu_has_arch_perfmon    boot_cpu_has(X86_FEATURE_ARCH_PERFMON)
 #define cpu_has_cpuid_faulting  boot_cpu_has(X86_FEATURE_CPUID_FAULTING)
 #define cpu_has_aperfmperf      boot_cpu_has(X86_FEATURE_APERFMPERF)
 #define cpu_has_lfence_dispatch boot_cpu_has(X86_FEATURE_LFENCE_DISPATCH)
+#define cpu_has_legacy_ssbd     boot_cpu_has(X86_FEATURE_LEGACY_SSBD)
 #define cpu_has_xen_lbr         boot_cpu_has(X86_FEATURE_XEN_LBR)
 
 enum _cache_type {
