@@ -370,6 +370,16 @@ static void __init guest_common_feature_adjustments(uint32_t *fs)
      */
     if ( host_cpuid_policy.feat.ibrsb )
         __set_bit(X86_FEATURE_IBPB, fs);
+
+    /*
+     * In practice, we can offer VIRT_SC_SSBD on any hardware with legacy_ssbd
+     * or msr_spec_ctrl, but until we've got a proper split between default
+     * and max policies, avoid offering it in cases where the guest shouldn't
+     * be using it.
+     */
+    __clear_bit(X86_FEATURE_VIRT_SC_SSBD, fs);
+    if ( cpu_has_legacy_ssbd )
+        __set_bit(X86_FEATURE_VIRT_SC_SSBD, fs);
 }
 
 static void __init calculate_pv_max_policy(void)

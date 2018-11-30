@@ -241,7 +241,7 @@ XEN_CPUFEATURE(IBPB,          8*32+12) /*A  IBPB support only (no IBRS, used by 
 XEN_CPUFEATURE(AMD_IBRS,      8*32+14) /*   MSR_SPEC_CTRL.IBRS available */
 XEN_CPUFEATURE(AMD_STIBP,     8*32+15) /*   MSR_SPEC_CTRL.STIBP available */
 XEN_CPUFEATURE(AMD_SSBD,      8*32+24) /*   MSR_SPEC_CTRL.SSBD available */
-XEN_CPUFEATURE(VIRT_SC_SSBD,  8*32+25) /*   MSR_VIRT_SPEC_CTRL.SSBD available. */
+XEN_CPUFEATURE(VIRT_SC_SSBD,  8*32+25) /*A  MSR_VIRT_SPEC_CTRL.SSBD available. */
 XEN_CPUFEATURE(AMD_SSB_NO,    8*32+26) /*   Hardware not vulnerable to SSB */
 
 /* Intel-defined CPU features, CPUID level 0x00000007:0.edx, word 9 */
