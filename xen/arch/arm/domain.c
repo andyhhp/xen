@@ -936,12 +936,6 @@ int arch_set_info_guest(
     return 0;
 }
 
-int arch_initialise_vcpu(struct vcpu *v, XEN_GUEST_HANDLE_PARAM(void) arg)
-{
-    ASSERT_UNREACHABLE();
-    return -EOPNOTSUPP;
-}
-
 int arch_vcpu_reset(struct vcpu *v)
 {
     vcpu_end_shutdown_deferral(v);
