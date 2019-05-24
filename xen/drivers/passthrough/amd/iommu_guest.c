@@ -477,7 +477,7 @@ static int do_invalidate_dte(struct domain *d, cmd_entry_t *cmd)
     mdte = &dte_base[req_id];
 
     spin_lock_irqsave(&iommu->lock, flags);
-    iommu_dte_set_guest_cr3(mdte, hdom_id, mfn_x(gcr3_mfn) XXX, gv, glx);
+    iommu_dte_set_guest_cr3(mdte, hdom_id, mfn_x(gcr3_mfn) /* XXX */, gv, glx);
 
     amd_iommu_flush_device(iommu, req_id);
     spin_unlock_irqrestore(&iommu->lock, flags);
