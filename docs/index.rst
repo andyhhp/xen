@@ -77,3 +77,11 @@ Miscellanea
 
    faq
    glossary
+
+Unsorted
+--------
+
+.. toctree::
+   :maxdepth: 2
+
+   misc/tech-debt
