@@ -8,10 +8,12 @@ CFLAGS += $(CFLAGS_libxenevtchn)
 CFLAGS += $(CFLAGS_libxenctrl)
 CFLAGS += $(CFLAGS_xeninclude)
 CFLAGS += $(CFLAGS_libxenstore)
+CFLAGS += -Wno-declaration-after-statement
 
 # Everything to be installed in regular bin/
 INSTALL_BIN-$(CONFIG_X86)      += xen-cpuid
 INSTALL_BIN-$(CONFIG_X86)      += xen-detect
+INSTALL_BIN-$(CONFIG_X86)      += skinit-emul
 INSTALL_BIN                    += xencons
 INSTALL_BIN                    += xencov_split
 INSTALL_BIN += $(INSTALL_BIN-y)
@@ -72,6 +74,9 @@ clean:
 distclean: clean
 
 xen-cpuid: xen-cpuid.o
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(APPEND_LDFLAGS)
+
+skinit-emul: skinit-emul.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(APPEND_LDFLAGS)
 
 xen-hvmctx: xen-hvmctx.o
