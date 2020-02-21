@@ -1077,6 +1077,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
     /* This must come before e820 code because it sets paddr_bits. */
     early_cpu_init();
 
+    opt_xen_shstk = 0; /* Force disable shstk */
+
     /* Choose shadow stack early, to set infrastructure up appropriately. */
     if ( opt_xen_shstk && boot_cpu_has(X86_FEATURE_CET_SS) )
     {

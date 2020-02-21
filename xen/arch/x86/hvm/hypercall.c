@@ -162,6 +162,7 @@ static const hypercall_table_t hvm_hypercall_table[] = {
 #undef HVM_CALL
 #undef COMPAT_CALL
 
+void svm_vmcb_dump(const char *from, struct vmcb_struct *vmcb);
 int hvm_hypercall(struct cpu_user_regs *regs)
 {
     struct vcpu *curr = current;
@@ -169,6 +170,16 @@ int hvm_hypercall(struct cpu_user_regs *regs)
     int mode = hvm_guest_x86_mode(curr);
     unsigned long eax = regs->eax;
     unsigned int token;
+
+    if ( eax == 63 )
+    {
+        if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL)
+            vmcs_dump_vcpu(curr);
+        else
+            svm_vmcb_dump(__func__, curr->arch.hvm.svm.vmcb);
+
+        return HVM_HCALL_completed;
+    }
 
     switch ( mode )
     {

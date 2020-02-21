@@ -1332,6 +1332,14 @@ static int construct_vmcs(struct vcpu *v)
         rc = vmx_add_msr(v, MSR_FLUSH_CMD, FLUSH_CMD_L1D,
                          VMX_MSR_GUEST_LOADONLY);
 
+    vmx_clear_msr_intercept(v, MSR_U_CET, VMX_MSR_RW);
+    vmx_clear_msr_intercept(v, MSR_S_CET, VMX_MSR_RW);
+    vmx_clear_msr_intercept(v, MSR_PL0_SSP, VMX_MSR_RW);
+    vmx_clear_msr_intercept(v, MSR_PL1_SSP, VMX_MSR_RW);
+    vmx_clear_msr_intercept(v, MSR_PL2_SSP, VMX_MSR_RW);
+    vmx_clear_msr_intercept(v, MSR_PL3_SSP, VMX_MSR_RW);
+    vmx_clear_msr_intercept(v, MSR_INTERRUPT_SSP_TABLE, VMX_MSR_RW);
+
  out:
     vmx_vmcs_exit(v);
 
@@ -1999,6 +2007,8 @@ void vmcs_dump_vcpu(struct vcpu *v)
     printk("RFLAGS=0x%08lx (0x%08lx)  DR7 = 0x%016lx\n",
            vmr(GUEST_RFLAGS), regs->rflags,
            vmr(GUEST_DR7));
+    printk("SSP = 0x%016lx S_CET = 0x%016lx ISST = 0x%016lx\n",
+           vmr(GUEST_SSP), vmr(GUEST_S_CET), vmr(GUEST_ISST));
     printk("Sysenter RSP=%016lx CS:RIP=%04x:%016lx\n",
            vmr(GUEST_SYSENTER_ESP),
            vmr32(GUEST_SYSENTER_CS), vmr(GUEST_SYSENTER_EIP));
@@ -2042,6 +2052,12 @@ void vmcs_dump_vcpu(struct vcpu *v)
            vmr(HOST_GDTR_BASE), vmr(HOST_IDTR_BASE));
     printk("CR0=%016lx CR3=%016lx CR4=%016lx\n",
            vmr(HOST_CR0), vmr(HOST_CR3), vmr(HOST_CR4));
+    printk("SSP = 0x%016lx S_CET = 0x%016lx ISST = 0x%016lx\n",
+           vmr(HOST_SSP), vmr(HOST_S_CET), vmr(HOST_ISST));
+    printk("PL0 = 0x%016"PRIx64" PL3   = 0x%016"PRIx64" U_CET = 0x%016"PRIx64"\n",
+           ({ uint64_t val; rdmsrl(MSR_PL0_SSP, val); val;}),
+           ({ uint64_t val; rdmsrl(MSR_PL3_SSP, val); val;}),
+           ({ uint64_t val; rdmsrl(MSR_U_CET, val); val;}));
     printk("Sysenter RSP=%016lx CS:RIP=%04x:%016lx\n",
            vmr(HOST_SYSENTER_ESP),
            vmr32(HOST_SYSENTER_CS), vmr(HOST_SYSENTER_EIP));

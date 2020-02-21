@@ -2188,6 +2188,53 @@ void asm_domain_crash_synchronous(unsigned long addr)
         do_softirq();
 }
 
+#include <xen/keyhandler.h>
+
+static void do_print(void *unused)
+{
+    unsigned int cpu = smp_processor_id();
+    uint64_t s_cet, u_cet, ist_ssp, pl0_ssp, pl3_ssp;
+
+    rdmsr_safe(MSR_S_CET, s_cet);
+    rdmsr_safe(MSR_U_CET, u_cet);
+    rdmsr_safe(MSR_INTERRUPT_SSP_TABLE, ist_ssp);
+    rdmsr_safe(MSR_PL0_SSP, pl0_ssp);
+    rdmsr_safe(MSR_PL3_SSP, pl3_ssp);
+
+    printk("CPU[%03u] S_CET %04lx, U_CET %04lx, IST %016lx, PL0_SSP %016lx, PL3_SSP %016lx\n",
+           cpu, s_cet, u_cet, ist_ssp, pl0_ssp, pl3_ssp);
+}
+
+static void do_extreme_debug(unsigned char key, struct cpu_user_regs *regs)
+{
+    unsigned int cpu;
+
+    printk("'%c' pressed -> Extreme debugging in progress...\n", key);
+
+    switch ( key )
+    {
+    case '1':
+        for_each_online_cpu ( cpu )
+            on_selected_cpus(cpumask_of(cpu), do_print, NULL, 1);
+        break;
+
+    case '2':
+        break;
+
+    case '3':
+        break;
+    }
+}
+
+static int __init extreme_debug_keyhandler_init(void)
+{
+    register_irq_keyhandler('1', &do_extreme_debug, "Extreme debugging 1", 0);
+    register_irq_keyhandler('2', &do_extreme_debug, "Extreme debugging 2", 0);
+    register_irq_keyhandler('3', &do_extreme_debug, "Extreme debugging 3", 0);
+    return 0;
+}
+__initcall(extreme_debug_keyhandler_init);
+
 /*
  * Local variables:
  * mode: C

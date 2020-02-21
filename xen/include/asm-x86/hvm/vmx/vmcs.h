@@ -512,6 +512,9 @@ enum vmcs_field {
     GUEST_PENDING_DBG_EXCEPTIONS    = 0x00006822,
     GUEST_SYSENTER_ESP              = 0x00006824,
     GUEST_SYSENTER_EIP              = 0x00006826,
+    GUEST_S_CET                     = 0x00006828,
+    GUEST_SSP                       = 0x0000682a,
+    GUEST_ISST                      = 0x0000682c,
     HOST_CR0                        = 0x00006c00,
     HOST_CR3                        = 0x00006c02,
     HOST_CR4                        = 0x00006c04,
@@ -524,6 +527,9 @@ enum vmcs_field {
     HOST_SYSENTER_EIP               = 0x00006c12,
     HOST_RSP                        = 0x00006c14,
     HOST_RIP                        = 0x00006c16,
+    HOST_S_CET                      = 0x00006c18,
+    HOST_SSP                        = 0x00006c1a,
+    HOST_ISST                       = 0x00006c1c,
 };
 
 #define VMCS_VPID_WIDTH 16
