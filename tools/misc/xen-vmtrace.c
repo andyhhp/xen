@@ -43,7 +43,7 @@ static uint32_t domid, vcpu;
 static size_t size;
 static char *buf;
 
-static sig_atomic_t interrupted = 0;
+static sig_atomic_t interrupted;
 static void int_handler(int signum)
 {
     interrupted = 1;
