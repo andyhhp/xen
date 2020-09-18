@@ -75,6 +75,7 @@
 #define X86_CR4_PKE        0x00400000 /* enable PKE */
 #define X86_CR4_CET        0x00800000 /* Control-flow Enforcement Technology */
 #define X86_CR4_PKS        0x01000000 /* Protection Key Supervisor */
+#define X86_CR4_FRED      0x100000000 /* Fast Return and Event Delivery */
 
 /*
  * XSTATE component flags in XCR0 | MSR_XSS
