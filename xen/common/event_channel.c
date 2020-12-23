@@ -16,6 +16,7 @@
 
 #include "event_channel.h"
 
+#include <xen/dmalloc.h>
 #include <xen/init.h>
 #include <xen/lib.h>
 #include <xen/errno.h>
@@ -148,7 +149,7 @@ static void free_evtchn_bucket(struct domain *d, struct evtchn *bucket)
         return;
 
     xsm_free_security_evtchns(bucket, EVTCHNS_PER_BUCKET);
-    xfree(bucket);
+    dfree(d, bucket);
 }
 
 static struct evtchn *alloc_evtchn_bucket(struct domain *d, unsigned int port)
@@ -156,7 +157,7 @@ static struct evtchn *alloc_evtchn_bucket(struct domain *d, unsigned int port)
     struct evtchn *chn;
     unsigned int i;
 
-    chn = xzalloc_array(struct evtchn, EVTCHNS_PER_BUCKET);
+    chn = dzalloc_array(d, struct evtchn, EVTCHNS_PER_BUCKET);
     if ( !chn )
         goto err;
 
@@ -208,7 +209,7 @@ int evtchn_allocate_port(struct domain *d, evtchn_port_t port)
 
             if ( !group_from_port(d, alloc_port) )
             {
-                grp = xzalloc_array(struct evtchn *, BUCKETS_PER_GROUP);
+                grp = dzalloc_array(d, struct evtchn *, BUCKETS_PER_GROUP);
                 if ( !grp )
                     return -ENOMEM;
                 group_from_port(d, alloc_port) = grp;
@@ -1541,7 +1542,7 @@ int evtchn_init(struct domain *d, unsigned int max_port)
     write_atomic(&d->active_evtchns, 0);
 
 #if MAX_VIRT_CPUS > BITS_PER_LONG
-    d->poll_mask = xzalloc_array(unsigned long, BITS_TO_LONGS(d->max_vcpus));
+    d->poll_mask = dzalloc_array(d, unsigned long, BITS_TO_LONGS(d->max_vcpus));
     if ( !d->poll_mask )
     {
         free_evtchn_bucket(d, d->evtchn);
@@ -1599,13 +1600,12 @@ void evtchn_destroy_final(struct domain *d)
             continue;
         for ( j = 0; j < BUCKETS_PER_GROUP; j++ )
             free_evtchn_bucket(d, d->evtchn_group[i][j]);
-        xfree(d->evtchn_group[i]);
+        dfree(d, d->evtchn_group[i]);
     }
     free_evtchn_bucket(d, d->evtchn);
 
 #if MAX_VIRT_CPUS > BITS_PER_LONG
-    xfree(d->poll_mask);
-    d->poll_mask = NULL;
+    DFREE(d, d->poll_mask);
 #endif
 }
 
