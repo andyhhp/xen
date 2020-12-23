@@ -485,6 +485,8 @@ static int domain_teardown(struct domain *d)
  */
 static void _domain_destroy(struct domain *d)
 {
+    int outstanding;
+
     BUG_ON(!d->is_dying);
     BUG_ON(atomic_read(&d->refcnt) != DOMAIN_DESTROYED);
 
@@ -499,6 +501,10 @@ static void _domain_destroy(struct domain *d)
     xsm_free_security_domain(d);
 
     lock_profile_deregister_struct(LOCKPROF_TYPE_PERDOM, d);
+
+    outstanding = atomic_read(&d->dalloc_heap);
+    if ( outstanding )
+        panic("%pd has %d outstanding heap allocations\n", d, outstanding);
 
     free_domain_struct(d);
 }

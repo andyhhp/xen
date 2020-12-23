@@ -405,6 +405,8 @@ struct domain
     atomic_t         paged_pages;       /* paged-out pages */
 #endif
 
+    atomic_t         dalloc_heap;       /* Number of xmalloc-like allocations. */
+
     /* Scheduling. */
     void            *sched_priv;    /* scheduler-specific data */
     struct sched_unit *sched_unit_list;
