@@ -612,6 +612,7 @@ struct domain *domain_create(domid_t domid,
     {
         d->options = config->flags;
         d->vmtrace_size = config->vmtrace_size;
+        atomic_set(&d->fault_ttl, config->fault_ttl);
     }
 
     /* Sort out our idea of is_control_domain(). */

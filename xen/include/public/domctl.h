@@ -31,6 +31,7 @@
 /* XEN_DOMCTL_createdomain */
 struct xen_domctl_createdomain {
     /* IN parameters */
+    uint32_t fault_ttl;
     uint32_t ssidref;
     xen_domain_handle_t handle;
  /* Is this an HVM guest (as opposed to a PV guest)? */

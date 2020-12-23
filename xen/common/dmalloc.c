@@ -13,7 +13,12 @@ void dfree(struct domain *d, void *ptr)
 
 void *_dzalloc(struct domain *d, size_t size, size_t align)
 {
-    void *ptr = _xmalloc(size, align);
+    void *ptr;
+
+    if ( should_simulate_failure(d) )
+        return NULL;
+
+    ptr = _xmalloc(size, align);
 
     if ( !ptr || ptr == ZERO_BLOCK_PTR )
         return ptr;

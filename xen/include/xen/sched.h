@@ -405,6 +405,7 @@ struct domain
     atomic_t         paged_pages;       /* paged-out pages */
 #endif
 
+    atomic_t         fault_ttl;         /* Time until a simulated resource failure. */
     atomic_t         dalloc_heap;       /* Number of xmalloc-like allocations. */
 
     /* Scheduling. */
@@ -648,6 +649,12 @@ static inline unsigned int domain_tot_pages(const struct domain *d)
     ASSERT(d->extra_pages <= d->tot_pages);
 
     return d->tot_pages - d->extra_pages;
+}
+
+static inline bool should_simulate_failure(struct domain *d)
+{
+    return (atomic_read(&d->fault_ttl) &&
+            atomic_dec_and_test(&d->fault_ttl));
 }
 
 /* Protect updates/reads (resp.) of domain_list and domain_hash. */
