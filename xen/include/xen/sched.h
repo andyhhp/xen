@@ -349,6 +349,7 @@ struct domain
     atomic_t         shr_pages;         /* shared pages */
     atomic_t         paged_pages;       /* paged-out pages */
 
+    atomic_t         fault_ttl;         /* Time until a simulated resource failure. */
     atomic_t         dalloc_heap;       /* Number of xmalloc-like allocations. */
 
     /* Scheduling. */

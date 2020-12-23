@@ -10,7 +10,13 @@ void dfree(struct domain *d, void *ptr)
 
 void *_dzalloc(struct domain *d, size_t size, size_t align)
 {
-    void *ptr = _xmalloc(size, align);
+    void *ptr;
+
+    if ( atomic_read(&d->fault_ttl) &&
+         atomic_dec_and_test(&d->fault_ttl) )
+        return NULL;
+
+    ptr = _xmalloc(size, align);
 
     if ( ptr )
         atomic_inc(&d->dalloc_heap);
