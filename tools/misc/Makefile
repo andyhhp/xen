@@ -8,6 +8,7 @@ CFLAGS += $(CFLAGS_libxenctrl)
 CFLAGS += $(CFLAGS_libxenguest)
 CFLAGS += $(CFLAGS_xeninclude)
 CFLAGS += $(CFLAGS_libxenstore)
+CFLAGS += -Wno-declaration-after-statement
 
 # Everything to be installed in regular bin/
 INSTALL_BIN-$(CONFIG_X86)      += xen-cpuid
@@ -26,6 +27,7 @@ INSTALL_SBIN-$(CONFIG_X86)     += xen-mfndump
 INSTALL_SBIN-$(CONFIG_X86)     += xen-ucode
 INSTALL_SBIN-$(CONFIG_X86)     += xen-vmtrace
 INSTALL_SBIN                   += xencov
+INSTALL_SBIN                   += xen-fault-ttl
 INSTALL_SBIN                   += xenhypfs
 INSTALL_SBIN                   += xenlockprof
 INSTALL_SBIN                   += xenperf
@@ -76,6 +78,9 @@ xen-cpuid: xen-cpuid.o
 
 xen-detect: xen-detect.o
 	$(CC) $(LDFLAGS) -o $@ $< $(APPEND_LDFLAGS)
+
+xen-fault-ttl: xen-fault-ttl.o
+	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(LDLIBS_libxenguest) $(APPEND_LDFLAGS)
 
 xen-hvmctx: xen-hvmctx.o
 	$(CC) $(LDFLAGS) -o $@ $< $(LDLIBS_libxenctrl) $(APPEND_LDFLAGS)
