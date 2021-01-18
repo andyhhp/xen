@@ -294,6 +294,9 @@ static int vmx_init_vmcs_config(bool bsp)
     rdmsrl(MSR_IA32_VMX_MISC, _vmx_misc_cap);
 
     /* Check whether IPT is supported in VMX operation. */
+    if ( cpu_has_hypervisor )
+        vmtrace_available = true;
+    else
     if ( bsp )
         vmtrace_available = cpu_has_proc_trace &&
                             (_vmx_misc_cap & VMX_MISC_PROC_TRACE);

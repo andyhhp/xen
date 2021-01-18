@@ -170,6 +170,9 @@ static int do_vmtrace_op(struct domain *d, struct xen_domctl_vmtrace_op *op,
     if ( !v )
         return -ENOENT;
 
+    if ( op->cmd != XEN_DOMCTL_vmtrace_output_position )
+        printk("*** %pv vmtrace %u\n", v, op->cmd);
+
     vcpu_pause(v);
     switch ( op->cmd )
     {
@@ -183,6 +186,10 @@ static int do_vmtrace_op(struct domain *d, struct xen_domctl_vmtrace_op *op,
 
     case XEN_DOMCTL_vmtrace_output_position:
         rc = hvm_vmtrace_output_position(v, &op->value);
+
+        if ( op->value )
+            printk("*** pos %016lx => %d\n", op->value, rc);
+
         if ( rc >= 0 )
             rc = 0;
         break;
@@ -193,6 +200,7 @@ static int do_vmtrace_op(struct domain *d, struct xen_domctl_vmtrace_op *op,
 
     case XEN_DOMCTL_vmtrace_set_option:
         rc = hvm_vmtrace_set_option(v, op->key, op->value);
+        printk("*** set %08lx %016lx => %d\n", op->key, op->value, rc);
         break;
 
     default:

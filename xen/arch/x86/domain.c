@@ -612,6 +612,7 @@ void arch_vcpu_destroy(struct vcpu *v)
         pv_vcpu_destroy(v);
 }
 
+extern bool opt_auto_vmtrace;
 int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
 {
     bool hvm = config->flags & XEN_DOMCTL_CDF_hvm;
@@ -659,6 +660,9 @@ int arch_sanitise_domain_config(struct xen_domctl_createdomain *config)
         dprintk(XENLOG_INFO, "Nested virt not supported without HAP\n");
         return -EINVAL;
     }
+
+    if ( hvm && opt_auto_vmtrace )
+        config->vmtrace_size = MB(64);
 
     if ( config->vmtrace_size )
     {

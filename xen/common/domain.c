@@ -138,6 +138,8 @@ static void vmtrace_free_buffer(struct vcpu *v)
     struct page_info *pg = v->vmtrace.pg;
     unsigned int i;
 
+    printk("*** %s(%pv)\n", __func__, v);
+
     if ( !pg )
         return;
 
@@ -155,6 +157,8 @@ static int vmtrace_alloc_buffer(struct vcpu *v)
     struct domain *d = v->domain;
     struct page_info *pg;
     unsigned int i;
+
+    printk("*** %s(%pv), size %#x\n", __func__, v, d->vmtrace_size);
 
     if ( !d->vmtrace_size )
         return 0;

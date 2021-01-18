@@ -60,6 +60,45 @@
 #include <asm/monitor.h>
 #include <public/arch-x86/cpuid.h>
 
+#include <xen/keyhandler.h>
+
+bool opt_auto_vmtrace;
+static bool opt_msr_ls = true, opt_msr_cs = true;
+
+static void do_extreme_debug(unsigned char key, struct cpu_user_regs *regs)
+{
+    printk("'%c' pressed -> Extreme debugging in progress...\n", key);
+
+    switch ( key )
+    {
+    case '1':
+        opt_msr_ls = !opt_msr_ls;
+        printk("MSR load/save: %u\n", opt_msr_ls);
+        break;
+
+    case '2':
+        opt_msr_cs = !opt_msr_cs;
+        printk("MSR context switch: %u\n", opt_msr_cs);
+        break;
+
+    case '3':
+        opt_auto_vmtrace = !opt_auto_vmtrace;
+        printk("Auto VMTRACE: %u\n", opt_auto_vmtrace);
+        break;
+    }
+}
+
+static int __init extreme_debug_keyhandler_init(void)
+{
+    register_irq_keyhandler('1', &do_extreme_debug, "Extreme debugging 1", 0);
+    register_irq_keyhandler('2', &do_extreme_debug, "Extreme debugging 2", 0);
+    register_irq_keyhandler('3', &do_extreme_debug, "Extreme debugging 3", 0);
+    return 0;
+}
+__initcall(extreme_debug_keyhandler_init);
+
+
+
 static bool_t __initdata opt_force_ept;
 boolean_param("force-ept", opt_force_ept);
 
@@ -533,8 +572,15 @@ static void vmx_save_guest_msrs(struct vcpu *v)
 
     if ( v->arch.hvm.vmx.ipt_active )
     {
-        rdmsrl(MSR_RTIT_OUTPUT_MASK, msrs->rtit.output_mask);
-        rdmsrl(MSR_RTIT_STATUS, msrs->rtit.status);
+        if ( opt_msr_cs )
+        {
+            rdmsrl(MSR_RTIT_OUTPUT_MASK, msrs->rtit.output_mask);
+            rdmsrl(MSR_RTIT_STATUS, msrs->rtit.status);
+            printk("*** %pv save MASK: %016lx STATUS: %016lx\n",
+                   v, msrs->rtit.output_mask, msrs->rtit.status);
+        }
+        else
+            printk("*** %pv Skip MSR save\n", v);
     }
 }
 
@@ -552,9 +598,17 @@ static void vmx_restore_guest_msrs(struct vcpu *v)
 
     if ( v->arch.hvm.vmx.ipt_active )
     {
-        wrmsrl(MSR_RTIT_OUTPUT_BASE, page_to_maddr(v->vmtrace.pg));
-        wrmsrl(MSR_RTIT_OUTPUT_MASK, msrs->rtit.output_mask);
-        wrmsrl(MSR_RTIT_STATUS, msrs->rtit.status);
+        if ( opt_msr_cs )
+        {
+            wrmsrl(MSR_RTIT_OUTPUT_BASE, page_to_maddr(v->vmtrace.pg));
+            wrmsrl(MSR_RTIT_OUTPUT_MASK, msrs->rtit.output_mask);
+            wrmsrl(MSR_RTIT_STATUS, msrs->rtit.status);
+            printk("*** %pv restore PG: %016lx MASK: %016lx STATUS: %016lx\n",
+                   v, page_to_maddr(v->vmtrace.pg), msrs->rtit.output_mask,
+                   msrs->rtit.status);
+        }
+        else
+            printk("*** %pv Skip MSR restore\n", v);
     }
 }
 
@@ -2332,6 +2386,12 @@ static int vmtrace_set_option(struct vcpu *v, uint64_t key, uint64_t value)
     /* ctl.trace_en changed => update MSR load/save lists appropriately. */
     if ( !old_en && new_en )
     {
+        printk("*** %pv CTL %lx\n", v, msrs->rtit.ctl);
+
+        if ( opt_msr_ls )
+        {
+            printk("*** %pv Using MSR Load/Save list\n", v);
+
         if ( vmx_add_guest_msr(v, MSR_RTIT_CTL, msrs->rtit.ctl) ||
              vmx_add_host_load_msr(v, MSR_RTIT_CTL, 0) )
         {
@@ -2344,9 +2404,13 @@ static int vmtrace_set_option(struct vcpu *v, uint64_t key, uint64_t value)
             domain_crash(v->domain);
             return -ENXIO;
         }
+        }
+        else
+            printk("*** %pv Skip MSR LS\n", v);
     }
     else if ( old_en && !new_en )
     {
+        printk("*** %pv CTL remove\n", v);
         vmx_del_msr(v, MSR_RTIT_CTL, VMX_MSR_GUEST);
         vmx_del_msr(v, MSR_RTIT_CTL, VMX_MSR_HOST);
     }
@@ -2382,6 +2446,7 @@ static int vmtrace_control(struct vcpu *v, bool enable, bool reset)
         return rc;
 
     v->arch.hvm.vmx.ipt_active = enable;
+    printk("*** trace %s\n", enable ? "enable" : "disable");
 
     return 0;
 }
