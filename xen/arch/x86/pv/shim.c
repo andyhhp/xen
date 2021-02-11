@@ -276,7 +276,7 @@ static void write_start_info(struct domain *d)
     struct cpu_user_regs *regs = guest_cpu_user_regs();
     start_info_t *si = map_domain_page(_mfn(is_pv_32bit_domain(d) ? regs->edx
                                                                   : regs->rdx));
-    uint64_t param;
+    uint64_t param = 0;
 
     snprintf(si->magic, sizeof(si->magic), "xen-3.0-x86_%s",
              is_pv_32bit_domain(d) ? "32p" : "64");
@@ -305,8 +305,8 @@ int pv_shim_shutdown(uint8_t reason)
     struct domain *d = current->domain;
     struct vcpu *v;
     unsigned int i;
-    uint64_t old_store_pfn, old_console_pfn = 0, store_pfn, console_pfn;
-    uint64_t store_evtchn, console_evtchn;
+    uint64_t old_store_pfn = 0, old_console_pfn = 0, store_pfn = 0, console_pfn = 0;
+    uint64_t store_evtchn = 0, console_evtchn = 0;
     long rc;
 
     if ( reason != SHUTDOWN_suspend )
