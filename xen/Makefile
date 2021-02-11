@@ -195,7 +195,8 @@ include/config/%.conf include/config/%.conf.cmd: $(KCONFIG_CONFIG)
 	$(MAKE) $(kconfig) syncconfig
 
 ifeq ($(CONFIG_DEBUG),y)
-CFLAGS += -O1
+blah := $(call cc-option,$(CC),-Og,-O1)
+CFLAGS += $(blah)
 else
 CFLAGS += -O2
 endif
