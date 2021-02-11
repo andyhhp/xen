@@ -930,7 +930,7 @@ static inline void trace_shadow_prealloc_unpin(struct domain *d, mfn_t smfn)
 static void _shadow_prealloc(struct domain *d, unsigned int pages)
 {
     struct vcpu *v;
-    struct page_info *sp, *t;
+    struct page_info *sp, *t = NULL;
     mfn_t smfn;
     int i;
 
