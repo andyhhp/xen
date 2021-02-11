@@ -135,8 +135,8 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
         return 0;
 
     /*
-     * From this point onward, all paths should go through the `out`
-     * label.  The invariants should be:
+     * From this point onward, all paths should go through the `out` (success)
+     * or `err` (failure) labels.  The invariants should be:
      * - rc may be 0, or an error code.
      * - if rc is an error code, user and intended_uid are ignored.
      * - if rc is 0, user may be set or not set.
@@ -153,13 +153,13 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
     if (user) {
         rc = userlookup_helper_getpwnam(gc, user, &user_pwbuf, &user_base);
         if (rc)
-            goto out;
+            goto err;
 
         if (!user_base) {
             LOGD(ERROR, guest_domid, "Couldn't find device_model_user %s",
                  user);
             rc = ERROR_INVAL;
-            goto out;
+            goto err;
         }
 
         intended_uid = user_base->pw_uid;
@@ -176,7 +176,6 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
         LOGD(DEBUG, guest_domid,
              "dm_restrict disabled, starting QEMU as root");
         user = NULL; /* Should already be null, but just in case */
-        kill_by_uid = false; /* Keep older versions of gcc happy */
         rc = 0;
         goto out;
     }
@@ -188,7 +187,7 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
     rc = userlookup_helper_getpwnam(gc, LIBXL_QEMU_USER_RANGE_BASE,
                                          &user_pwbuf, &user_base);
     if (rc)
-        goto out;
+        goto err;
     if (user_base) {
         struct passwd *user_clash, user_clash_pwbuf;
 
@@ -196,14 +195,14 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
         rc = userlookup_helper_getpwuid(gc, intended_uid,
                                          &user_clash_pwbuf, &user_clash);
         if (rc)
-            goto out;
+            goto err;
         if (user_clash) {
             LOGD(ERROR, guest_domid,
                  "wanted to use uid %ld (%s + %d) but that is user %s !",
                  (long)intended_uid, LIBXL_QEMU_USER_RANGE_BASE,
                  guest_domid, user_clash->pw_name);
             rc = ERROR_INVAL;
-            goto out;
+            goto err;
         }
 
         LOGD(DEBUG, guest_domid, "using uid %ld", (long)intended_uid);
@@ -222,12 +221,11 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
     user = LIBXL_QEMU_USER_SHARED;
     rc = userlookup_helper_getpwnam(gc, user, &user_pwbuf, &user_base);
     if (rc)
-        goto out;
+        goto err;
     if (user_base) {
         LOGD(WARN, guest_domid, "Could not find user %s, falling back to %s",
              LIBXL_QEMU_USER_RANGE_BASE, LIBXL_QEMU_USER_SHARED);
         intended_uid = user_base->pw_uid;
-        kill_by_uid = false;
         rc = 0;
         goto out;
     }
@@ -240,23 +238,26 @@ static int libxl__domain_get_device_model_uid(libxl__gc *gc,
          "Could not find user %s or range base pseudo-user %s, cannot restrict",
          LIBXL_QEMU_USER_SHARED, LIBXL_QEMU_USER_RANGE_BASE);
     rc = ERROR_INVAL;
+    goto err;
 
 out:
+    assert(rc == 0);
+
     /* First, do a root check if appropriate */
-    if (!rc) {
-        if (user && intended_uid == 0) {
-            LOGD(ERROR, guest_domid, "intended_uid is 0 (root)!");
-            rc = ERROR_INVAL;
-        }
+    if (user && intended_uid == 0) {
+        LOGD(ERROR, guest_domid, "intended_uid is 0 (root)!");
+        rc = ERROR_INVAL;
+        goto err;
     }
 
     /* Then do the final set, if still appropriate */
-    if (!rc && user) {
+    if (user) {
         state->dm_runas = user;
         if (kill_by_uid)
             state->dm_kill_uid = GCSPRINTF("%ld", (long)intended_uid);
     }
 
+ err:
     return rc;
 }
 
