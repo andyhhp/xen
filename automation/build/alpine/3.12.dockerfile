@@ -38,6 +38,8 @@ RUN \
   apk add xz-dev && \
   apk add yajl-dev && \
   apk add zlib-dev && \
+  apk add bzip2-dev && \
+  apk add zstd-dev && \
   \
   # qemu build deps
   apk add bison && \
