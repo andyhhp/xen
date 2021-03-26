@@ -23,7 +23,6 @@ RUN \
   apk add gcc  && \
   apk add g++ && \
   apk add clang  && \
-  apk add gettext && \
   apk add git && \
   apk add iasl && \
   apk add libaio-dev && \

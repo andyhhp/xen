@@ -26,7 +26,6 @@ RUN apt-get update && \
         pkg-config \
         flex \
         bison \
-        gettext \
         acpica-tools \
         bin86 \
         bcc \

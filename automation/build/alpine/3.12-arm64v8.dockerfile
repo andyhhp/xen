@@ -22,7 +22,6 @@ RUN \
   apk add dev86 && \
   apk add dtc-dev && \
   apk add gcc  && \
-  apk add gettext && \
   apk add git && \
   apk add iasl && \
   apk add libaio-dev && \
