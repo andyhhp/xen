@@ -393,22 +393,22 @@ ubuntu-bionic-gcc-debug:
 ubuntu-focal-gcc:
   extends: .gcc-x86-64-build
   variables:
-    CONTAINER: ubuntu:focal
+    CONTAINER: ubuntu:focal-test
 
 ubuntu-focal-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
-    CONTAINER: ubuntu:focal
+    CONTAINER: ubuntu:focal-test
 
 ubuntu-focal-clang:
   extends: .gcc-x86-64-build
   variables:
-    CONTAINER: ubuntu:focal
+    CONTAINER: ubuntu:focal-test
 
 ubuntu-focal-clang-debug:
   extends: .gcc-x86-64-build-debug
   variables:
-    CONTAINER: ubuntu:focal
+    CONTAINER: ubuntu:focal-test
 
 opensuse-leap-clang:
   extends: .clang-x86-64-build
@@ -433,25 +433,25 @@ opensuse-leap-gcc-debug:
 alpine-3.12-gcc:
   extends: .gcc-x86-64-build
   variables:
-    CONTAINER: alpine:3.12
+    CONTAINER: alpine:3.12-test
   allow_failure: true
 
 alpine-3.12-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
-    CONTAINER: alpine:3.12
+    CONTAINER: alpine:3.12-test
   allow_failure: true
 
 alpine-3.12-clang:
   extends: .clang-x86-64-build
   variables:
-    CONTAINER: alpine:3.12
+    CONTAINER: alpine:3.12-test
   allow_failure: true
 
 alpine-3.12-clang-debug:
   extends: .clang-x86-64-build-debug
   variables:
-    CONTAINER: alpine:3.12
+    CONTAINER: alpine:3.12-test
   allow_failure: true
 
 
