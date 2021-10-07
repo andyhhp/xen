@@ -1886,6 +1886,11 @@ void do_nmi(const struct cpu_user_regs *regs)
     this_cpu(nmi_count)++;
     nmi_enter();
 
+    /*
+     * Think carefully before putting any logic before this point.
+     * nmi_callback() might be the crash quiesce...
+     */
+
     callback = ACCESS_ONCE(nmi_callback);
     if ( unlikely(callback) && callback(regs, cpu) )
         goto out;
