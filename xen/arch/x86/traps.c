@@ -759,21 +759,7 @@ static int nmi_show_execution_state(const struct cpu_user_regs *regs, int cpu)
     return 1;
 }
 
-const char *trapstr(unsigned int trapnr)
-{
-    static const char * const strings[] = {
-        "divide error", "debug", "nmi", "bkpt", "overflow", "bounds",
-        "invalid opcode", "device not available", "double fault",
-        "coprocessor segment", "invalid tss", "segment not found",
-        "stack error", "general protection fault", "page fault",
-        "spurious interrupt", "coprocessor error", "alignment check",
-        "machine check", "simd error", "virtualisation exception"
-    };
-
-    return trapnr < ARRAY_SIZE(strings) ? strings[trapnr] : "???";
-}
-
-static const char *vec_name(unsigned int vec)
+const char *vec_name(unsigned int vec)
 {
     static const char names[][4] = {
 #define P(x) [X86_EXC_ ## x] = "#" #x
@@ -858,9 +844,7 @@ void do_unhandled_trap(struct cpu_user_regs *regs)
     if ( debugger_trap_fatal(trapnr, regs) )
         return;
 
-    show_execution_state(regs);
-    panic("FATAL RESERVED TRAP: vec %u, %s[%04x]\n",
-          trapnr, vec_name(trapnr), regs->error_code);
+    fatal_trap(regs, false);
 }
 
 static void fixup_exception_return(struct cpu_user_regs *regs,
@@ -970,10 +954,7 @@ void do_trap(struct cpu_user_regs *regs)
     if ( debugger_trap_fatal(trapnr, regs) )
         return;
 
-    show_execution_state(regs);
-    panic("FATAL TRAP: vector = %d (%s)\n"
-          "[error_code=%04x]\n",
-          trapnr, trapstr(trapnr), regs->error_code);
+    fatal_trap(regs, false);
 }
 
 int guest_rdmsr_xen(const struct vcpu *v, uint32_t idx, uint64_t *val)
