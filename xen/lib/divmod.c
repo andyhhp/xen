@@ -1,6 +1,5 @@
-#include <xen/lib.h>
-#include <xen/types.h>
-#include <asm/byteorder.h>
+#include <xen/byteorder.h>
+#include <xen/macros.h>
 
 /*
  * A couple of 64 bit operations ported from FreeBSD.
