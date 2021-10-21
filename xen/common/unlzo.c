@@ -39,12 +39,20 @@
 
 static inline u16 get_unaligned_be16(const void *p)
 {
-	return be16_to_cpup(p);
+	u16 v;
+
+	memcpy(&v, p, sizeof(v));
+
+	return be16_to_cpu(v);
 }
 
 static inline u32 get_unaligned_be32(const void *p)
 {
-	return be32_to_cpup(p);
+	u32 v;
+
+	memcpy(&v, p, sizeof(v));
+
+	return be32_to_cpu(v);
 }
 
 #endif
