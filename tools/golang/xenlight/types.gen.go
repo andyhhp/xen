@@ -316,6 +316,7 @@ CpuTime uint64
 VcpuMaxId uint32
 VcpuOnline uint32
 Cpupool uint32
+GpaddrBits byte
 DomainType DomainType
 }
 
