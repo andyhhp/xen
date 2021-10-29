@@ -44,7 +44,6 @@ void free_vcpu_struct(struct vcpu *v);
 #ifndef alloc_pirq_struct
 struct pirq *alloc_pirq_struct(struct domain *);
 #endif
-void free_pirq_struct(void *);
 
 /*
  * Initialise/destroy arch-specific details of a VCPU.

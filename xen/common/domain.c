@@ -365,6 +365,39 @@ static int __init parse_extra_guest_irqs(const char *s)
 }
 custom_param("extra_guest_irqs", parse_extra_guest_irqs);
 
+static void _free_pirq_struct(struct rcu_head *head)
+{
+    xfree(container_of(head, struct pirq, rcu_head));
+}
+
+static void free_pirq_struct(void *ptr)
+{
+    struct pirq *pirq = ptr;
+
+    call_rcu(&pirq->rcu_head, _free_pirq_struct);
+}
+
+struct pirq *pirq_get_info(struct domain *d, int pirq)
+{
+    struct pirq *info = pirq_info(d, pirq);
+
+    if ( likely(info) )
+        return info;
+
+    info = alloc_pirq_struct(d);
+    if ( unlikely(!info) )
+        return NULL;
+
+    info->pirq = pirq;
+    if ( likely(radix_tree_insert(&d->pirq_tree, pirq, info) == 0) )
+        return info; /* Success. */
+
+    /* Don't use call_rcu() to free a struct we failed to insert. */
+    _free_pirq_struct(&info->rcu_head);
+
+    return NULL;
+}
+
 /*
  * Release resources held by a domain.  There may or may not be live
  * references to the domain, and it may or may not be fully constructed.
@@ -1788,35 +1821,6 @@ long do_vm_assist(unsigned int cmd, unsigned int type)
     return -ENOSYS;
 }
 #endif
-
-struct pirq *pirq_get_info(struct domain *d, int pirq)
-{
-    struct pirq *info = pirq_info(d, pirq);
-
-    if ( !info && (info = alloc_pirq_struct(d)) != NULL )
-    {
-        info->pirq = pirq;
-        if ( radix_tree_insert(&d->pirq_tree, pirq, info) )
-        {
-            free_pirq_struct(info);
-            info = NULL;
-        }
-    }
-
-    return info;
-}
-
-static void _free_pirq_struct(struct rcu_head *head)
-{
-    xfree(container_of(head, struct pirq, rcu_head));
-}
-
-void free_pirq_struct(void *ptr)
-{
-    struct pirq *pirq = ptr;
-
-    call_rcu(&pirq->rcu_head, _free_pirq_struct);
-}
 
 struct migrate_info {
     long (*func)(void *data);
