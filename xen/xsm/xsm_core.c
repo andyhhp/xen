@@ -218,15 +218,3 @@ bool __init has_xsm_magic(paddr_t start)
 #endif
 
 #endif
-
-long do_xsm_op(XEN_GUEST_HANDLE_PARAM(void) op)
-{
-    return xsm_do_xsm_op(op);
-}
-
-#ifdef CONFIG_COMPAT
-int compat_xsm_op(XEN_GUEST_HANDLE_PARAM(void) op)
-{
-    return xsm_do_compat_op(op);
-}
-#endif

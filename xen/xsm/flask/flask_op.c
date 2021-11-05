@@ -22,6 +22,8 @@
 #include <objsec.h>
 #include <conditional.h>
 
+#include "../private.h"
+
 #define ret_t long
 #define _copy_to_guest copy_to_guest
 #define _copy_from_guest copy_from_guest
@@ -607,21 +609,17 @@ static int flask_relabel_domain(struct xen_flask_relabel *arg)
 
 #endif /* !COMPAT */
 
-ret_t do_flask_op(XEN_GUEST_HANDLE_PARAM(void) u_flask_op)
+ret_t do_flask_op(xen_flask_op_t *op, bool *copyback)
 {
-    xen_flask_op_t op;
     int rv;
 
-    if ( copy_from_guest(&op, u_flask_op, 1) )
-        return -EFAULT;
-
-    if ( op.interface_version != XEN_FLASK_INTERFACE_VERSION )
+    if ( op->interface_version != XEN_FLASK_INTERFACE_VERSION )
         return -ENOSYS;
 
-    switch ( op.cmd )
+    switch ( op->cmd )
     {
     case FLASK_LOAD:
-        rv = flask_security_load(&op.u.load);
+        rv = flask_security_load(&op->u.load);
         break;
 
     case FLASK_GETENFORCE:
@@ -629,27 +627,27 @@ ret_t do_flask_op(XEN_GUEST_HANDLE_PARAM(void) u_flask_op)
         break;
 
     case FLASK_SETENFORCE:
-        rv = flask_security_setenforce(&op.u.enforce);
+        rv = flask_security_setenforce(&op->u.enforce);
         break;
 
     case FLASK_CONTEXT_TO_SID:
-        rv = flask_security_context(&op.u.sid_context);
+        rv = flask_security_context(&op->u.sid_context);
         break;
 
     case FLASK_SID_TO_CONTEXT:
-        rv = flask_security_sid(&op.u.sid_context);
+        rv = flask_security_sid(&op->u.sid_context);
         break;
 
     case FLASK_ACCESS:
-        rv = flask_security_access(&op.u.access);
+        rv = flask_security_access(&op->u.access);
         break;
 
     case FLASK_CREATE:
-        rv = flask_security_create(&op.u.transition);
+        rv = flask_security_create(&op->u.transition);
         break;
 
     case FLASK_RELABEL:
-        rv = flask_security_relabel(&op.u.transition);
+        rv = flask_security_relabel(&op->u.transition);
         break;
 
     case FLASK_POLICYVERS:
@@ -657,11 +655,11 @@ ret_t do_flask_op(XEN_GUEST_HANDLE_PARAM(void) u_flask_op)
         break;
 
     case FLASK_GETBOOL:
-        rv = flask_security_get_bool(&op.u.boolean);
+        rv = flask_security_get_bool(&op->u.boolean);
         break;
 
     case FLASK_SETBOOL:
-        rv = flask_security_set_bool(&op.u.boolean);
+        rv = flask_security_set_bool(&op->u.boolean);
         break;
 
     case FLASK_COMMITBOOLS:
@@ -677,41 +675,41 @@ ret_t do_flask_op(XEN_GUEST_HANDLE_PARAM(void) u_flask_op)
         break;
 
     case FLASK_SETAVC_THRESHOLD:
-        rv = flask_security_setavc_threshold(&op.u.setavc_threshold);
+        rv = flask_security_setavc_threshold(&op->u.setavc_threshold);
         break;
 
     case FLASK_AVC_HASHSTATS:
-        rv = avc_get_hash_stats(&op.u.hash_stats);
+        rv = avc_get_hash_stats(&op->u.hash_stats);
         break;
 
 #ifdef CONFIG_XSM_FLASK_AVC_STATS
     case FLASK_AVC_CACHESTATS:
-        rv = flask_security_avc_cachestats(&op.u.cache_stats);
+        rv = flask_security_avc_cachestats(&op->u.cache_stats);
         break;
 #endif
 
     case FLASK_MEMBER:
-        rv = flask_security_member(&op.u.transition);
+        rv = flask_security_member(&op->u.transition);
         break;
 
     case FLASK_ADD_OCONTEXT:
-        rv = flask_ocontext_add(&op.u.ocontext);
+        rv = flask_ocontext_add(&op->u.ocontext);
         break;
 
     case FLASK_DEL_OCONTEXT:
-        rv = flask_ocontext_del(&op.u.ocontext);
+        rv = flask_ocontext_del(&op->u.ocontext);
         break;
 
     case FLASK_GET_PEER_SID:
-        rv = flask_get_peer_sid(&op.u.peersid);
+        rv = flask_get_peer_sid(&op->u.peersid);
         break;
 
     case FLASK_RELABEL_DOMAIN:
-        rv = flask_relabel_domain(&op.u.relabel);
+        rv = flask_relabel_domain(&op->u.relabel);
         break;
 
     case FLASK_DEVICETREE_LABEL:
-        rv = flask_devicetree_label(&op.u.devicetree_label);
+        rv = flask_devicetree_label(&op->u.devicetree_label);
         break;
 
     default:
@@ -719,16 +717,12 @@ ret_t do_flask_op(XEN_GUEST_HANDLE_PARAM(void) u_flask_op)
     }
 
     if ( rv < 0 )
-        goto out;
+        return rv;
 
-    if ( (FLASK_COPY_OUT&(1UL<<op.cmd)) )
-    {
-        if ( copy_to_guest(u_flask_op, &op, 1) )
-            rv = -EFAULT;
-    }
+    if ( (1ul << op->cmd) & FLASK_COPY_OUT )
+        *copyback = true;
 
- out:
-    return rv;
+    return 0;
 }
 
 #if defined(CONFIG_COMPAT) && !defined(COMPAT)

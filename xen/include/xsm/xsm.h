@@ -141,11 +141,6 @@ struct xsm_ops {
     int (*page_offline)(uint32_t cmd);
     int (*hypfs_op)(void);
 
-    long (*do_xsm_op)(XEN_GUEST_HANDLE_PARAM(void) op);
-#ifdef CONFIG_COMPAT
-    int (*do_compat_op)(XEN_GUEST_HANDLE_PARAM(void) op);
-#endif
-
     int (*hvm_param)(struct domain *d, unsigned long op);
     int (*hvm_param_altp2mhvm)(struct domain *d);
     int (*hvm_altp2mhvm_op)(struct domain *d, uint64_t mode, uint32_t op);
@@ -584,18 +579,6 @@ static inline int xsm_hypfs_op(xsm_default_t def)
 {
     return alternative_call(xsm_ops.hypfs_op);
 }
-
-static inline long xsm_do_xsm_op(XEN_GUEST_HANDLE_PARAM(void) op)
-{
-    return alternative_call(xsm_ops.do_xsm_op, op);
-}
-
-#ifdef CONFIG_COMPAT
-static inline int xsm_do_compat_op(XEN_GUEST_HANDLE_PARAM(void) op)
-{
-    return alternative_call(xsm_ops.do_compat_op, op);
-}
-#endif
 
 static inline int xsm_hvm_param(
     xsm_default_t def, struct domain *d, unsigned long op)

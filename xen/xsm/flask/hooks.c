@@ -1742,9 +1742,6 @@ static int flask_argo_send(const struct domain *d, const struct domain *t)
 
 #endif
 
-long do_flask_op(XEN_GUEST_HANDLE_PARAM(void) u_flask_op);
-int compat_flask_op(XEN_GUEST_HANDLE_PARAM(void) u_flask_op);
-
 static const struct xsm_ops __initconstrel flask_ops = {
     .security_domaininfo = flask_security_domaininfo,
     .domain_create = flask_domain_create,
@@ -1819,7 +1816,6 @@ static const struct xsm_ops __initconstrel flask_ops = {
     .hvm_param_altp2mhvm = flask_hvm_param_altp2mhvm,
     .hvm_altp2mhvm_op = flask_hvm_altp2mhvm_op,
 
-    .do_xsm_op = do_flask_op,
     .get_vnumainfo = flask_get_vnumainfo,
 
     .vm_event_control = flask_vm_event_control,
@@ -1834,10 +1830,6 @@ static const struct xsm_ops __initconstrel flask_ops = {
 
 #ifdef CONFIG_MEM_SHARING
     .mem_sharing = flask_mem_sharing,
-#endif
-
-#ifdef CONFIG_COMPAT
-    .do_compat_op = compat_flask_op,
 #endif
 
     .add_to_physmap = flask_add_to_physmap,

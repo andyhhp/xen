@@ -99,11 +99,6 @@ static const struct xsm_ops __initconstrel dummy_ops = {
     .hvm_param_altp2mhvm           = xsm_hvm_param_altp2mhvm,
     .hvm_altp2mhvm_op              = xsm_hvm_altp2mhvm_op,
 
-    .do_xsm_op                     = xsm_do_xsm_op,
-#ifdef CONFIG_COMPAT
-    .do_compat_op                  = xsm_do_compat_op,
-#endif
-
     .add_to_physmap                = xsm_add_to_physmap,
     .remove_from_physmap           = xsm_remove_from_physmap,
     .map_gmfn_foreign              = xsm_map_gmfn_foreign,

@@ -32,7 +32,7 @@ headers-$(CONFIG_HYPFS)   += compat/hypfs.h
 headers-$(CONFIG_KEXEC)   += compat/kexec.h
 headers-$(CONFIG_TRACEBUFFER) += compat/trace.h
 headers-$(CONFIG_XENOPROF) += compat/xenoprof.h
-headers-$(CONFIG_XSM_FLASK) += compat/xsm/flask_op.h
+headers-$(CONFIG_XSM)      += compat/xsm/flask_op.h
 
 cppflags-y                := -include public/xen-compat.h -DXEN_GENERATING_COMPAT_HEADERS
 cppflags-$(CONFIG_X86)    += -m32
