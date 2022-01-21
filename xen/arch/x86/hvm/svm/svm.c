@@ -3086,6 +3086,33 @@ void svm_vmexit_handler(struct cpu_user_regs *regs)
     vmcb_set_vintr(vmcb, intr);
 }
 
+/* Called with GIF=0. */
+void vmexit_spec_ctrl(struct cpu_info *info)
+{
+    unsigned int val = info->xen_spec_ctrl;
+
+    /*
+     * Write to MSR_SPEC_CTRL unconditionally, for the RAS[:32] flushing side
+     * effect.
+     */
+    wrmsr(MSR_SPEC_CTRL, val, 0);
+    info->last_spec_ctrl = val;
+}
+
+/* Called with GIF=0. */
+void vmentry_spec_ctrl(const struct vcpu *curr, struct cpu_info *info)
+{
+    unsigned int val = curr->arch.msrs->spec_ctrl.raw;
+
+    if ( val != info->last_spec_ctrl )
+    {
+        wrmsr(MSR_SPEC_CTRL, val, 0);
+        info->last_spec_ctrl = val;
+    }
+
+    /* No Spectre v1 concerns.  Execution is going to hit VMRUN imminently. */
+}
+
 /*
  * Local variables:
  * mode: C

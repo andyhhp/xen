@@ -55,11 +55,12 @@ __UNLIKELY_END(nsvm_hap)
         mov  %rsp, %rdi
         call svm_vmenter_helper
 
-        mov VCPU_arch_msrs(%rbx), %rax
-        mov VCPUMSR_spec_ctrl_raw(%rax), %eax
+        clgi
 
         /* WARNING! `ret`, `call *`, `jmp *` not safe beyond this point. */
-        /* SPEC_CTRL_EXIT_TO_SVM   (nothing currently) */
+        /* SPEC_CTRL_EXIT_TO_SVM       Req:                           Clob: C   */
+        ALTERNATIVE "", STR(mov %rbx, %rdi; mov %rsp, %rsi), X86_FEATURE_SC_MSR_HVM
+        ALTERNATIVE "", STR(call vmentry_spec_ctrl), X86_FEATURE_SC_MSR_HVM
 
         pop  %r15
         pop  %r14
@@ -78,7 +79,6 @@ __UNLIKELY_END(nsvm_hap)
         pop  %rsi
         pop  %rdi
 
-        clgi
         sti
         vmrun
 
@@ -86,8 +86,10 @@ __UNLIKELY_END(nsvm_hap)
 
         GET_CURRENT(bx)
 
-        /* SPEC_CTRL_ENTRY_FROM_SVM    Req: b=curr %rsp=regs/cpuinfo, Clob: ac  */
+        /* SPEC_CTRL_ENTRY_FROM_SVM    Req:                           Clob: C   */
         ALTERNATIVE "", DO_OVERWRITE_RSB, X86_FEATURE_SC_RSB_HVM
+        ALTERNATIVE "", STR(mov %rsp, %rdi), X86_FEATURE_SC_MSR_HVM
+        ALTERNATIVE "", STR(call vmexit_spec_ctrl), X86_FEATURE_SC_MSR_HVM
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */
 
         stgi
