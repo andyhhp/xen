@@ -23,7 +23,7 @@ fi
 cp xen/.config xen-config
 
 # arm32 only cross-compiles the hypervisor
-if [[ "${XEN_TARGET_ARCH}" = "arm32" ]]; then
+if [[ -n "${ONLY_XEN}" || "${XEN_TARGET_ARCH}" = "arm32" ]]; then
     hypervisor_only="y"
 fi
 

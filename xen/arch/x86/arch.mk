@@ -42,6 +42,8 @@ CFLAGS += -mno-red-zone -fpic
 # SSE setup for variadic function calls.
 CFLAGS += -mno-sse $(call cc-option,$(CC),-mskip-rax-setup)
 
+CFLAGS += -fcf-protection=branch -fcf-check-attribute=no
+
 # Compile with thunk-extern, indirect-branch-register if avaiable.
 CFLAGS-$(CONFIG_INDIRECT_THUNK) += -mindirect-branch=thunk-extern
 CFLAGS-$(CONFIG_INDIRECT_THUNK) += -mindirect-branch-register
