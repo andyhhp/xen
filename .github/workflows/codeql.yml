@@ -1,0 +1,58 @@
+name: CodeQL
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [staging]
+  schedule:
+    - cron: '18 10 * * WED,SUN' # Bi-weekly at 10:18 UTC
+
+jobs:
+  analyse:
+
+    strategy:
+      matrix:
+        language: [ 'cpp', 'python', 'go' ]
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Install build dependencies
+      run: |
+        sudo apt-get install -y wget git \
+          libbz2-dev build-essential \
+          zlib1g-dev libncurses5-dev iasl \
+          libbz2-dev e2fslibs-dev uuid-dev libyajl-dev \
+          autoconf libtool liblzma-dev \
+          python3-dev golang python-dev libsystemd-dev
+
+    - uses: actions/checkout@v2
+
+    - name: Configure Xen
+      run: |
+        ./configure --with-system-qemu=/bin/true \
+                    --with-system-seabios=/bin/true \
+                    --with-system-ovmf=/bin/true
+
+    - name: Pre build stuff
+      run: |
+        make -j`nproc` mini-os-dir
+
+    - uses: github/codeql-action/init@v1
+      with:
+        config-file: ./.github/codeql/codeql-config.yml
+        languages: ${{matrix.language}}
+        queries: security-and-quality
+
+    - if: matrix.language == 'cpp'
+      name: Full Build
+      run: |
+        make -j`nproc` build-xen build-tools
+        make -j`nproc` -C extras/mini-os/
+
+    - if: matrix.language == 'python' || matrix.language == 'go'
+      name: Tools Build
+      run: |
+        make -j`nproc` build-tools
+
+    - uses: github/codeql-action/analyze@v1
