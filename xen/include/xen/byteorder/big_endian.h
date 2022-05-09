@@ -1,10 +1,6 @@
 #ifndef __XEN_BYTEORDER_BIG_ENDIAN_H__
 #define __XEN_BYTEORDER_BIG_ENDIAN_H__
 
-#ifndef __BIG_ENDIAN
-#define __BIG_ENDIAN 4321
-#endif
-
 #include <xen/types.h>
 #include <xen/byteorder/swab.h>
 

@@ -1,10 +1,6 @@
 #ifndef __XEN_BYTEORDER_LITTLE_ENDIAN_H__
 #define __XEN_BYTEORDER_LITTLE_ENDIAN_H__
 
-#ifndef __LITTLE_ENDIAN
-#define __LITTLE_ENDIAN 1234
-#endif
-
 #include <xen/types.h>
 #include <xen/byteorder/swab.h>
 

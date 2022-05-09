@@ -98,4 +98,10 @@
 #define ZERO_BLOCK_PTR ((void *)-1L)
 #endif
 
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+# define __LITTLE_ENDIAN
+#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+# define __BIG_ENDIAN
+#endif
+
 #endif /* __XEN_CONFIG_H__ */
