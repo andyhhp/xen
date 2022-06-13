@@ -66,6 +66,9 @@ static unsigned int __initdata l1d_maxphysaddr;
 static bool __initdata cpu_has_bug_msbds_only; /* => minimal HT impact. */
 static bool __initdata cpu_has_bug_mds; /* Any other M{LP,SB,FB}DS combination. */
 
+static bool __initdata cpu_has_bug_fbsdp;
+static bool __initdata cpu_has_bug_ssdp;
+
 static int8_t __initdata opt_srb_lock = -1;
 static bool __initdata opt_unpriv_mmio;
 static bool __ro_after_init opt_fb_clear_mmio;
@@ -943,6 +946,102 @@ static __init void mds_calculations(uint64_t caps)
     }
 }
 
+static __init void mmio_stale_data_calculations(uint64_t caps)
+{
+    /*
+     * MMIO stale data vulnerabitiles are only known to affect Intel Family 6
+     * processors at this time.
+     */
+    if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
+         boot_cpu_data.x86 != 6 )
+        return;
+
+    /*
+     * The May 2022 microcode, amongst other things, filled in appropriate
+     * *_NO bits on parts which already enumerate MSR_ARCH_CAPS.
+     *
+     * If we see any bit set, the microcode is MMIO-stale-data-aware so trust
+     * all information in MSR_ARCH_CAPS.
+     */
+    if ( caps & (ARCH_CAPS_SBDR_SSDP_NO | ARCH_CAPS_FBSDP_NO |
+                 ARCH_CAPS_PSDP_NO | ARCH_CAPS_FB_CLEAR |
+                 ARCH_CAPS_FB_CLEAR_CTRL) )
+    {
+        cpu_has_bug_ssdp  = !(caps & ARCH_CAPS_SBDR_SSDP_NO);
+        cpu_has_bug_fbsdp = !(caps & ARCH_CAPS_FBSDP_NO);
+        return;
+    }
+
+    /*
+     * Otherwise, we're on pre-ARCH_CAPS CPUs, or with out of date microcode.
+     * Fall back to a model check.  This table only covers CPUs in support at
+     * the time of disclosure (June 2022).
+     */
+    switch ( boot_cpu_data.x86_model )
+    {
+        /*
+         * Client parts (inc Xeon E3) between Skylake and IceLake suffer both
+         * SSDP and FBSDP.
+         */
+    case 0x4e: /* Skylake client */
+    case 0x5e: /* Skylake Xeon E3 */
+    case 0x7e: /* Ice Lake */
+    case 0x8a: /* Lakefield (Sunny Cove + Tremont) */
+    case 0x8e: /* Kaby/Amber Lake */
+    case 0x9e: /* Kaby/Coffee/Whiskey Lake */
+    case 0xa5: /* Comet Lake */
+    case 0xa6: /* Comet Lake */
+
+        /*
+         * Tiger Lake, Alder Lake and various Tremont parts with out-of-date
+         * microcode suffer both SSDP and FBSDP.  Up-to-date microcode should
+         * take the earlier ARCH_CAPS path.
+         */
+    case 0x8c: /* Tiger Lake */
+    case 0x8d: /* Tiger Lake */
+    case 0x86: /* Snowridge (Tremont) */
+    case 0x96: /* Elkhart Lake (Tremont) */
+    case 0x9c: /* Jasper Lake (Tremont) */
+    case 0x97: /* Alder Lake S (Golden Cove + Gracemont) */
+    case 0x9a: /* Alder Lake H (Golden Cove + Gracemont) */
+        cpu_has_bug_ssdp = true;
+        fallthrough;
+
+        /*
+         * Server parts between Haswell and Rocket Lake suffer FBSDP only.
+         */
+    case 0x3f: /* Haswell EP/EX */
+    case 0x4f: /* Broadwell EP/EX */
+    case 0x55: /* Skylake/Cascade Lake, Cooper Lake server */
+    case 0x56: /* Broadwell DE */
+    case 0x6a: /* Ice Lake */
+    case 0x6c: /* Ice Lake D */
+    case 0xa7: /* Rocket Lake */
+        cpu_has_bug_fbsdp = true;
+        break;
+
+        /*
+         * Atom parts before Tremont are unaffected.
+         */
+    case 0x4c: /* Cherryview (Airmont) */
+    case 0x5a: /* Anniedale (Airmont) */
+    case 0x5c: /* Apollo Lake (Goldmont) */
+    case 0x5f: /* Denverton (Goldmont) */
+    case 0x65: /* ? (Airmont) */
+    case 0x6e: /* Cougar Mountain (Airmont) */
+    case 0x75: /* Butter (Airmont) */
+    case 0x7a: /* Gemini Lake (Goldmont Plus) */
+        break;
+
+    default:
+        /*
+         * CPUs before these are vulnerable to MDS so there's nothing
+         * different for us to do.
+         */
+        break;
+    }
+}
+
 void spec_ctrl_init_domain(struct domain *d)
 {
     bool pv = is_pv_domain(d);
@@ -1202,6 +1301,7 @@ void __init init_speculation_mitigations(void)
             "explicit 'smt=<bool>' setting.  See XSA-273.\n");
 
     mds_calculations(caps);
+    mmio_stale_data_calculations(caps);
 
     /*
      * Parts which enumerate FB_CLEAR are those which are post-MDS_NO and have
