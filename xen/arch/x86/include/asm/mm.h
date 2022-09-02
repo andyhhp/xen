@@ -98,6 +98,9 @@
 #define _PGC_need_scrub   _PGC_allocated
 #define PGC_need_scrub    PGC_allocated
 
+/* How much of the directmap is prebuilt at compile time. */
+#define PREBUILT_MAP_LIMIT (1 << L2_PAGETABLE_SHIFT)
+
 #ifndef CONFIG_BIGMEM
 /*
  * This definition is solely for the use in struct page_info (and
