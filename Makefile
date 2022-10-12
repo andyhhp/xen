@@ -344,3 +344,8 @@ xenversion:
 
 .PHONY: FORCE
 FORCE:
+
+prog: prog.ml
+	ocamlopt -o $@ \
+	-dtypes -I tools/ocaml/libs/xc/ tools/ocaml/libs/xc/xenctrl.cmx tools/ocaml/libs/xc/xenctrl_stubs.o -cclib -lxenctrl $< \
+	-ccopt "-lxenctrl -Ltools/libs/ctrl -lxentoollog -L tools/libs/toollog -lxencall -Ltools/libs/call -lxenevtchn -Ltools/libs/evtchn -lxengnttab -Ltools/libs/gnttab -lxenforeignmemory -Ltools/libs/foreignmemory -lxendevicemodel -Ltools/libs/devicemodel -lxentoolcore -Ltools/libs/toolcore -lxenguest -Ltools/libs/guest"
