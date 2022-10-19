@@ -323,5 +323,6 @@ static inline void find_evt_log(void **evt_log, uint32_t *evt_log_size)
 
 extern void map_txt_mem_regions(void);
 extern void protect_txt_mem_regions(void);
+extern void txt_restore_mtrrs(bool e820_verbose);
 
 #endif /* __ASSEMBLY__ */

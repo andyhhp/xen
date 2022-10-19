@@ -100,3 +100,62 @@ void __init protect_txt_mem_regions(void)
                  TXT_PRIV_CONFIG_REGS_BASE + NR_TXT_CONFIG_PAGES * PAGE_SIZE,
                  E820_RAM, E820_UNUSABLE);
 }
+
+void __init txt_restore_mtrrs(bool e820_verbose)
+{
+    struct txt_os_mle_data *os_mle;
+    struct slr_table *slrt;
+    struct slr_entry_intel_info *intel_info;
+    int os_mle_size;
+    uint64_t mtrr_cap, mtrr_def, base, mask;
+    unsigned int i;
+
+    os_mle_size = txt_os_mle_data_size(__va(txt_heap_base));
+    os_mle = txt_os_mle_data_start(__va(txt_heap_base));
+
+    if ( os_mle_size < sizeof(*os_mle) )
+        panic("OS-MLE too small\n");
+
+    rdmsrl(MSR_MTRRcap, mtrr_cap);
+    rdmsrl(MSR_MTRRdefType, mtrr_def);
+
+    if ( e820_verbose ) {
+        printk("MTRRs set previously for SINIT ACM:\n");
+        printk(" MTRR cap: %"PRIx64" type: %"PRIx64"\n", mtrr_cap, mtrr_def);
+
+        for ( i = 0; i < (uint8_t)mtrr_cap; i++ )
+        {
+            rdmsrl(MSR_IA32_MTRR_PHYSBASE(i), base);
+            rdmsrl(MSR_IA32_MTRR_PHYSMASK(i), mask);
+
+            printk(" MTRR[%d]: base %"PRIx64" mask %"PRIx64"\n",
+                   i, base, mask);
+        }
+    }
+
+    slrt = __va(os_mle->slrt);
+    intel_info = (struct slr_entry_intel_info *)
+        slr_next_entry_by_tag(slrt, NULL, SLR_ENTRY_INTEL_INFO);
+
+    if ( (mtrr_cap & 0xFF) != intel_info->saved_bsp_mtrrs.mtrr_vcnt ) {
+        printk("Bootloader saved %ld MTRR values, but there should be %ld\n",
+               intel_info->saved_bsp_mtrrs.mtrr_vcnt, mtrr_cap & 0xFF);
+        /* Choose the smaller one to be on the safe side. */
+        mtrr_cap = (mtrr_cap & 0xFF) > intel_info->saved_bsp_mtrrs.mtrr_vcnt ?
+                   intel_info->saved_bsp_mtrrs.mtrr_vcnt : mtrr_cap;
+    }
+
+    /* Restore MTRRs saved by bootloader. */
+    wrmsrl(MSR_MTRRdefType, intel_info->saved_bsp_mtrrs.default_mem_type);
+
+    for ( i = 0; i < (uint8_t)mtrr_cap; i++ )
+    {
+        base = intel_info->saved_bsp_mtrrs.mtrr_pair[i].mtrr_physbase;
+        mask = intel_info->saved_bsp_mtrrs.mtrr_pair[i].mtrr_physmask;
+        wrmsrl(MSR_IA32_MTRR_PHYSBASE(i), base);
+        wrmsrl(MSR_IA32_MTRR_PHYSMASK(i), mask);
+    }
+
+    if ( e820_verbose )
+        printk("Restored MTRRs:\n"); /* Printed by caller, mtrr_top_of_ram(). */
+}
