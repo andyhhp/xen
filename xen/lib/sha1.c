@@ -21,6 +21,7 @@
  *   Software.
  */
 
+#include <xen/sha1.h>
 #include <xen/string.h>
 #include <xen/types.h>
 
@@ -150,21 +151,23 @@ static void sha1_compress(const uint8_t block[static 64], uint32_t state[static 
 
 /* Full message hasher */
 
-void sha1_hash(const uint8_t message[], size_t len, uint32_t hash[static STATE_LEN]) {
+void sha1_hash(const uint8_t message[], size_t len, uint8_t hash[static SHA1_DIGEST_SIZE]) {
 	uint8_t block[BLOCK_LEN] = {0};
 	size_t rem;
 	size_t off;
 
-	hash[0] = UINT32_C(0x67452301);
-	hash[1] = UINT32_C(0xEFCDAB89);
-	hash[2] = UINT32_C(0x98BADCFE);
-	hash[3] = UINT32_C(0x10325476);
-	hash[4] = UINT32_C(0xC3D2E1F0);
+	uint32_t state[STATE_LEN] = {
+		UINT32_C(0x67452301),
+		UINT32_C(0xEFCDAB89),
+		UINT32_C(0x98BADCFE),
+		UINT32_C(0x10325476),
+		UINT32_C(0xC3D2E1F0),
+	};
 
 	#define LENGTH_SIZE 8  // In bytes
 
 	for (off = 0; len - off >= BLOCK_LEN; off += BLOCK_LEN)
-		sha1_compress(&message[off], hash);
+		sha1_compress(&message[off], state);
 
 	rem = len - off;
 
@@ -174,7 +177,7 @@ void sha1_hash(const uint8_t message[], size_t len, uint32_t hash[static STATE_L
 	block[rem] = 0x80;
 	rem++;
 	if (BLOCK_LEN - rem < LENGTH_SIZE) {
-		sha1_compress(block, hash);
+		sha1_compress(block, state);
 		memset(block, 0, sizeof(block));
 	}
 
@@ -182,11 +185,13 @@ void sha1_hash(const uint8_t message[], size_t len, uint32_t hash[static STATE_L
 	len >>= 5;
 	for (int i = 1; i < LENGTH_SIZE; i++, len >>= 8)
 		block[BLOCK_LEN - 1 - i] = (uint8_t)(len & 0xFFU);
-	sha1_compress(block, hash);
+	sha1_compress(block, state);
 
-	hash[0] = __builtin_bswap32(hash[0]);
-	hash[1] = __builtin_bswap32(hash[1]);
-	hash[2] = __builtin_bswap32(hash[2]);
-	hash[3] = __builtin_bswap32(hash[3]);
-	hash[4] = __builtin_bswap32(hash[4]);
+	state[0] = __builtin_bswap32(state[0]);
+	state[1] = __builtin_bswap32(state[1]);
+	state[2] = __builtin_bswap32(state[2]);
+	state[3] = __builtin_bswap32(state[3]);
+	state[4] = __builtin_bswap32(state[4]);
+
+	memcpy(hash, state, sizeof(state));
 }

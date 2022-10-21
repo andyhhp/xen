@@ -325,4 +325,20 @@ extern void map_txt_mem_regions(void);
 extern void protect_txt_mem_regions(void);
 extern void txt_restore_mtrrs(bool e820_verbose);
 
+#define DRTM_LOC                   2
+#define DRTM_CODE_PCR              17
+#define DRTM_DATA_PCR              18
+
+/*
+ * Secure Launch event log entry type. The TXT specification defines the
+ * base event value as 0x400 for DRTM values.
+ */
+#define TXT_EVTYPE_BASE            0x400
+#define TXT_EVTYPE_SLAUNCH         (TXT_EVTYPE_BASE + 0x102)
+#define TXT_EVTYPE_SLAUNCH_START   (TXT_EVTYPE_BASE + 0x103)
+#define TXT_EVTYPE_SLAUNCH_END     (TXT_EVTYPE_BASE + 0x104)
+
+void tpm_hash_extend(unsigned loc, unsigned pcr, uint8_t *buf, unsigned size,
+                     uint32_t type, uint8_t *log_data, unsigned log_data_size);
+
 #endif /* __ASSEMBLY__ */
