@@ -28,6 +28,7 @@ lib-y += strrchr.o
 lib-y += strsep.o
 lib-y += strspn.o
 lib-y += strstr.o
+lib-$(CONFIG_X86) += sha1.o
 lib-$(CONFIG_X86) += xxhash32.o
 lib-$(CONFIG_X86) += xxhash64.o
 
