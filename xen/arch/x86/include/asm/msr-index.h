@@ -165,6 +165,9 @@
 #define MSR_X2APIC_FIRST                    0x00000800
 #define MSR_X2APIC_LAST                     0x000008ff
 
+/* MSR offset can be obtained by shifting MMIO offset this number of bits to the right. */
+#define MSR_X2APIC_SHIFT                    4
+
 #define MSR_X2APIC_TPR                      0x00000808
 #define MSR_X2APIC_PPR                      0x0000080a
 #define MSR_X2APIC_EOI                      0x0000080b
