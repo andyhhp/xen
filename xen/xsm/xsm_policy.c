@@ -50,7 +50,7 @@ int __init xsm_multiboot_policy_init(
             continue;
 
         _policy_start = bootstrap_map(mod + i);
-        _policy_len   = mod[i].mod_end;
+        _policy_len   = mod[i].mod_end - mod[i].mod_start;
 
         if ( (xsm_magic_t)(*_policy_start) == XSM_MAGIC )
         {

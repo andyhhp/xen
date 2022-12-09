@@ -375,9 +375,9 @@ int __init dom0_construct_pv(struct domain *d,
     start_info_t *si;
     struct vcpu *v = d->vcpu[0];
     void *image_base = bootstrap_map(image);
-    unsigned long image_len = image->mod_end;
+    unsigned long image_len = image->mod_end - image->mod_start;
     void *image_start = image_base + image_headroom;
-    unsigned long initrd_len = initrd ? initrd->mod_end : 0;
+    unsigned long initrd_len = initrd ? initrd->mod_end - initrd->mod_start : 0;
     l4_pgentry_t *l4tab = NULL, *l4start = NULL;
     l3_pgentry_t *l3tab = NULL, *l3start = NULL;
     l2_pgentry_t *l2tab = NULL, *l2start = NULL;
@@ -613,7 +613,7 @@ int __init dom0_construct_pv(struct domain *d,
         initrd_pfn = vinitrd_start ?
                      (vinitrd_start - v_start) >> PAGE_SHIFT :
                      domain_tot_pages(d);
-        initrd_mfn = mfn = initrd->mod_start;
+        initrd_mfn = mfn = paddr_to_pfn(initrd->mod_start);
         count = PFN_UP(initrd_len);
         if ( d->arch.physaddr_bitsize &&
              ((mfn + count - 1) >> (d->arch.physaddr_bitsize - PAGE_SHIFT)) )
@@ -628,7 +628,7 @@ int __init dom0_construct_pv(struct domain *d,
                     free_domheap_pages(page, order);
                     page += 1UL << order;
                 }
-            memcpy(page_to_virt(page), mfn_to_virt(initrd->mod_start),
+            memcpy(page_to_virt(page), maddr_to_virt(initrd->mod_start),
                    initrd_len);
             initrd_mfn = mfn_x(page_to_mfn(page));
         }

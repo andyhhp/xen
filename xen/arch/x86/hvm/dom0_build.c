@@ -649,8 +649,8 @@ static int __init pvh_load_kernel(struct domain *d, const module_t *image,
                                   paddr_t *start_info_addr)
 {
     void *image_start = image_base + image_headroom;
-    unsigned long image_len = image->mod_end;
-    unsigned long initrd_len = initrd ? initrd->mod_end : 0;
+    unsigned long image_len = image->mod_end - image->mod_start;
+    unsigned long initrd_len = initrd ? initrd->mod_end - image->mod_start: 0;
     struct elf_binary elf;
     struct elf_dom_parms parms;
     paddr_t last_addr;
@@ -725,7 +725,7 @@ static int __init pvh_load_kernel(struct domain *d, const module_t *image,
 
     if ( initrd != NULL )
     {
-        rc = hvm_copy_to_guest_phys(last_addr, mfn_to_virt(initrd->mod_start),
+        rc = hvm_copy_to_guest_phys(last_addr, maddr_to_virt(initrd->mod_start),
                                     initrd_len, v);
         if ( rc )
         {

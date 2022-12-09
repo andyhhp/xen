@@ -730,8 +730,8 @@ static void __init efi_arch_handle_module(const struct file *file,
     if ( options )
         place_string(&mb_modules[mbi.mods_count].string, options);
     place_string(&mb_modules[mbi.mods_count].string, local_name.s);
-    mb_modules[mbi.mods_count].mod_start = file->addr >> PAGE_SHIFT;
-    mb_modules[mbi.mods_count].mod_end = file->size;
+    mb_modules[mbi.mods_count].mod_start = file->addr;
+    mb_modules[mbi.mods_count].mod_end   = file->addr + file->size;
     ++mbi.mods_count;
     efi_bs->FreePool(ptr);
 }

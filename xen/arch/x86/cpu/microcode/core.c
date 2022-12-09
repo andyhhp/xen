@@ -181,7 +181,7 @@ static void __init microcode_scan_module(
             continue;
 
         _blob_start = bootstrap_map(&mod[i]);
-        _blob_size = mod[i].mod_end;
+        _blob_size = mod[i].mod_end - mod[i].mod_start;
         if ( !_blob_start )
         {
             printk("Could not map multiboot module #%d (size: %ld)\n",
@@ -814,7 +814,7 @@ int __init microcode_init_cache(unsigned long *module_map,
 
     if ( ucode_mod.mod_end )
         rc = early_update_cache(bootstrap_map(&ucode_mod),
-                                ucode_mod.mod_end);
+                                ucode_mod.mod_end - ucode_mod.mod_start);
     else if ( ucode_blob.size )
         rc = early_update_cache(ucode_blob.data, ucode_blob.size);
 
@@ -835,7 +835,7 @@ static int __init early_microcode_update_cpu(void)
     }
     else if ( ucode_mod.mod_end )
     {
-        len = ucode_mod.mod_end;
+        len = ucode_mod.mod_end - ucode_mod.mod_start;
         data = bootstrap_map(&ucode_mod);
     }
 

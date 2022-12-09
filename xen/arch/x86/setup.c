@@ -299,8 +299,8 @@ unsigned long __init initial_images_nrpages(nodeid_t node)
 
     for ( nr = i = 0; i < nr_initial_images; ++i )
     {
-        unsigned long start = initial_images[i].mod_start;
-        unsigned long end = start + PFN_UP(initial_images[i].mod_end);
+        unsigned long start = paddr_to_pfn(initial_images[i].mod_start);
+        unsigned long end = PFN_UP(initial_images[i].mod_end);
 
         if ( end > node_start && node_end > start )
             nr += min(node_end, end) - max(node_start, start);
@@ -317,8 +317,6 @@ void __init discard_initial_images(void) /* a.k.a. free multiboot modules */
 
     for ( i = 0; i < nr_initial_images; ++i )
     {
-        uint64_t start = (uint64_t)initial_images[i].mod_start << PAGE_SHIFT;
-
         /*
          * Sometimes the initrd is mapped, rather than copied, into dom0.
          * end=0 signifies that we should leave it alone.
@@ -326,8 +324,8 @@ void __init discard_initial_images(void) /* a.k.a. free multiboot modules */
         if ( initial_images[i].mod_end == 0 )
             continue;
 
-        init_domheap_pages(start,
-                           start + PAGE_ALIGN(initial_images[i].mod_end));
+        init_domheap_pages(initial_images[i].mod_start,
+                           PAGE_ALIGN(initial_images[i].mod_end));
     }
 
     nr_initial_images = 0;
@@ -427,13 +425,13 @@ void *__init bootstrap_map(const module_t *mod)
         if ( !mod )
             goto unmap;
 
-        start = (uint64_t)mod->mod_start << PAGE_SHIFT;
-        end = start + mod->mod_end;
+        start = mod->mod_start;
+        end   = mod->mod_end;
 
         printk("*** %s(0x%08"PRIx64", 0x%08"PRIx64")\n",
                __func__, start, end);
 
-        return mfn_to_virt(mod->mod_start);
+        return maddr_to_virt(mod->mod_start);
     }
 
     if ( !mod )
@@ -445,8 +443,8 @@ void *__init bootstrap_map(const module_t *mod)
         return NULL;
     }
 
-    start = (uint64_t)mod->mod_start << PAGE_SHIFT;
-    end = start + mod->mod_end;
+    start = mod->mod_start;
+    end   = mod->mod_end;
     if ( start >= end )
         return NULL;
 
@@ -490,6 +488,10 @@ static void __init move_memory(
         if ( mod.mod_end > blksz )
             mod.mod_end = blksz;
         sz = mod.mod_end - soffs;
+
+        mod.mod_start <<= PAGE_SHIFT;
+        mod.mod_end += mod.mod_start;
+
         s = bootstrap_map(&mod);
 
         mod.mod_start = (dst - doffs) >> PAGE_SHIFT;
@@ -498,6 +500,10 @@ static void __init move_memory(
             mod.mod_end = blksz;
         if ( sz > mod.mod_end - doffs )
             sz = mod.mod_end - doffs;
+
+        mod.mod_start <<= PAGE_SHIFT;
+        mod.mod_end += mod.mod_start;
+
         d = bootstrap_map(&mod);
 
         memmove(d + doffs, s + soffs, sz);
@@ -641,8 +647,8 @@ static uint64_t __init _consider_modules(
 
     for ( i = 0; i < nr_mods ; ++i )
     {
-        uint64_t start = (uint64_t)mod[i].mod_start << PAGE_SHIFT;
-        uint64_t end = start + PAGE_ALIGN(mod[i].mod_end);
+        uint64_t start = mod[i].mod_start;
+        uint64_t end = PAGE_ALIGN(mod[i].mod_end);
 
         if ( i == this_mod )
             continue;
@@ -1383,8 +1389,6 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
     {
         if ( mod[i].mod_start & (PAGE_SIZE - 1) )
             panic("Bootloader didn't honor module alignment request\n");
-        mod[i].mod_end -= mod[i].mod_start;
-        mod[i].mod_start >>= PAGE_SHIFT;
         mod[i].reserved = 0;
     }
 
@@ -1405,11 +1409,12 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
          * respective reserve_e820_ram() invocation below. No need to
          * query efi_boot_mem_unused() here, though.
          */
-        mod[mbi->mods_count].mod_start = virt_to_mfn(_stext);
-        mod[mbi->mods_count].mod_end = __2M_rwdata_end - _stext;
+        mod[mbi->mods_count].mod_start = virt_to_maddr(_stext);
+        mod[mbi->mods_count].mod_end   = virt_to_maddr(__2M_rwdata_end);
     }
 
-    modules_headroom = bzimage_headroom(bootstrap_map(mod), mod->mod_end);
+    modules_headroom = bzimage_headroom(bootstrap_map(&mod[0]),
+                                        mod[0].mod_end - mod[0].mod_start);
     bootstrap_map(NULL);
 
     printk("*** mod[0] headroom: %lu, sz %#x\n",
@@ -1500,7 +1505,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
              * move mod[0], we incorperate this as extra space at the start.
              */
             unsigned long headroom = j ? 0 : modules_headroom;
-            unsigned long size = PAGE_ALIGN(headroom + mod[j].mod_end);
+            unsigned long size = PAGE_ALIGN(headroom + mod[j].mod_end - mod[j].mod_start);
 
             if ( mod[j].reserved )
                 continue;
@@ -1513,14 +1518,13 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
                 continue;
 
             if ( s < end &&
-                 (headroom ||
-                  ((end - size) >> PAGE_SHIFT) > mod[j].mod_start) )
+                 (headroom || (end - size) > mod[j].mod_start) )
             {
                 move_memory(end - size + headroom,
-                            (uint64_t)mod[j].mod_start << PAGE_SHIFT,
-                            mod[j].mod_end);
-                mod[j].mod_start = (end - size) >> PAGE_SHIFT;
-                mod[j].mod_end += headroom;
+                            mod[j].mod_start,
+                            mod[j].mod_end - mod[j].mod_start);
+                mod[j].mod_start = end - size;
+                mod[j].mod_end   = end;
                 mod[j].reserved = 1;
             }
         }
@@ -1552,11 +1556,8 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
     if ( modules_headroom && !mod->reserved )
         panic("Not enough memory to relocate the dom0 kernel image\n");
     for ( i = 0; i < mbi->mods_count; ++i )
-    {
-        uint64_t s = (uint64_t)mod[i].mod_start << PAGE_SHIFT;
-
-        reserve_e820_ram(&boot_e820, s, s + PAGE_ALIGN(mod[i].mod_end));
-    }
+        reserve_e820_ram(&boot_e820, mod[i].mod_start,
+                         PAGE_ALIGN(mod[i].mod_end));
 
     if ( !xen_phys_start )
         panic("Not enough memory to relocate Xen\n");
@@ -1638,11 +1639,8 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
                 map_e = boot_e820.map[j].addr + boot_e820.map[j].size;
                 for ( j = 0; j < mbi->mods_count; ++j )
                 {
-                    uint64_t end = pfn_to_paddr(mod[j].mod_start) +
-                                   mod[j].mod_end;
-
-                    if ( map_e < end )
-                        map_e = end;
+                    if ( map_e < mod[j].mod_end )
+                        map_e = mod[j].mod_end;
                 }
                 if ( PFN_UP(map_e) < max_page )
                 {
@@ -1714,11 +1712,12 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
     printk("PDX+MAP mods\n");
     for ( i = 0; i < mbi->mods_count; ++i )
     {
-        set_pdx_range(mod[i].mod_start,
-                      mod[i].mod_start + PFN_UP(mod[i].mod_end));
-        map_pages_to_xen((unsigned long)mfn_to_virt(mod[i].mod_start),
-                         _mfn(mod[i].mod_start),
-                         PFN_UP(mod[i].mod_end), PAGE_HYPERVISOR);
+        set_pdx_range(paddr_to_pfn(mod[i].mod_start),
+                      paddr_to_pfn(PAGE_ALIGN(mod[i].mod_end)));
+        map_pages_to_xen((unsigned long)maddr_to_virt(mod[i].mod_start),
+                         maddr_to_mfn(mod[i].mod_start),
+                         PFN_UP(mod[i].mod_end - mod[i].mod_start),
+                         PAGE_HYPERVISOR);
     }
 
 #ifdef CONFIG_KEXEC
