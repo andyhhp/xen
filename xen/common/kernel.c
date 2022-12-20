@@ -1,6 +1,6 @@
 /******************************************************************************
  * kernel.c
- * 
+ *
  * Copyright (c) 2002-2005 K A Fraser
  */
 
@@ -617,7 +617,7 @@ long do_xen_version(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             return -EFAULT;
         return 0;
     }
-    
+
     case XENVER_platform_parameters:
     {
         const struct vcpu *curr = current;
@@ -656,9 +656,8 @@ long do_xen_version(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         }
 
         return 0;
-        
     }
-    
+
     case XENVER_changeset:
     {
         xen_changeset_info_t chgset;
@@ -689,7 +688,7 @@ long do_xen_version(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
             if ( VM_ASSIST(d, pae_extended_cr3) )
                 fi.submap |= (1U << XENFEAT_pae_pgdir_above_4gb);
             if ( paging_mode_translate(d) )
-                fi.submap |= 
+                fi.submap |=
                     (1U << XENFEAT_writable_page_tables) |
                     (1U << XENFEAT_auto_translated_physmap);
             if ( is_hardware_domain(d) )
