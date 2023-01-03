@@ -52,12 +52,12 @@ unsigned int xen_minor_version(void)
 
 const char *xen_extra_version(void)
 {
-    return XEN_EXTRAVERSION;
+    return XEN_EXTRAVERSION "+REALLY LONG EXTRAVERSION";
 }
 
 const char *xen_changeset(void)
 {
-    return XEN_CHANGESET;
+    return XEN_CHANGESET "+REALLY SUPER DUPER EXTRA MEGA LONG CHANGESET";
 }
 
 const char *xen_banner(void)
