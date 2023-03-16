@@ -1,5 +1,4 @@
-from distutils.core import setup, Extension
-from distutils.ccompiler import new_compiler
+from setuptools import setup, Extension
 import os
 import sys
 
