@@ -448,17 +448,30 @@ static void *__init bootstrap_map_addr(paddr_t start, paddr_t end)
     void *ret;
 
     if ( system_state != SYS_STATE_early_boot )
-        return end ? maddr_to_virt(start) : NULL;
+    {
+        if ( !end )
+            goto unmap;
+
+        printk("*** %s(0x%08"PRIx64", 0x%08"PRIx64")\n",
+               __func__, start, end);
+
+        return maddr_to_virt(start);
+    }
 
     if ( !end )
     {
         destroy_xen_mappings(BOOTSTRAP_MAP_BASE, BOOTSTRAP_MAP_LIMIT);
         map_cur = BOOTSTRAP_MAP_BASE;
+    unmap:
+        printk("*** %s(unmap)\n", __func__);
         return NULL;
     }
 
     if ( start >= end )
         return NULL;
+
+    printk("*** %s(0x%08"PRIx64", 0x%08"PRIx64")\n",
+           __func__, start, end);
 
     ret = (void *)(map_cur + (unsigned long)(start & mask));
     start &= ~mask;
@@ -487,9 +500,13 @@ static void __init noinline move_memory(
     unsigned int blksz = BOOTSTRAP_MAP_LIMIT - BOOTSTRAP_MAP_BASE;
     unsigned int mask = (1L << L2_PAGETABLE_SHIFT) - 1;
 
+    printk("*** %s(%08lx, %08lx, %u/%#x)\n",
+           __func__, dst, src, size, size);
+
     if ( src + size > BOOTSTRAP_MAP_BASE )
         blksz >>= 1;
 
+    //blksz = MB(4);
     while ( size )
     {
         unsigned int soffs = src & mask;
@@ -511,6 +528,9 @@ static void __init noinline move_memory(
         d = bootstrap_map_addr(dst, dst + sz);
 
         memmove(d, s, sz);
+
+        printk("*** partial(%08lx, %0lx, %u/%#x)\n",
+               (unsigned long)d, (unsigned long)s, sz, sz);
 
         dst += sz;
         src += sz;
