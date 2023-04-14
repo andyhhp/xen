@@ -405,32 +405,27 @@ static int move_payload(struct payload *payload, struct livepatch_elf *elf)
 
 static int secure_payload(struct payload *payload, struct livepatch_elf *elf)
 {
-    int rc = 0;
-    unsigned int text_pages, rw_pages, ro_pages;
+    unsigned int text_pages = PFN_UP(payload->text_size);
+    unsigned int rw_pages   = PFN_UP(payload->rw_size);
+    unsigned int ro_pages   = PFN_UP(payload->ro_size);
+    int rc;
 
-    text_pages = PFN_UP(payload->text_size);
+    if ( ro_pages + rw_pages + text_pages != payload->pages )
+        return -EINVAL;
 
-    if ( text_pages )
-    {
-        rc = arch_livepatch_secure(payload->text_addr, text_pages, LIVEPATCH_VA_RX);
-        if ( rc )
-            return rc;
-    }
-    rw_pages = PFN_UP(payload->rw_size);
-    if ( rw_pages )
-    {
-        rc = arch_livepatch_secure(payload->rw_addr, rw_pages, LIVEPATCH_VA_RW);
-        if ( rc )
-            return rc;
-    }
+    if ( text_pages &&
+         (rc = arch_livepatch_secure(payload->text_addr, text_pages, LIVEPATCH_VA_RX)) )
+        return rc;
 
-    ro_pages = PFN_UP(payload->ro_size);
-    if ( ro_pages )
-        rc = arch_livepatch_secure(payload->ro_addr, ro_pages, LIVEPATCH_VA_RO);
+    if ( rw_pages &&
+         (rc = arch_livepatch_secure(payload->rw_addr, rw_pages, LIVEPATCH_VA_RW)) )
+        return rc;
 
-    ASSERT(ro_pages + rw_pages + text_pages == payload->pages);
+    if ( ro_pages &&
+         (rc = arch_livepatch_secure(payload->ro_addr, ro_pages, LIVEPATCH_VA_RO)) )
+        return rc;
 
-    return rc;
+    return 0;
 }
 
 static bool section_ok(const struct livepatch_elf *elf,
