@@ -75,6 +75,8 @@
 
 #ifndef __ASSEMBLY__
 
+extern bool slaunch_active;
+
 /* We need to differentiate between pre- and post paging enabled. */
 #ifdef __BOOT_DEFS_H__
 #define _txt(x) _p(x)
@@ -257,6 +259,30 @@ static inline void *txt_sinit_mle_data_start(void *heap)
     return heap + txt_bios_data_size(heap) +
         txt_os_mle_data_size(heap) +
         txt_os_sinit_data_size(heap) + sizeof(uint64_t);
+}
+
+static inline int is_in_pmr(struct txt_os_sinit_data *os_sinit, uint64_t base,
+                            uint32_t size, int check_high)
+{
+    /* Check for size overflow. */
+    if (base + size < base)
+        txt_reset(SLAUNCH_ERROR_INTEGER_OVERFLOW);
+
+    /* Low range always starts at 0, so its size is also end address. */
+    if (base >= os_sinit->vtd_pmr_lo_base &&
+        base + size <= os_sinit->vtd_pmr_lo_size)
+        return 1;
+
+    if (check_high && os_sinit->vtd_pmr_hi_size != 0) {
+        if (os_sinit->vtd_pmr_hi_base + os_sinit->vtd_pmr_hi_size <
+            os_sinit->vtd_pmr_hi_size)
+            txt_reset(SLAUNCH_ERROR_INTEGER_OVERFLOW);
+        if (base >= os_sinit->vtd_pmr_hi_base &&
+            base + size <= os_sinit->vtd_pmr_hi_base + os_sinit->vtd_pmr_hi_size)
+            return 1;
+    }
+
+    return 0;
 }
 
 #endif /* __ASSEMBLY__ */

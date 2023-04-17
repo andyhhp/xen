@@ -506,6 +506,10 @@ __start:
         /* Bootloaders may set multiboot{1,2}.mem_lower to a nonzero value. */
         xor     %edx,%edx
 
+        /* Check for TrenchBoot slaunch bootloader. */
+        cmp     $SLAUNCH_BOOTLOADER_MAGIC,%eax
+        je      .Lslaunch_proto
+
         /* Check for Multiboot2 bootloader. */
         cmp     $MULTIBOOT2_BOOTLOADER_MAGIC,%eax
         je      .Lmultiboot2_proto
@@ -520,6 +524,23 @@ __start:
         /* Not available? BDA value will be fine. */
         cmovnz  MB_mem_lower(%ebx),%edx
         jmp     trampoline_bios_setup
+
+.Lslaunch_proto:
+        /* Save information that TrenchBoot slaunch was used. */
+        movb    $1, sym_esi(slaunch_active)
+
+        /* Push arguments to stack and call txt_early_tests(). */
+        push    $sym_offs(__2M_rwdata_end)  /* end of target image */
+        push    $sym_offs(_start)           /* target base address */
+        push    %esi                        /* load base address */
+        call    txt_early_tests
+
+        /*
+         * txt_early_tests() returns MBI address, move it to EBX, move magic
+         * number expected by Multiboot 2 to EAX and fall through.
+         */
+        movl    %eax,%ebx
+        movl    $MULTIBOOT2_BOOTLOADER_MAGIC,%eax
 
 .Lmultiboot2_proto:
         /* Skip Multiboot2 information fixed part. */
@@ -850,6 +871,10 @@ cmdline_parse_early:
         ALIGN
 reloc:
         .incbin "reloc.bin"
+
+        ALIGN
+txt_early_tests:
+        .incbin "txt_early.bin"
 
 ENTRY(trampoline_start)
 #include "trampoline.S"
