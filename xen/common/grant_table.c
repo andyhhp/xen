@@ -991,6 +991,26 @@ union maptrack_node {
     unsigned long raw;
 };
 
+#include <public/io/xs_wire.h>
+static struct xenstore_domain_interface *d1_ring;
+
+void dump_d1_ring(void)
+{
+    if ( !d1_ring )
+    {
+        printk("*** %pv, no d1 ring\n", current);
+        return;
+    }
+
+    printk("*** %pv d1 req_c %08x req_p %08x rsp_c %08x, rsp_p %08x srv %08x, conn %08x, err %08x\n",
+           current,
+           ACCESS_ONCE(d1_ring->req_cons), ACCESS_ONCE(d1_ring->req_prod),
+           ACCESS_ONCE(d1_ring->rsp_cons), ACCESS_ONCE(d1_ring->rsp_prod),
+           ACCESS_ONCE(d1_ring->server_features),
+           ACCESS_ONCE(d1_ring->connection),
+           ACCESS_ONCE(d1_ring->error));
+}
+
 static void
 map_grant_ref(
     struct gnttab_map_grant_ref *op)
@@ -1324,6 +1344,22 @@ map_grant_ref(
     op->status       = GNTST_okay;
 
     rcu_unlock_domain(rd);
+
+    /* Find dom0 trying to map dom1's store ring */
+    if ( ld->domain_id == 0 && rd->domain_id == 1 &&
+         ref == GNTTAB_RESERVED_XENSTORE )
+    {
+        if ( d1_ring )
+        {
+            printk("*** %pv unmapping old d1 ring\n",
+                   current);
+            unmap_domain_page_global(d1_ring);
+        }
+
+        d1_ring = map_domain_page_global(mfn);
+        printk("*** %pv mapping d1 ring, mfn %"PRI_mfn"\n",
+               current, mfn_x(mfn));
+    }
     return;
 
  undo_out:
@@ -4355,6 +4391,8 @@ static void cf_check gnttab_usage_print_all(unsigned char key)
     rcu_read_unlock(&domlist_read_lock);
 
     printk("%s ] done\n", __func__);
+
+    dump_d1_ring();
 }
 
 static int __init cf_check gnttab_usage_init(void)

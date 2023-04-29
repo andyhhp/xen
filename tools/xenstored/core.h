@@ -302,6 +302,7 @@ void setup_structure(bool live_update);
 struct connection *new_connection(const struct interface_funcs *funcs);
 struct connection *get_connection_by_id(unsigned int conn_id);
 void check_store(void);
+void check_rings(void);
 void corrupt(struct connection *conn, const char *fmt, ...);
 
 /* Get name of parent node. */

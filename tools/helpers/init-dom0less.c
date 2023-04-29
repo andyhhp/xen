@@ -328,6 +328,8 @@ int main(int argc, char **argv)
         goto out;
     }
 
+    printf("*** init-dom0less got %d doms\n", nb_vm);
+
     for (i = 0; i < nb_vm; i++) {
         domid_t domid = info[i].domid;
 

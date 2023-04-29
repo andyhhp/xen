@@ -798,6 +798,7 @@ int evtchn_close(struct domain *d1, int port1, bool guest)
     return rc;
 }
 
+#include <xen/grant_table.h>
 int evtchn_send(struct domain *ld, unsigned int lport)
 {
     struct evtchn *lchn = _evtchn_from_port(ld, lport), *rchn;
@@ -839,6 +840,12 @@ int evtchn_send(struct domain *ld, unsigned int lport)
             return 0;
         }
         evtchn_port_set_pending(rd, rchn->notify_vcpu_id, rchn);
+        if ( ld != rd )
+        {
+            printk("*** %pd/%u interdom to %pd/%u\n",
+                   ld, lport, rd, rport);
+            dump_d1_ring();
+        }
         break;
     case ECS_IPI:
         evtchn_port_set_pending(ld, lchn->notify_vcpu_id, lchn);

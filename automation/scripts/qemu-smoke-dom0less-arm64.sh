@@ -9,6 +9,8 @@ if [ -z "${test_variant}" ]; then
     domU_check="
 until ifconfig eth0 192.168.0.2 &> /dev/null && ping -c 10 192.168.0.1; do
     sleep 30
+    find / -name xenstore-ls
+    /usr/local/bin/xenstore-ls -fp /local/domain/1
 done
 echo \"${passed}\"
 "
@@ -87,6 +89,9 @@ cp /bin/busybox initrd/bin/busybox
 initrd/bin/busybox --install initrd/bin
 echo "#!/bin/sh
 
+export LD_LIBRARY_PATH=/usr/local/lib
+export PATH=/usr/local/bin:$PATH
+
 mount -t proc proc /proc
 mount -t sysfs sysfs /sys
 mount -t devtmpfs devtmpfs /dev
@@ -94,6 +99,7 @@ ${domU_check}
 /bin/sh" > initrd/init
 chmod +x initrd/init
 cd initrd
+cp -var ../binaries/dist/install/* .
 find . | cpio --create --format='newc' | gzip > ../binaries/initrd
 cd ..
 
@@ -110,8 +116,13 @@ cp -ar ../binaries/dist/install/* .
 
 echo "#!/bin/bash
 
+set -x
+
 export LD_LIBRARY_PATH=/usr/local/lib
-bash /etc/init.d/xencommons start
+
+/usr/local/lib/xen/bin/test-paging-mempool >/var/log/xen/test-paging-mempool.log &
+
+bash -x /etc/init.d/xencommons start
 
 /usr/local/lib/xen/bin/init-dom0less
 
@@ -121,10 +132,22 @@ ifconfig eth0 up
 ifconfig xenbr0 up
 ifconfig xenbr0 192.168.0.1
 
-xl network-attach 1 type=vif
+(while :; do xenstore-control rings; sleep 2; done) &
+
+xl -vv network-attach 1 type=vif
+echo $?
 ${dom0_check}
+sleep 10
+
+cat /var/log/xen/xenstored-trace.log
+xl debug-keys g
+
+xenstore-ls -fp
+ps auxf
+
 " > etc/local.d/xen.start
 chmod +x etc/local.d/xen.start
+echo "XENSTORED_TRACE=yes" >> etc/default/xencommons
 echo "rc_verbose=yes" >> etc/rc.conf
 find . | cpio -H newc -o | gzip > ../binaries/dom0-rootfs.cpio.gz
 cd ..

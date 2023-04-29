@@ -136,16 +136,26 @@ static void run_tests(void)
                     64 << 20, size_bytes);
 }
 
+#include <sys/time.h>
+static uint64_t tv_delta_us(const struct timeval *before,
+                            const struct timeval *after)
+{
+    return (((after->tv_sec - before->tv_sec)*1000000ull) +
+            (after->tv_usec - before->tv_usec));
+}
+
 int main(int argc, char **argv)
 {
     int rc;
 
-    printf("Paging mempool tests\n");
+    //printf("Paging mempool tests\n");
 
     xch = xc_interface_open(NULL, NULL, 0);
 
     if ( !xch )
         err(1, "xc_interface_open");
+
+    if ( 0 ) {
 
     rc = xc_domain_create(xch, &domid, &create);
     if ( rc )
@@ -166,6 +176,39 @@ int main(int argc, char **argv)
     if ( rc )
         fail("  Failed to destroy domain: %d - %s\n",
              errno, strerror(errno));
+    }
+
+    {
+        static xc_domaininfo_t domaininfo[DOMID_FIRST_RESERVED - 1];
+        unsigned int iter = 0;
+
+        printf("Test large dominfo\n");
+
+        for ( ;; iter++ )
+        {
+            struct timeval before, after;
+
+            printf("Iter %u\n", iter);
+
+            gettimeofday(&before, NULL);
+            rc = xc_domain_getinfolist(xch, 1, DOMID_FIRST_RESERVED - 1, domaininfo);
+            gettimeofday(&after, NULL);
+
+            printf("list -> time %"PRIu64"us rc = %d\n",
+                   tv_delta_us(&before, &after), rc);
+
+            if ( rc < 0 )
+            {
+                fail("xc_domain_getinfolist(): %d - %s\n",
+                     errno, strerror(errno));
+                break;
+            }
+
+            for ( int i = 0; i < rc; ++i )
+                printf("info[%d].domain = %u\n", i, domaininfo[i].domain);
+        }
+    }
+
  out:
     return !!nr_failures;
 }

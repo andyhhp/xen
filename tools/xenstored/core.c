@@ -135,8 +135,8 @@ static void trace_io(const struct connection *conn,
 	now = time(NULL);
 	tm = localtime(&now);
 
-	trace("io: %s %p %04d%02d%02d %02d:%02d:%02d %s (",
-	      out ? "OUT" : "IN", conn,
+	trace("io: %s %p d%u %04d%02d%02d %02d:%02d:%02d %s (",
+	      out ? "OUT" : "IN", conn, conn->id,
 	      tm->tm_year + 1900, tm->tm_mon + 1,
 	      tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec,
 	      sockmsg_string(data->hdr.msg.type));
@@ -450,7 +450,7 @@ static int destroy_conn(void *_conn)
 	return 0;
 }
 
-static bool conn_can_read(struct connection *conn)
+static bool _conn_can_read(struct connection *conn)
 {
 	if (conn->is_ignored)
 		return false;
@@ -468,9 +468,31 @@ static bool conn_can_read(struct connection *conn)
 	return true;
 }
 
-static bool conn_can_write(struct connection *conn)
+static bool conn_can_read(struct connection *conn)
+{
+	bool ret = _conn_can_read(conn);
+
+	if (0 && conn->id)
+		trace("*** %s(d%u) {ig %u, st %u} -> %u\n",
+		      __func__, conn->id, conn->is_ignored, conn->is_stalled, ret);
+
+	return ret;
+}
+
+static bool _conn_can_write(struct connection *conn)
 {
 	return !conn->is_ignored && conn->funcs->can_write(conn);
+}
+
+static bool conn_can_write(struct connection *conn)
+{
+	bool ret = _conn_can_write(conn);
+
+	if (0 && conn->id)
+		trace("*** %s(d%u) {ig %u} -> %u\n",
+		      __func__, conn->id, conn->is_ignored, ret);
+
+	return ret;
 }
 
 /* This function returns index inside the array if succeed, -1 if fail */
@@ -2207,6 +2229,15 @@ static void handle_input(struct connection *conn)
 			 * Any potential change of the maximum payload size
 			 * needs to be negotiated between the involved parties.
 			 */
+
+			if (conn->id)
+				trace("*** d%d HDR { ty 0x%08x, rqid 0x%08x, txid 0x%08x, len 0x%08x }\n",
+				      conn->id,
+				      in->hdr.msg.type,
+				      in->hdr.msg.req_id,
+				      in->hdr.msg.tx_id,
+				      in->hdr.msg.len);
+
 			if (in->hdr.msg.len > XENSTORE_PAYLOAD_MAX) {
 				syslog(LOG_ERR, "Client tried to feed us %i",
 				       in->hdr.msg.len);

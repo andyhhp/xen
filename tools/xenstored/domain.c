@@ -37,6 +37,11 @@
 #include <xenctrl.h>
 #include <xen/grant_table.h>
 
+#define __ACCESS_ONCE(x) ({			    \
+	(void)(typeof(x))0; /* Scalar typecheck. */ \
+	(volatile typeof(x) *)&(x); })
+#define ACCESS_ONCE(x) (*__ACCESS_ONCE(x))
+
 static xc_interface **xc_handle;
 xengnttab_handle **xgt_handle;
 static evtchn_port_t virq_port;
@@ -688,6 +693,32 @@ static struct domain *find_domain_struct(unsigned int domid)
 	return hashtable_search(domhash, &domid);
 }
 
+void check_rings(void)
+{
+	struct domain *d = find_domain_struct(1);
+	struct xenstore_domain_interface *intf;
+
+	if (!d) {
+		log("*** d1, no struct dom");
+		return;
+	}
+	if (!d->interface) {
+		log("*** d1, no interface");
+		return;
+	}
+
+	intf = d->interface;
+
+	log("*** d1 req_cons %08x, req_prod %08x",
+	    ACCESS_ONCE(intf->req_cons), ACCESS_ONCE(intf->req_prod));
+	log("*** d1 rsp_cons %08x, rsp_prod %08x",
+	    ACCESS_ONCE(intf->rsp_cons), ACCESS_ONCE(intf->rsp_prod));
+	log("*** d1 srv %08x, conn %08x, err %08x",
+	    ACCESS_ONCE(intf->server_features),
+	    ACCESS_ONCE(intf->connection),
+	    ACCESS_ONCE(intf->error));
+}
+
 int domain_get_quota(const void *ctx, struct connection *conn,
 		     unsigned int domid)
 {
@@ -914,6 +945,7 @@ static int acc_add_changed_dom(const void *ctx, struct list_head *head,
 static void domain_conn_reset(struct domain *domain)
 {
 	struct connection *conn = domain->conn;
+	unsigned int rqc, rqp, rsc, rsp;
 
 	conn_delete_all_watches(conn);
 	conn_delete_all_transactions(conn);
@@ -921,9 +953,22 @@ static void domain_conn_reset(struct domain *domain)
 
 	talloc_free(conn->in);
 
-	domain->interface->req_cons = domain->interface->req_prod = 0;
-	domain->interface->rsp_cons = domain->interface->rsp_prod = 0;
+	rqc = ACCESS_ONCE(domain->interface->req_cons);
+	domain->interface->req_cons = 0;
+
+	rqp = ACCESS_ONCE(domain->interface->req_prod);
+	domain->interface->req_prod = 0;
+
+	rsc = ACCESS_ONCE(domain->interface->rsp_cons);
+	domain->interface->rsp_cons = 0;
+
+	rsp = ACCESS_ONCE(domain->interface->rsp_prod);
+	domain->interface->rsp_prod = 0;
+
 	xen_wmb();
+
+	trace("*** d%u CONN RESET req_cons %08x, req_prod %08x rsp_cons %08x, rsp_prod %08x\n",
+	      conn->id, rqc, rqp, rsc, rsp);
 }
 
 /*

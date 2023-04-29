@@ -58,6 +58,15 @@ static int do_control_check(const void *ctx, struct connection *conn,
 	return 0;
 }
 
+static int do_control_rings(const void *ctx, struct connection *conn,
+			    const char **vec, int num)
+{
+	check_rings();
+
+	send_ack(conn, XS_CONTROL);
+	return 0;
+}
+
 static int do_control_log(const void *ctx, struct connection *conn,
 			  const char **vec, int num)
 {
@@ -287,6 +296,8 @@ static int do_control_help(const void *, struct connection *, const char **,
 static struct cmd_s cmds[] = {
 	{ "check", do_control_check, "" },
 	{ "log", do_control_log, "[on|off|+<switch>|-<switch>]" },
+
+        { "rings", do_control_rings, "" },
 
 #ifndef NO_LIVE_UPDATE
 	/*

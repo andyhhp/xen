@@ -29,6 +29,7 @@
 #include <asm/grant_table.h>
 
 struct grant_table;
+void dump_d1_ring(void);
 
 #ifdef CONFIG_GRANT_TABLE
 

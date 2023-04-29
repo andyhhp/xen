@@ -113,6 +113,13 @@ long do_hvm_op(unsigned long op, XEN_GUEST_HANDLE_PARAM(void) arg)
 
     param_fail:
         rcu_unlock_domain(d);
+
+        if ( op == HVMOP_set_param )
+            printk("*** %pv on %pd: Set %#x=%08"PRIx64" -> %ld\n",
+                   current, d, a.index, a.value, rc);
+        else
+            printk("*** %pv on %pd: Get %#x -> %08"PRIx64" (%ld)\n",
+                   current, d, a.index, a.value, rc);
         break;
     }
 
