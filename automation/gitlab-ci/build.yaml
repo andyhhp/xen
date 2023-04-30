@@ -12,6 +12,12 @@
       - '*/*.log'
     when: always
   needs: []
+  except:
+    - /auto-.*/
+    - master
+    - smoke
+    - /^coverity-tested\/.*/
+    - /^stable-.*/
 
 .gcc-tmpl:
   variables: &gcc
@@ -209,6 +215,12 @@
 .yocto-test:
   stage: build
   image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  except:
+    - /auto-.*/
+    - master
+    - smoke
+    - /^coverity-tested\/.*/
+    - /^stable-.*/
   script:
     - ./automation/build/yocto/build-yocto.sh -v --log-dir=./logs --xen-dir=`pwd` ${YOCTO_BOARD} ${YOCTO_OUTPUT}
   variables:
@@ -259,6 +271,7 @@
 .test-jobs-artifact-common:
   stage: build
   needs: []
+#  except: !reference [.test-jobs-common, except]
 
 # Arm test artifacts
 
@@ -447,6 +460,7 @@ alpine-3.18-gcc-arm64:
 
 alpine-3.18-gcc-debug-arm64:
   extends: .gcc-arm64-build-debug
+  except: []
   variables:
     CONTAINER: alpine:3.18-arm64v8
 
