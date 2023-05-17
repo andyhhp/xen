@@ -115,6 +115,8 @@ static int __init always_inline parse_cpuid(
     return rc;
 }
 
+static bool opt_def_ac = true;
+
 static void __init cf_check _parse_xen_cpuid(unsigned int feat, bool val)
 {
     if ( !val )
@@ -122,6 +124,8 @@ static void __init cf_check _parse_xen_cpuid(unsigned int feat, bool val)
     else if ( feat == X86_FEATURE_RDRAND &&
               (cpuid_ecx(1) & cpufeat_mask(X86_FEATURE_RDRAND)) )
         setup_force_cpu_cap(X86_FEATURE_RDRAND);
+    else if ( feat == X86_FEATURE_ARCH_CAPS )
+        opt_def_ac = true;
 }
 
 static int __init cf_check parse_xen_cpuid(const char *s)
@@ -467,6 +471,9 @@ static void __init guest_common_default_feature_adjustments(uint32_t *fs)
      */
     if ( rtm_disabled )
         __clear_bit(X86_FEATURE_RTM, fs);
+
+    if ( !opt_def_ac )
+        __clear_bit(X86_FEATURE_ARCH_CAPS, fs);
 }
 
 static void __init guest_common_feature_adjustments(uint32_t *fs)
