@@ -169,6 +169,9 @@ ifconfig eth0 up
 ifconfig xenbr0 up
 ifconfig xenbr0 192.168.0.1
 
+xen-cpuid
+xen-cpuid -v
+
 xl create /etc/xen/domU.cfg
 ${dom0_check}
 " > etc/local.d/xen.start
@@ -189,7 +192,7 @@ TFTP=/scratch/gitlab-runner/tftp
 CONTROLLER=control@thor.testnet
 
 echo "
-multiboot2 (http)/gitlab-ci/xen $CONSOLE_OPTS loglvl=all guest_loglvl=all dom0_mem=4G $extra_xen_opts
+multiboot2 (http)/gitlab-ci/xen $CONSOLE_OPTS loglvl=all guest_loglvl=all dom0_mem=4G cpuid=arch-caps $extra_xen_opts
 module2 (http)/gitlab-ci/vmlinuz console=hvc0 root=/dev/ram0 earlyprintk=xen
 module2 (http)/gitlab-ci/initrd-dom0
 " > $TFTP/grub.cfg
