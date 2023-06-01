@@ -1538,7 +1538,7 @@ long do_vcpu_op(int cmd, unsigned int vcpuid, XEN_GUEST_HANDLE_PARAM(void) arg)
             break;
 
         cpu_id.phys_id =
-            (uint64_t)x86_cpu_to_apicid[v->vcpu_id] |
+            (uint64_t)cpu_physical_id(v->vcpu_id) |
             ((uint64_t)acpi_get_processor_id(v->vcpu_id) << 32);
 
         rc = -EFAULT;

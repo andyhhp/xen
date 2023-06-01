@@ -347,7 +347,7 @@ void start_secondary(void *unused)
         x2apic_ap_setup();
         my_apicid = get_apic_id();
 
-        while ( my_apicid != x86_cpu_to_apicid[cpu] ) {
+        while ( my_apicid != cpu_physical_id(cpu) ) {
             asm volatile ("monitor; xor %0,%0; mwait"
                           :: "a"(__va(sinit_mle->rlp_wakeup_addr)), "c"(0),
                           "d"(0) : "memory");
@@ -1211,7 +1211,7 @@ void __init smp_prepare_cpus(void)
     print_cpu_info(0);
 
     boot_cpu_physical_apicid = get_apic_id();
-    x86_cpu_to_apicid[0] = boot_cpu_physical_apicid;
+    cpu_physical_id(0) = boot_cpu_physical_apicid;
 
     stack_base[0] = (void *)((unsigned long)stack_start & ~(STACK_SIZE - 1));
 
@@ -1431,7 +1431,7 @@ int __cpu_up(unsigned int cpu)
 {
     int apicid, ret;
 
-    if ( (apicid = x86_cpu_to_apicid[cpu]) == BAD_APICID )
+    if ( (apicid = cpu_physical_id(cpu)) == BAD_APICID )
         return -ENODEV;
 
     if ( (!x2apic_enabled && apicid >= APIC_ALL_CPUS) ||

@@ -187,7 +187,7 @@ static int MP_processor_info_x(struct mpc_config_processor *m,
 			       " Processor with apicid %i ignored\n", apicid);
 			return cpu;
 		}
-		x86_cpu_to_apicid[cpu] = apicid;
+		cpu_physical_id(cpu) = apicid;
 		cpumask_set_cpu(cpu, &cpu_present_map);
 	}
 
@@ -822,12 +822,12 @@ void mp_unregister_lapic(uint32_t apic_id, uint32_t cpu)
 	if (!cpu || (apic_id == boot_cpu_physical_apicid))
 		return;
 
-	if (x86_cpu_to_apicid[cpu] != apic_id)
+	if (cpu_physical_id(cpu) != apic_id)
 		return;
 
 	physid_clear(apic_id, phys_cpu_present_map);
 
-	x86_cpu_to_apicid[cpu] = BAD_APICID;
+	cpu_physical_id(cpu) = BAD_APICID;
 	cpumask_clear_cpu(cpu, &cpu_present_map);
 }
 

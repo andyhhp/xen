@@ -588,7 +588,7 @@ ret_t do_platform_op(
         }
         else
         {
-            g_info->apic_id = x86_cpu_to_apicid[g_info->xen_cpuid];
+            g_info->apic_id = cpu_physical_id(g_info->xen_cpuid);
             g_info->acpi_id = acpi_get_processor_id(g_info->xen_cpuid);
             ASSERT(g_info->apic_id != BAD_APICID);
             g_info->flags = 0;

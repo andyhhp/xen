@@ -89,7 +89,7 @@ unsigned int acpi_get_processor_id(unsigned int cpu)
 {
 	unsigned int acpiid, apicid;
 
-	if ((apicid = x86_cpu_to_apicid[cpu]) == BAD_APICID)
+	if ((apicid = cpu_physical_id(cpu)) == BAD_APICID)
 		return INVALID_ACPIID;
 
 	for (acpiid = 0; acpiid < ARRAY_SIZE(x86_acpiid_to_apicid); acpiid++)

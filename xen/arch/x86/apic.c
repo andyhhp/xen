@@ -985,7 +985,7 @@ __next:
      */
     if (boot_cpu_physical_apicid == -1U)
         boot_cpu_physical_apicid = get_apic_id();
-    x86_cpu_to_apicid[0] = get_apic_id();
+    cpu_physical_id(0) = get_apic_id();
 
     ioapic_init();
 }

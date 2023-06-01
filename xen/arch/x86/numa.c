@@ -340,7 +340,7 @@ void __init init_cpu_to_node(void)
 
     for ( i = 0; i < nr_cpu_ids; i++ )
     {
-        u32 apicid = x86_cpu_to_apicid[i];
+        u32 apicid = cpu_physical_id(i);
         if ( apicid == BAD_APICID )
             continue;
         node = apicid < MAX_LOCAL_APIC ? apicid_to_node[apicid] : NUMA_NO_NODE;

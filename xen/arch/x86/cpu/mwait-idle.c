@@ -1221,8 +1221,8 @@ static void __init ivt_idle_state_table_update(void)
 	unsigned int cpu, max_apicid = boot_cpu_physical_apicid;
 
 	for_each_present_cpu(cpu)
-		if (max_apicid < x86_cpu_to_apicid[cpu])
-			max_apicid = x86_cpu_to_apicid[cpu];
+		if (max_apicid < cpu_physical_id(cpu))
+			max_apicid = cpu_physical_id(cpu);
 	switch (apicid_to_socket(max_apicid)) {
 	case 0: case 1:
 		/* 1 and 2 socket systems use default ivt_cstates */

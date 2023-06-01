@@ -717,7 +717,7 @@ static bool __init check_smt_enabled(void)
      * has a non-zero thread id component indicates that SMT is active.
      */
     for_each_present_cpu ( cpu )
-        if ( x86_cpu_to_apicid[cpu] & (boot_cpu_data.x86_num_siblings - 1) )
+        if ( cpu_physical_id(cpu) & (boot_cpu_data.x86_num_siblings - 1) )
             return true;
 
     return false;

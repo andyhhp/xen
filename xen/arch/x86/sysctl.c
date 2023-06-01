@@ -59,7 +59,7 @@ static long cf_check smt_up_down_helper(void *data)
     for_each_present_cpu ( cpu )
     {
         /* Skip primary siblings (those whose thread id is 0). */
-        if ( !(x86_cpu_to_apicid[cpu] & sibling_mask) )
+        if ( !(cpu_physical_id(cpu) & sibling_mask) )
             continue;
 
         if ( !up && core_parking_remove(cpu) )
