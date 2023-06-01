@@ -73,10 +73,8 @@ unsigned int __read_mostly nr_sockets;
 cpumask_t **__read_mostly socket_cpumask;
 static cpumask_t *secondary_socket_cpumask;
 
-struct cpuinfo_x86 cpu_data[NR_CPUS];
-
-u32 x86_cpu_to_apicid[NR_CPUS] __read_mostly =
-	{ [0 ... NR_CPUS-1] = BAD_APICID };
+struct cpuinfo_x86 cpu_data[NR_CPUS] =
+        { [0 ... NR_CPUS-1] .apicid = BAD_APICID };
 
 static int cpu_error;
 static enum cpu_state {
@@ -93,7 +91,9 @@ void *stack_base[NR_CPUS];
 
 void initialize_cpu_data(unsigned int cpu)
 {
+    uint32_t apicid = cpu_physical_id(cpu);
     cpu_data[cpu] = boot_cpu_data;
+    cpu_physical_id(cpu) = apicid;
 }
 
 static bool smp_store_cpu_info(unsigned int id)

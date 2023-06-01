@@ -166,7 +166,7 @@ register unsigned long current_stack_pointer asm("rsp");
 #endif
 
 #define CPUINFO_FEATURE_OFFSET(feature)           \
-    (CPUINFO_features + (cpufeat_word(feature) * 4))
+    (CPUINFO_X86_features + (cpufeat_word(feature) * 4))
 
 #else
 

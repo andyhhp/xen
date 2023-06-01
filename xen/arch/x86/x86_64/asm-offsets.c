@@ -186,7 +186,9 @@ void __dummy__(void)
     OFFSET(IRQSTAT_softirq_pending, irq_cpustat_t, __softirq_pending);
     BLANK();
 
-    OFFSET(CPUINFO_features, struct cpuinfo_x86, x86_capability);
+    OFFSET(CPUINFO_X86_features, struct cpuinfo_x86, x86_capability);
+    OFFSET(CPUINFO_X86_apicid, struct cpuinfo_x86, apicid);
+    DEFINE(CPUINFO_X86_sizeof, sizeof(struct cpuinfo_x86));
     BLANK();
 
     OFFSET(MB_flags, multiboot_info_t, flags);

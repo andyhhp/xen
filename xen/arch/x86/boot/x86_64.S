@@ -20,15 +20,17 @@ ENTRY(__high_start)
         jz      .L_stack_set
 
         /* APs only: get stack base from APIC ID saved in %esp. */
-        mov     $-1, %rax
-        lea     x86_cpu_to_apicid(%rip), %rcx
+        mov     $0, %rax
+        lea     cpu_data(%rip), %rcx
+        /* cpu_data[0] is BSP, skip it. */
 1:
         add     $1, %rax
+        add     $CPUINFO_X86_sizeof, %rcx
         cmp     $NR_CPUS, %eax
         jb      2f
         hlt
 2:
-        cmp     %esp, (%rcx, %rax, 4)
+        cmp     %esp, CPUINFO_X86_apicid(%rcx)
         jne     1b
 
         /* %eax is now Xen CPU index. */

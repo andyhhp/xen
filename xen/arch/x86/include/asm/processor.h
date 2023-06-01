@@ -149,6 +149,8 @@ extern struct cpuinfo_x86 boot_cpu_data;
 extern struct cpuinfo_x86 cpu_data[];
 #define current_cpu_data cpu_data[smp_processor_id()]
 
+#define cpu_physical_id(cpu)	cpu_data[cpu].apicid
+
 extern bool probe_cpuid_faulting(void);
 extern void ctxt_switch_levelling(const struct vcpu *next);
 extern void (*ctxt_switch_masking)(const struct vcpu *next);
