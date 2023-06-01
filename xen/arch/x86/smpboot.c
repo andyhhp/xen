@@ -87,13 +87,15 @@ static enum cpu_state {
 } cpu_state;
 #define set_cpu_state(state) do { smp_mb(); cpu_state = (state); } while (0)
 
-void *stack_base[NR_CPUS];
-
 void initialize_cpu_data(unsigned int cpu)
 {
     uint32_t apicid = cpu_physical_id(cpu);
+    void *stack = cpu_data[cpu].stack_base;
+
     cpu_data[cpu] = boot_cpu_data;
+
     cpu_physical_id(cpu) = apicid;
+    cpu_data[cpu].stack_base = stack;
 }
 
 static bool smp_store_cpu_info(unsigned int id)
@@ -636,8 +638,6 @@ static int do_boot_cpu(int apicid, int cpu)
         printk("Booting processor %d/%d eip %lx\n",
                cpu, apicid, start_eip);
 
-    stack_start = stack_base[cpu] + STACK_SIZE - sizeof(struct cpu_info);
-
     /* This grunge runs the startup process for the targeted processor. */
 
     set_cpu_state(CPU_STATE_INIT);
@@ -913,7 +913,7 @@ int setup_cpu_root_pgt(unsigned int cpu)
 
     /* Install direct map page table entries for stack, IDT, and TSS. */
     for ( off = rc = 0; !rc && off < STACK_SIZE; off += PAGE_SIZE )
-        rc = clone_mapping(__va(__pa(stack_base[cpu])) + off, rpt);
+        rc = clone_mapping(__va(__pa(cpu_data[cpu].stack_base)) + off, rpt);
 
     if ( !rc )
         rc = clone_mapping(idt_tables[cpu], rpt);
@@ -1064,10 +1064,10 @@ static void cpu_smpboot_free(unsigned int cpu, bool remove)
         FREE_XENHEAP_PAGE(per_cpu(gdt, cpu));
         FREE_XENHEAP_PAGE(idt_tables[cpu]);
 
-        if ( stack_base[cpu] )
+        if ( cpu_data[cpu].stack_base )
         {
-            memguard_unguard_stack(stack_base[cpu]);
-            FREE_XENHEAP_PAGES(stack_base[cpu], STACK_ORDER);
+            memguard_unguard_stack(cpu_data[cpu].stack_base);
+            FREE_XENHEAP_PAGES(cpu_data[cpu].stack_base, STACK_ORDER);
         }
     }
 }
@@ -1101,11 +1101,11 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     if ( node != NUMA_NO_NODE )
         memflags = MEMF_node(node);
 
-    if ( stack_base[cpu] == NULL &&
-         (stack_base[cpu] = cpu_alloc_stack(cpu)) == NULL )
+    if ( cpu_data[cpu].stack_base == NULL &&
+         (cpu_data[cpu].stack_base = cpu_alloc_stack(cpu)) == NULL )
             goto out;
 
-    info = get_cpu_info_from_stack((unsigned long)stack_base[cpu]);
+    info = get_cpu_info_from_stack((unsigned long)cpu_data[cpu].stack_base);
     info->processor_id = cpu;
     info->per_cpu_offset = __per_cpu_offset[cpu];
 
@@ -1213,7 +1213,8 @@ void __init smp_prepare_cpus(void)
     boot_cpu_physical_apicid = get_apic_id();
     cpu_physical_id(0) = boot_cpu_physical_apicid;
 
-    stack_base[0] = (void *)((unsigned long)stack_start & ~(STACK_SIZE - 1));
+    cpu_data[0].stack_base = (void *)
+             ((unsigned long)stack_start & ~(STACK_SIZE - 1));
 
     set_nr_sockets();
 

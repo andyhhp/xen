@@ -33,9 +33,8 @@ ENTRY(__high_start)
         cmp     %esp, CPUINFO_X86_apicid(%rcx)
         jne     1b
 
-        /* %eax is now Xen CPU index. */
-        lea     stack_base(%rip), %rcx
-        mov     (%rcx, %rax, 8), %rsp
+        /* %rcx is now cpu_data[cpu], read stack base from it. */
+        mov     CPUINFO_X86_stack_base(%rcx), %rsp
 
         test    %rsp,%rsp
         jnz     1f

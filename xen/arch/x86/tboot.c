@@ -238,9 +238,9 @@ static int mfn_in_guarded_stack(unsigned long mfn)
 
     for ( i = 0; i < nr_cpu_ids; i++ )
     {
-        if ( !stack_base[i] )
+        if ( !cpu_data[i].stack_base )
             continue;
-        p = (void *)((unsigned long)stack_base[i] + STACK_SIZE -
+        p = (void *)((unsigned long)cpu_data[i].stack_base + STACK_SIZE -
                      PRIMARY_STACK_SIZE - PAGE_SIZE);
         if ( mfn == virt_to_mfn(p) )
             return -1;

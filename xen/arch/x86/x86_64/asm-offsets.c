@@ -188,6 +188,7 @@ void __dummy__(void)
 
     OFFSET(CPUINFO_X86_features, struct cpuinfo_x86, x86_capability);
     OFFSET(CPUINFO_X86_apicid, struct cpuinfo_x86, apicid);
+    OFFSET(CPUINFO_X86_stack_base, struct cpuinfo_x86, stack_base);
     DEFINE(CPUINFO_X86_sizeof, sizeof(struct cpuinfo_x86));
     BLANK();
 

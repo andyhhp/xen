@@ -683,7 +683,7 @@ static void __init noreturn reinit_bsp_stack(void)
     /* Update SYSCALL trampolines */
     percpu_traps_init();
 
-    stack_base[0] = stack;
+    cpu_data[0].stack_base = stack;
 
     rc = setup_cpu_root_pgt(0);
     if ( rc )
@@ -1915,8 +1915,8 @@ void __init noreturn __start_xen(unsigned long mbi_p)
             /* Set up node_to_cpumask based on cpu_to_node[]. */
             numa_add_cpu(i);
 
-            if ( stack_base[i] == NULL )
-                stack_base[i] = cpu_alloc_stack(i);
+            if ( cpu_data[i].stack_base == NULL )
+                cpu_data[i].stack_base = cpu_alloc_stack(i);
         }
 
         for_each_present_cpu ( i )
