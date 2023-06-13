@@ -196,7 +196,6 @@ static void smp_callin(void)
      * update until we finish. We are free to set up this CPU: first the APIC.
      */
     Dprintk("CALLIN, before setup_local_APIC().\n");
-    x2apic_ap_setup();
     setup_local_APIC(false);
 
     /* Save our processor parameters. */
@@ -386,6 +385,14 @@ void start_secondary(void *unused)
     get_cpu_info()->xen_cr3 = 0;
     get_cpu_info()->pv_cr3 = 0;
 
+    /*
+     * BUG_ON() used in load_system_tables() and later code may end up calling
+     * machine_restart() which tries to get APIC ID for CPU running this code.
+     * If BSP detected that x2APIC is enabled, get_apic_id() will try to use it
+     * for _all_ CPUs. Enable x2APIC on secondary CPUs now so we won't end up
+     * with endless #GP loop.
+     */
+    x2apic_ap_setup();
     load_system_tables();
 
     /* Full exception support from here on in. */
