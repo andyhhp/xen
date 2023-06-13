@@ -20,20 +20,24 @@ ENTRY(__high_start)
         jz      .L_stack_set
 
         /* APs only: get stack base from APIC ID saved in %esp. */
-        mov     $0, %rax
+        mov     $0, %rbx
         lea     cpu_data(%rip), %rcx
         /* cpu_data[0] is BSP, skip it. */
 1:
-        add     $1, %rax
+        add     $1, %rbx
         add     $CPUINFO_X86_sizeof, %rcx
-        cmp     $NR_CPUS, %eax
+        cmp     $NR_CPUS, %rbx
         jb      2f
         hlt
 2:
         cmp     %esp, CPUINFO_X86_apicid(%rcx)
         jne     1b
 
-        /* %rcx is now cpu_data[cpu], read stack base from it. */
+        /*
+         * At this point:
+         * - %rcx is cpu_data[cpu], read stack base from it,
+         * - %rbx (callee-save) is Xen cpu number, pass it to start_secondary().
+         */
         mov     CPUINFO_X86_stack_base(%rcx), %rsp
 
         test    %rsp,%rsp
@@ -101,6 +105,7 @@ ENTRY(__high_start)
 .L_ap_cet_done:
 #endif /* CONFIG_XEN_SHSTK || CONFIG_XEN_IBT */
 
+        mov     %rbx, %rdi
         call    start_secondary
         BUG     /* start_secondary() shouldn't return. */
 

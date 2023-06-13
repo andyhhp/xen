@@ -234,8 +234,6 @@ static void smp_callin(void)
         cpu_relax();
 }
 
-static int booting_cpu;
-
 /* CPUs for which sibling maps can be computed. */
 static cpumask_t cpu_sibling_setup_map;
 
@@ -323,15 +321,14 @@ static void set_cpu_sibling_map(unsigned int cpu)
     }
 }
 
-void start_secondary(void *unused)
+void start_secondary(unsigned int cpu)
 {
     struct cpu_info *info = get_cpu_info();
 
     /*
-     * Dont put anything before smp_callin(), SMP booting is so fragile that we
+     * Don't put anything before smp_callin(), SMP booting is so fragile that we
      * want to limit the things done here to the most necessary things.
      */
-    unsigned int cpu = booting_cpu;
 
     if ( slaunch_active ) {
         uint64_t misc_enable;
@@ -352,7 +349,6 @@ void start_secondary(void *unused)
             asm volatile ("monitor; xor %0,%0; mwait"
                           :: "a"(__va(sinit_mle->rlp_wakeup_addr)), "c"(0),
                           "d"(0) : "memory");
-            cpu = booting_cpu;
         }
     }
 
@@ -381,9 +377,9 @@ void start_secondary(void *unused)
      */
     spin_debug_disable();
 
-    get_cpu_info()->use_pv_cr3 = false;
-    get_cpu_info()->xen_cr3 = 0;
-    get_cpu_info()->pv_cr3 = 0;
+    info->use_pv_cr3 = false;
+    info->xen_cr3 = 0;
+    info->pv_cr3 = 0;
 
     /*
      * BUG_ON() used in load_system_tables() and later code may end up calling
@@ -631,8 +627,6 @@ static int do_boot_cpu(int apicid, int cpu)
      * (e.g. by the ACPI SMI) to initialize new CPUs with MTRRs in sync:
      */
     mtrr_save_state();
-
-    booting_cpu = cpu;
 
     start_eip = bootsym_phys(trampoline_realmode_entry);
 
