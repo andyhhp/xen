@@ -577,9 +577,23 @@ void machine_restart(unsigned int delay_millisecs)
         /* Ensure we are the boot CPU. */
         if ( get_apic_id() != boot_cpu_physical_apicid )
         {
-            /* Send IPI to the boot CPU (logical cpu 0). */
-            on_selected_cpus(cpumask_of(0), __machine_restart,
-                             &delay_millisecs, 0);
+            /*
+             * Send IPI to the boot CPU (logical cpu 0).
+             *
+             * If multiple CPUs called machine_restart() before actual restart
+             * took place, but after boot CPU declared itself not online, ASSERT
+             * in on_selected_cpus() will fail. Few calls later we would end up
+             * here again, with another frame on call stack for new exception.
+             * To protect against running out of stack, check if boot CPU is
+             * online.
+             *
+             * Note this is not an atomic operation, so it is possible for
+             * on_selected_cpus() to be called once after boot CPU is offline
+             * before we hit halt() below.
+             */
+            if ( cpu_online(0) )
+                on_selected_cpus(cpumask_of(0), __machine_restart,
+                                 &delay_millisecs, 0);
             for ( ; ; )
                 halt();
         }
