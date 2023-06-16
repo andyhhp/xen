@@ -138,6 +138,7 @@ struct cpuinfo_x86 {
     __u32 cpu_core_id;     /* core ID of each logical CPU*/
     __u32 compute_unit_id; /* AMD compute unit ID of each logical CPU */
     void *stack_base;
+    unsigned int cpu_state;
     unsigned short x86_clflush_size;
 } __cacheline_aligned;
 
