@@ -31,6 +31,7 @@ DECLARE_PER_CPU(cpumask_var_t, send_ipi_cpumask);
 extern bool park_offline_cpus;
 
 void smp_send_nmi_allbutself(void);
+void smp_send_init_sipi_sipi_allbutself(void);
 
 void send_IPI_mask(const cpumask_t *, int vector);
 void send_IPI_self(int vector);
