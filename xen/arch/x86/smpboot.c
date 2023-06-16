@@ -605,7 +605,6 @@ int alloc_cpu_id(void)
 static int do_boot_cpu(int apicid, int cpu)
 {
     int timeout, boot_error = 0, rc = 0;
-    unsigned long start_eip;
 
     /*
      * Save current MTRR state in case it was changed since early boot
@@ -613,21 +612,31 @@ static int do_boot_cpu(int apicid, int cpu)
      */
     mtrr_save_state();
 
-    start_eip = bootsym_phys(trampoline_realmode_entry);
+    /* Check if AP is already up. */
+    if ( cpu_data[cpu].cpu_state != CPU_STATE_INIT )
+    {
+        /* This grunge runs the startup process for the targeted processor. */
+        unsigned long start_eip;
+        start_eip = bootsym_phys(trampoline_realmode_entry);
 
-    /* start_eip needs be page aligned, and below the 1M boundary. */
-    if ( start_eip & ~0xff000 )
-        panic("AP trampoline %#lx not suitably positioned\n", start_eip);
+        /* start_eip needs be page aligned, and below the 1M boundary. */
+        if ( start_eip & ~0xff000 )
+            panic("AP trampoline %#lx not suitably positioned\n", start_eip);
 
-    /* So we see what's up   */
+        /* So we see what's up   */
+        if ( opt_cpu_info )
+            printk("AP trampoline at %lx\n", start_eip);
+
+        /* mark "stuck" area as not stuck */
+        bootsym(trampoline_cpu_started) = 0;
+        smp_mb();
+
+        /* Starting actual IPI sequence... */
+        boot_error = wakeup_secondary_cpu(apicid, start_eip);
+    }
+
     if ( opt_cpu_info )
-        printk("Booting processor %d/%d eip %lx\n",
-               cpu, apicid, start_eip);
-
-    /* This grunge runs the startup process for the targeted processor. */
-
-    /* Starting actual IPI sequence... */
-    boot_error = wakeup_secondary_cpu(apicid, start_eip);
+        printk("Booting processor %d/%d\n", cpu, apicid);
 
     if ( !boot_error )
     {
@@ -685,10 +694,6 @@ static int do_boot_cpu(int apicid, int cpu)
         cpu_exit_clear(cpu);
         rc = -EIO;
     }
-
-    /* mark "stuck" area as not stuck */
-    bootsym(trampoline_cpu_started) = 0;
-    smp_mb();
 
     return rc;
 }
