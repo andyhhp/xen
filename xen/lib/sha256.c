@@ -21,6 +21,7 @@
  *   Software.
  */
 
+#include <xen/sha256.h>
 #include <xen/string.h>
 #include <xen/types.h>
 
@@ -29,7 +30,7 @@
 #define BLOCK_LEN 64  // In bytes
 #define STATE_LEN 8  // In words
 
-static void sha256_compress(const uint8_t block[static 64], uint32_t state[static 8]) {
+static void sha256_compress(const uint8_t block[static BLOCK_LEN], uint32_t state[static STATE_LEN]) {
 	#define ROTR32(x, n)  (((0U + (x)) << (32 - (n))) | ((x) >> (n)))  // Assumes that x is uint32_t and 0 < n < 32
 
 	#define LOADSCHEDULE(i)  \
@@ -201,24 +202,26 @@ static void sha256_compress(const uint8_t block[static 64], uint32_t state[stati
 
 /* Full message hasher */
 
-void sha256_hash(const uint8_t message[], size_t len, uint32_t hash[static STATE_LEN]) {
+void sha256_hash(const uint8_t message[], size_t len, uint8_t hash[static SHA256_DIGEST_SIZE]) {
 	uint8_t block[BLOCK_LEN] = {0};
 	size_t off;
 	size_t rem;
 
-	hash[0] = UINT32_C(0x6A09E667);
-	hash[1] = UINT32_C(0xBB67AE85);
-	hash[2] = UINT32_C(0x3C6EF372);
-	hash[3] = UINT32_C(0xA54FF53A);
-	hash[4] = UINT32_C(0x510E527F);
-	hash[5] = UINT32_C(0x9B05688C);
-	hash[6] = UINT32_C(0x1F83D9AB);
-	hash[7] = UINT32_C(0x5BE0CD19);
+	uint32_t state[STATE_LEN] = {
+		UINT32_C(0x6A09E667),
+		UINT32_C(0xBB67AE85),
+		UINT32_C(0x3C6EF372),
+		UINT32_C(0xA54FF53A),
+		UINT32_C(0x510E527F),
+		UINT32_C(0x9B05688C),
+		UINT32_C(0x1F83D9AB),
+		UINT32_C(0x5BE0CD19),
+	};
 
 	#define LENGTH_SIZE 8  // In bytes
 
 	for (off = 0; len - off >= BLOCK_LEN; off += BLOCK_LEN)
-		sha256_compress(&message[off], hash);
+		sha256_compress(&message[off], state);
 
 	rem = len - off;
 	if (rem > 0)
@@ -227,7 +230,7 @@ void sha256_hash(const uint8_t message[], size_t len, uint32_t hash[static STATE
 	block[rem] = 0x80;
 	rem++;
 	if (BLOCK_LEN - rem < LENGTH_SIZE) {
-		sha256_compress(block, hash);
+		sha256_compress(block, state);
 		memset(block, 0, sizeof(block));
 	}
 
@@ -235,14 +238,16 @@ void sha256_hash(const uint8_t message[], size_t len, uint32_t hash[static STATE
 	len >>= 5;
 	for (int i = 1; i < LENGTH_SIZE; i++, len >>= 8)
 		block[BLOCK_LEN - 1 - i] = (uint8_t)(len & 0xFFU);
-	sha256_compress(block, hash);
+	sha256_compress(block, state);
 
-	hash[0] = __builtin_bswap32(hash[0]);
-	hash[1] = __builtin_bswap32(hash[1]);
-	hash[2] = __builtin_bswap32(hash[2]);
-	hash[3] = __builtin_bswap32(hash[3]);
-	hash[4] = __builtin_bswap32(hash[4]);
-	hash[5] = __builtin_bswap32(hash[5]);
-	hash[6] = __builtin_bswap32(hash[6]);
-	hash[7] = __builtin_bswap32(hash[7]);
+	state[0] = __builtin_bswap32(state[0]);
+	state[1] = __builtin_bswap32(state[1]);
+	state[2] = __builtin_bswap32(state[2]);
+	state[3] = __builtin_bswap32(state[3]);
+	state[4] = __builtin_bswap32(state[4]);
+	state[5] = __builtin_bswap32(state[5]);
+	state[6] = __builtin_bswap32(state[6]);
+	state[7] = __builtin_bswap32(state[7]);
+
+	memcpy(hash, state, sizeof(state));
 }
