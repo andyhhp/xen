@@ -55,6 +55,7 @@ else
     # Full build.  Figure out our ./configure options
     cfgargs=()
     cfgargs+=("--enable-docs")
+    cfgargs+=("--enable-rombios")
 
     # booleans for which compiler is in use
     cc_is_gcc="$($cc --version | grep -q gcc && echo "y" || :)"
