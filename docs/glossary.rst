@@ -50,3 +50,12 @@ Glossary
 
      By default it gets all devices, including all disks and network cards, so
      is responsible for multiplexing guest I/O.
+
+   system domain
+     Abstractions within Xen that are modelled in a similar way to regular
+     :term:`domains<domain>`.  E.g. When there's no work to do, Xen schedules
+     ``DOMID_IDLE`` to put the CPU into a lower power state.
+
+     System domains have :term:`domids<domid>` and are referenced by
+     privileged software for certain control operations, but they do not run
+     guest code.
