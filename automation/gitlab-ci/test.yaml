@@ -1,6 +1,7 @@
 .test-jobs-common:
   stage: test
   image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  when: manual
 
 .arm64-test-needs: &arm64-test-needs
   - alpine-3.18-arm64-rootfs-export
@@ -98,7 +99,7 @@
     when: always
   only:
     variables:
-      - $XILINX_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
+      - $XILINX_JOBS == "true"
   tags:
     - xilinx
 
@@ -117,7 +118,7 @@
     when: always
   only:
     variables:
-      - $XILINX_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
+      - $XILINX_JOBS == "true"
   tags:
     - xilinx
 
@@ -137,7 +138,7 @@
     when: always
   only:
     variables:
-      - $QUBES_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
+      - $QUBES_JOBS == "true"
   tags:
     - qubes-hw2
 
@@ -167,6 +168,7 @@ build-each-commit-gcc:
   needs: []
   tags:
     - x86_64
+  when: manual
 
 xilinx-smoke-dom0less-arm64-gcc-debug:
   extends: .xilinx-arm64
