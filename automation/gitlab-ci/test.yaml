@@ -99,7 +99,7 @@
       - '*.dtb'
     when: always
   rules:
-    - if: $XILINX_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
+    - if: $XILINX_JOBS == "true"
   tags:
     - xilinx
 
@@ -117,7 +117,7 @@
       - '*.log'
     when: always
   rules:
-    - if: $XILINX_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
+    - if: $XILINX_JOBS == "true"
   tags:
     - xilinx
 
@@ -136,7 +136,7 @@
       - '*.log'
     when: always
   rules:
-    - if: $QUBES_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
+    - if: $QUBES_JOBS == "true"
   tags:
     - qubes-hw2
 
