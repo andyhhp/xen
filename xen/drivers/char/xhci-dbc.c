@@ -1164,6 +1164,7 @@ static void cf_check dbc_uart_poll(void *data)
     struct dbc_uart *uart = port->uart;
     struct dbc *dbc = &uart->dbc;
     unsigned long flags = 0;
+    struct cpu_user_regs *old_regs;
 
     if ( spin_trylock_irqsave(&port->tx_lock, flags) )
     {
@@ -1175,10 +1176,15 @@ static void cf_check dbc_uart_poll(void *data)
         spin_unlock_irqrestore(&port->tx_lock, flags);
     }
 
+    /* Mimic interrupt context. */
+    old_regs = set_irq_regs(guest_cpu_user_regs());
+
     while ( dbc_work_ring_size(&dbc->dbc_iwork) )
         serial_rx_interrupt(port, guest_cpu_user_regs());
 
     serial_tx_interrupt(port, guest_cpu_user_regs());
+
+    set_irq_regs(old_regs);
     set_timer(&uart->timer, NOW() + MICROSECS(DBC_POLL_INTERVAL));
 }
 
