@@ -29,8 +29,7 @@ static bool alt_key_handling;
 static keyhandler_fn_t cf_check show_handlers, cf_check dump_hwdom_registers,
     cf_check dump_domains, cf_check read_clocks;
 static irq_keyhandler_fn_t cf_check do_toggle_alt_key, cf_check dump_registers,
-    cf_check reboot_machine, cf_check run_all_keyhandlers,
-    cf_check do_debug_key;
+    cf_check reboot_machine, cf_check run_all_keyhandlers;
 
 static struct keyhandler {
     union {
@@ -57,7 +56,6 @@ static struct keyhandler {
     IRQ_KEYHANDLER('R', reboot_machine, "reboot machine", 0),
         KEYHANDLER('t', read_clocks, "display multi-cpu clock info", 1),
         KEYHANDLER('0', dump_hwdom_registers, "dump Dom0 registers", 1),
-    IRQ_KEYHANDLER('%', do_debug_key, "trap to xendbg", 0),
     IRQ_KEYHANDLER('*', run_all_keyhandlers, "print all diagnostics", 0),
 
 #ifdef CONFIG_PERF_COUNTERS
@@ -138,7 +136,7 @@ static void cf_check show_handlers(unsigned char key)
 
 static cpumask_t dump_execstate_mask;
 
-void cf_check dump_execstate(struct cpu_user_regs *regs)
+void cf_check dump_execstate(const struct cpu_user_regs *regs)
 {
     unsigned int cpu = smp_processor_id();
 
@@ -499,23 +497,6 @@ static void cf_check run_all_keyhandlers(unsigned char key, bool need_context)
 
     /* Trigger the others from a tasklet in non-IRQ context */
     tasklet_schedule(&run_all_keyhandlers_tasklet);
-}
-
-static void cf_check do_debugger_trap_fatal(struct cpu_user_regs *regs)
-{
-    (void)debugger_trap_fatal(0xf001, regs);
-
-    /* Prevent tail call optimisation, which confuses xendbg. */
-    barrier();
-}
-
-static void cf_check do_debug_key(unsigned char key, bool need_context)
-{
-    printk("'%c' pressed -> trapping into debugger\n", key);
-    if ( !need_context )
-        do_debugger_trap_fatal(get_irq_regs() ?: guest_cpu_user_regs());
-    else
-        run_in_exception_handler(do_debugger_trap_fatal);
 }
 
 static void cf_check do_toggle_alt_key(unsigned char key, bool unused)

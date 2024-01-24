@@ -1243,12 +1243,9 @@ static int cf_check ehci_dbgp_getc(struct serial_port *port, char *pc)
     return 1;
 }
 
-/* Safe: ehci_dbgp_poll() runs as timer handler, so not reentrant. */
-static struct serial_port *poll_port;
-
-static void cf_check _ehci_dbgp_poll(struct cpu_user_regs *regs)
+static void cf_check ehci_dbgp_poll(void *data)
 {
-    struct serial_port *port = poll_port;
+    struct serial_port *port = data;
     struct ehci_dbgp *dbgp = port->uart;
     unsigned long flags;
     unsigned int timeout = MICROSECS(DBGP_CHECK_INTERVAL);
@@ -1288,12 +1285,6 @@ static void cf_check _ehci_dbgp_poll(struct cpu_user_regs *regs)
     }
 
     set_timer(&dbgp->timer, NOW() + timeout);
-}
-
-static void cf_check ehci_dbgp_poll(void *data)
-{
-    poll_port = data;
-    run_in_exception_handler(_ehci_dbgp_poll);
 }
 
 static bool ehci_dbgp_setup_preirq(struct ehci_dbgp *dbgp)

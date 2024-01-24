@@ -203,12 +203,9 @@ static void cf_check ns16550_interrupt(int irq, void *dev_id)
     }
 }
 
-/* Safe: ns16550_poll() runs as softirq so not reentrant on a given CPU. */
-static DEFINE_PER_CPU(struct serial_port *, poll_port);
-
-static void cf_check __ns16550_poll(struct cpu_user_regs *regs)
+static void cf_check ns16550_poll(void *data)
 {
-    struct serial_port *port = this_cpu(poll_port);
+    struct serial_port *port = data;
     struct ns16550 *uart = port->uart;
 
     if ( uart->intr_works )
@@ -227,12 +224,6 @@ static void cf_check __ns16550_poll(struct cpu_user_regs *regs)
 
 out:
     set_timer(&uart->timer, NOW() + MILLISECS(uart->timeout_ms));
-}
-
-static void cf_check ns16550_poll(void *data)
-{
-    this_cpu(poll_port) = data;
-    run_in_exception_handler(__ns16550_poll);
 }
 
 static int cf_check ns16550_tx_ready(struct serial_port *port)

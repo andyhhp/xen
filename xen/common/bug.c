@@ -63,13 +63,9 @@ int do_bug_frame(struct cpu_user_regs *regs, unsigned long pc)
 
     if ( id == BUGFRAME_run_fn )
     {
-        void (*fn)(struct cpu_user_regs *) = bug_ptr(bug);
+        bug_fn_t *fn = bug_ptr(bug);
 
         fn(regs);
-
-        /* Re-enforce consistent types, because of the casts involved. */
-        if ( false )
-            run_in_exception_handler(fn);
 
         return id;
     }
