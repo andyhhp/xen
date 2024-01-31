@@ -430,16 +430,23 @@ static inline int ffsl(unsigned long x)
     return (int)r+1;
 }
 
-static inline int ffs(unsigned int x)
+static always_inline unsigned int arch_ffs(unsigned int x)
 {
-    int r;
+    int r = -1;
 
-    asm ( "bsf %1,%0\n\t"
-          "jnz 1f\n\t"
-          "mov $-1,%0\n"
-          "1:" : "=r" (r) : "rm" (x));
+    /*
+     * The AMD manual states that BSF won't modify the destination register if
+     * x=0.  The Intel manual states that the result is undefined, but the
+     * architects have said that the register is written back with it's old
+     * value, possibly zero extended above 32 bits.
+     */
+    asm ( "bsf %[val], %[res]"
+          : [res] "+r" (r)
+          : [val] "rm" (x) );
+
     return r + 1;
 }
+#define arch_ffs arch_ffs
 
 /**
  * fls - find last bit set

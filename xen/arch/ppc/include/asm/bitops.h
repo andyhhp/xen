@@ -173,7 +173,6 @@ static inline int __test_and_clear_bit(int nr, volatile void *addr)
 
 #define flsl(x) generic_flsl(x)
 #define fls(x) generic_fls(x)
-#define ffs(x) ({ unsigned int t_ = (x); fls(t_ & -t_); })
 #define ffsl(x) ({ unsigned long t_ = (x); flsl(t_ & -t_); })
 
 /* Based on linux/include/asm-generic/bitops/ffz.h */

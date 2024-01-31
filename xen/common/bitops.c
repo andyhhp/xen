@@ -45,8 +45,18 @@
         RUNTIME_CHECK(fn, val, res);            \
     } while ( 0 )
 
+static void __init test_ffs(void)
+{
+    /* unsigned int ffs(unsigned int) */
+    CHECK(ffs, 0, 0);
+    CHECK(ffs, 1, 1);
+    CHECK(ffs, 0x80000000U, 32);
+}
+
 static int __init cf_check test_bitops(void)
 {
+    test_ffs();
+
     return 0;
 }
 __initcall(test_bitops);

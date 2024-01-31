@@ -110,6 +110,21 @@ static inline int generic_flsl(unsigned long x)
 
 #include <asm/bitops.h>
 
+/*
+ * Find First Set bit.  Bits are labelled from 1.
+ */
+static always_inline __pure unsigned int ffs(unsigned int x)
+{
+    if ( __builtin_constant_p(x) )
+        return __builtin_ffs(x);
+
+#ifndef arch_ffs
+#define arch_ffs __builtin_ffs
+#endif
+
+    return arch_ffs(x);
+}
+
 /* --------------------- Please tidy below here --------------------- */
 
 #ifndef find_next_bit
