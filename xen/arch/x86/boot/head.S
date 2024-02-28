@@ -127,7 +127,7 @@ mle_header:
         .long   (slaunch_stub_entry - start)  /* Linear entry point of MLE (SINIT virt. address) */
         .long   0x00000000  /* First valid page of MLE */
         .long   0x00000000  /* Offset within binary of first byte of MLE */
-        .long   0x00000000  /* Offset within binary of last byte + 1 of MLE (set by loader) */
+        .long   (_end - start)  /* Offset within binary of last byte + 1 of MLE */
         .long   0x00000223  /* Bit vector of MLE-supported capabilities */
         .long   0x00000000  /* Starting linear address of command line (unused) */
         .long   0x00000000  /* Ending linear address of command line (unused) */
