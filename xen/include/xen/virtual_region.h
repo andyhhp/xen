@@ -12,8 +12,9 @@
 struct virtual_region
 {
     struct list_head list;
-    const void *start;                /* Virtual address start. */
-    const void *end;                  /* Virtual address end. */
+
+    const void *text_start;                /* .text virtual address start. */
+    const void *text_end;                  /* .text virtual address end. */
 
     /* If this is NULL the default lookup mechanism is used. */
     symbols_lookup_t *symbols_lookup;
