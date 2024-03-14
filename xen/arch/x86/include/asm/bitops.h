@@ -420,12 +420,28 @@ static inline int ffsl(unsigned long x)
 
 static always_inline unsigned int arch_ffs(unsigned int x)
 {
-    int r;
+    unsigned int r;
 
-    asm ( "bsf %1,%0\n\t"
-          "jnz 1f\n\t"
-          "mov $-1,%0\n"
-          "1:" : "=r" (r) : "rm" (x));
+    if ( __builtin_constant_p(x > 0) && x > 0 )
+    {
+        /* Safe, when the compiler knows that x is nonzero. */
+        asm ( "bsf %[val], %[res]"
+              : [res] "=r" (r)
+              : [val] "rm" (x) );
+    }
+    else
+    {
+        /*
+         * The AMD manual states that BSF won't modify the destination
+         * register if x=0.  The Intel manual states that the result is
+         * undefined, but the architects have said that the register is
+         * written back with it's old value (zero extended as normal).
+         */
+        asm ( "bsf %[val], %[res]"
+              : [res] "=r" (r)
+              : [val] "rm" (x), "[res]" (-1) );
+    }
+
     return r + 1;
 }
 #define arch_ffs arch_ffs
