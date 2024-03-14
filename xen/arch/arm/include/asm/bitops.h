@@ -167,10 +167,7 @@ static inline int fls(unsigned int x)
  * Returns the bit-number of the first set bit (first bit being 0).
  * The input must *not* be zero.
  */
-static inline unsigned int find_first_set_bit(unsigned long word)
-{
-        return ffsl(word) - 1;
-}
+#define find_first_set_bit(w) (ffsl(w) - 1)
 
 /**
  * hweightN - returns the hamming weight of a N-bit word
