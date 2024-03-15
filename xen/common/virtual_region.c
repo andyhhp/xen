@@ -15,8 +15,19 @@ extern const struct bug_frame
     __start_bug_frames_2[], __stop_bug_frames_2[],
     __start_bug_frames_3[], __stop_bug_frames_3[];
 
+/*
+ * For the built-in regions, the double linked list can be constructed at
+ * build time.  Forward-declare the elements.
+ */
+static struct list_head virtual_region_list;
+static struct virtual_region core, core_init;
+
 static struct virtual_region core = {
-    .list = LIST_HEAD_INIT(core.list),
+    .list = {
+        .next = &core_init.list,
+        .prev = &virtual_region_list,
+    },
+
     .text_start = _stext,
     .text_end = _etext,
     .rodata_start = _srodata,
@@ -32,7 +43,11 @@ static struct virtual_region core = {
 
 /* Becomes irrelevant when __init sections are cleared. */
 static struct virtual_region core_init __initdata = {
-    .list = LIST_HEAD_INIT(core_init.list),
+    .list = {
+        .next = &virtual_region_list,
+        .prev = &core.list,
+    },
+
     .text_start = _sinittext,
     .text_end = _einittext,
 
@@ -50,7 +65,10 @@ static struct virtual_region core_init __initdata = {
  *
  * All readers of virtual_region_list MUST use list_for_each_entry_rcu.
  */
-static LIST_HEAD(virtual_region_list);
+static struct list_head virtual_region_list = {
+    .next = &core.list,
+    .prev = &core_init.list,
+};
 static DEFINE_SPINLOCK(virtual_region_lock);
 static DEFINE_RCU_READ_LOCK(rcu_virtual_region_lock);
 
@@ -155,9 +173,6 @@ void __init setup_virtual_regions(const struct exception_table_entry *start,
 {
     core_init.ex = core.ex = start;
     core_init.ex_end = core.ex_end = end;
-
-    register_virtual_region(&core_init);
-    register_virtual_region(&core);
 }
 
 /*
