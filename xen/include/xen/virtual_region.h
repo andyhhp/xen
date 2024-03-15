@@ -37,8 +37,6 @@ struct virtual_region
 };
 
 const struct virtual_region *find_text_region(unsigned long addr);
-void setup_virtual_regions(const struct exception_table_entry *start,
-                           const struct exception_table_entry *end);
 void unregister_init_virtual_region(void);
 void register_virtual_region(struct virtual_region *r);
 void unregister_virtual_region(struct virtual_region *r);
