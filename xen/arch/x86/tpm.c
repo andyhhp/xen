@@ -923,7 +923,9 @@ void tpm_hash_extend(unsigned loc, unsigned pcr, uint8_t *buf, unsigned size,
     void *evt_log_addr;
     uint32_t evt_log_size;
 
-    find_evt_log(&evt_log_addr, &evt_log_size);
+    struct slr_table *slrt = __va(txt_find_slrt());
+
+    find_evt_log(slrt, &evt_log_addr, &evt_log_size);
     evt_log_addr = __va(evt_log_addr);
 
     if ( is_tpm12() ) {
@@ -966,13 +968,10 @@ void __stdcall tpm_extend_mbi(uint32_t *mbi)
 #else
 static struct slr_table *slr_get_table(void)
 {
-    struct txt_os_mle_data *os_mle;
-    struct slr_table *slrt;
+    uint32_t slrt_pa = txt_find_slrt();
+    struct slr_table *slrt = __va(slrt_pa);
 
-    os_mle = txt_os_mle_data_start(__va(read_txt_reg(TXTCR_HEAP_BASE)));
-
-    map_l2(os_mle->slrt, PAGE_SIZE);
-    slrt = __va(os_mle->slrt);
+    map_l2(slrt_pa, PAGE_SIZE);
 
     if ( slrt->magic != SLR_TABLE_MAGIC )
         panic("SLRT has invalid magic value: %#08x!\n", slrt->magic);
@@ -987,7 +986,7 @@ static struct slr_table *slr_get_table(void)
               slrt->size, slrt->max_size);
 
     if ( slrt->size > PAGE_SIZE )
-        map_l2(os_mle->slrt, slrt->size);
+        map_l2(slrt_pa, slrt->size);
 
     return slrt;
 }
