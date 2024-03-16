@@ -12,6 +12,7 @@
 #include <asm/msr.h>
 #include <asm/guest.h>
 #include <asm/intel_txt.h>
+#include <asm/slaunch.h>
 
 /*
  * opt_mem: Limit maximum address of physical RAM.

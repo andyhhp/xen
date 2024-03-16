@@ -5,37 +5,12 @@
 #include <xen/string.h>
 #include <asm/page.h>
 #include <asm/intel_txt.h>
+#include <asm/slaunch.h>
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/slr_table.h>
 
 static uint64_t __initdata txt_heap_base, txt_heap_size;
-
-bool __initdata slaunch_active;
-
-static void __maybe_unused compile_time_checks(void)
-{
-    BUILD_BUG_ON(sizeof(slaunch_active) != 1);
-}
-
-int __init map_l2(unsigned long paddr, unsigned long size)
-{
-    unsigned long aligned_paddr = paddr & ~((1ULL << L2_PAGETABLE_SHIFT) - 1);
-    unsigned long pages = ((paddr + size) - aligned_paddr);
-    pages = ROUNDUP(pages, 1ULL << L2_PAGETABLE_SHIFT) >> PAGE_SHIFT;
-
-    if ( (aligned_paddr + pages * PAGE_SIZE) <= PREBUILT_MAP_LIMIT )
-        return 0;
-
-    if ( aligned_paddr < PREBUILT_MAP_LIMIT ) {
-        pages -= (PREBUILT_MAP_LIMIT - aligned_paddr) >> PAGE_SHIFT;
-        aligned_paddr = PREBUILT_MAP_LIMIT;
-    }
-
-    return map_pages_to_xen((unsigned long)__va(aligned_paddr),
-                            maddr_to_mfn(aligned_paddr),
-                            pages, PAGE_HYPERVISOR);
-}
 
 void __init map_txt_mem_regions(void)
 {
