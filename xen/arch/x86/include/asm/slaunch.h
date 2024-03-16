@@ -11,6 +11,8 @@
 /*
  * Secure Launch event log entry types. The TXT specification defines the
  * base event value as 0x400 for DRTM values.
+ *
+ * Using the same values for AMD SKINIT.
  */
 #define TXT_EVTYPE_BASE            0x400
 #define DLE_EVTYPE_SLAUNCH         (TXT_EVTYPE_BASE + 0x102)

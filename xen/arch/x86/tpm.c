@@ -31,6 +31,7 @@ asm (
 #include "include/asm/intel_txt.h"
 #include "include/asm/slaunch.h"
 #include "include/asm/tpm.h"
+#include "include/asm/x86-vendors.h"
 #ifdef __va
 #error "__va defined in non-paged mode!"
 #endif
@@ -62,14 +63,30 @@ void *memcpy(void *dest, const void *src, size_t n)
     return dest;
 }
 
+static bool is_amd_cpu(void)
+{
+    /* No boot_cpu_data in early code. */
+    uint32_t eax, ebx, ecx, edx;
+    cpuid(0x00000000, &eax, &ebx, &ecx, &edx);
+    return ebx == X86_VENDOR_AMD_EBX
+        && ecx == X86_VENDOR_AMD_ECX
+        && edx == X86_VENDOR_AMD_EDX;
+}
+
 #else   /* __EARLY_TPM__ */
 
 #include <xen/mm.h>
 #include <xen/pfn.h>
 #include <xen/types.h>
 #include <asm/intel_txt.h>
+#include <asm/processor.h>
 #include <asm/slaunch.h>
 #include <asm/tpm.h>
+
+static bool is_amd_cpu(void)
+{
+    return boot_cpu_data.x86_vendor == X86_VENDOR_AMD;
+}
 
 #endif  /* __EARLY_TPM__ */
 
@@ -827,10 +844,27 @@ static uint32_t tpm2_hash_extend(unsigned loc, uint8_t *buf, unsigned size,
 
 #endif /* __EARLY_TPM__ */
 
-static struct heap_event_log_pointer_element2_1 *find_evt_log_ext_data(void)
+static struct heap_event_log_pointer_element2_1 *
+find_evt_log_ext_data(struct tpm2_spec_id_event *evt_log)
 {
     struct txt_os_sinit_data *os_sinit;
     struct txt_ext_data_element *ext_data;
+
+    if ( is_amd_cpu() ) {
+        /*
+         * Event log pointer is defined by TXT specification, but
+         * secure-kernel-loader provides a compatible structure in vendor data
+         * of the log.
+         */
+        const uint8_t *data_size =
+            (void *)&evt_log->digestSizes[evt_log->digestCount];
+
+        if ( *data_size != sizeof(struct heap_event_log_pointer_element2_1) )
+            return NULL;
+
+        /* Vendor data directly follows one-byte size. */
+        return (void *)(data_size + 1);
+    }
 
     os_sinit = txt_os_sinit_data_start(__va(read_txt_reg(TXTCR_HEAP_BASE)));
     ext_data = (void *)((uint8_t *)os_sinit + sizeof(*os_sinit));
@@ -864,7 +898,7 @@ create_log_event20(struct tpm2_spec_id_event *evt_log, uint32_t evt_log_size,
     unsigned i;
     uint8_t *p;
 
-    log_ext_data = find_evt_log_ext_data();
+    log_ext_data = find_evt_log_ext_data(evt_log);
     if ( log_ext_data == NULL )
         return log_hashes;
 

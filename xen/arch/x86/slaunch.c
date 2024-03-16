@@ -9,6 +9,10 @@
 #include <xen/mm.h>
 #include <xen/multiboot.h>
 
+/* SLB is 64k, 64k-aligned */
+#define SKINIT_SLB_SIZE  0x10000
+#define SKINIT_SLB_ALIGN 0x10000
+
 bool __initdata slaunch_active;
 uint32_t __initdata slaunch_slrt;
 
@@ -37,6 +41,19 @@ int __init map_l2(unsigned long paddr, unsigned long size)
                             pages, PAGE_HYPERVISOR);
 }
 
+static uint32_t get_slb_start(void)
+{
+    /* The runtime computation relies on size being a power of 2 and equal to
+     * alignment. Make sure these assumptions hold. */
+    BUILD_BUG_ON(SKINIT_SLB_SIZE != SKINIT_SLB_ALIGN);
+    BUILD_BUG_ON(SKINIT_SLB_SIZE == 0);
+    BUILD_BUG_ON((SKINIT_SLB_SIZE & (SKINIT_SLB_SIZE - 1)) != 0);
+
+    /* Rounding any address within SLB down to alignment gives SLB base and
+     * SLRT is inside SLB on AMD. */
+    return slaunch_slrt & ~(SKINIT_SLB_SIZE - 1);
+}
+
 void __init map_slaunch_mem_regions(void)
 {
     void *evt_log_addr;
@@ -48,7 +65,14 @@ void __init map_slaunch_mem_regions(void)
     map_l2((unsigned long)evt_log_addr, evt_log_size);
 
     /* Vendor-specific part. */
-    map_txt_mem_regions();
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+    {
+        map_txt_mem_regions();
+    }
+    else if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+    {
+        map_l2(get_slb_start(), SKINIT_SLB_SIZE);
+    }
 }
 
 void __init protect_slaunch_mem_regions(void)
@@ -68,11 +92,25 @@ void __init protect_slaunch_mem_regions(void)
     }
 
     /* Vendor-specific part. */
-    protect_txt_mem_regions();
+    if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+    {
+        protect_txt_mem_regions();
+    }
+    else if ( boot_cpu_data.x86_vendor == X86_VENDOR_AMD )
+    {
+        uint64_t slb_start = get_slb_start();
+        uint64_t slb_end = slb_start + SKINIT_SLB_SIZE;
+        printk("SLAUNCH: reserving SLB (%#lx - %#lx)\n", slb_start, slb_end);
+        e820_change_range_type(&e820_raw, slb_start, slb_end,
+                               E820_RAM, E820_RESERVED);
+    }
 }
 
 static struct slr_table *slr_get_table(void)
 {
+    bool intel_cpu = (boot_cpu_data.x86_vendor == X86_VENDOR_INTEL);
+    uint16_t slrt_architecture = intel_cpu ? SLR_INTEL_TXT : SLR_AMD_SKINIT;
+
     struct slr_table *slrt = __va(slaunch_slrt);
 
     map_l2(slaunch_slrt, PAGE_SIZE);
@@ -82,9 +120,9 @@ static struct slr_table *slr_get_table(void)
     /* XXX: are newer revisions allowed? */
     if ( slrt->revision != SLR_TABLE_REVISION )
         panic("SLRT is of unsupported revision: %#04x!\n", slrt->revision);
-    if ( slrt->architecture != SLR_INTEL_TXT )
-        panic("SLRT is for unexpected architecture: %#04x!\n",
-              slrt->architecture);
+    if ( slrt->architecture != slrt_architecture )
+        panic("SLRT is for unexpected architecture: %#04x != %#04x!\n",
+              slrt->architecture, slrt_architecture);
     if ( slrt->size > slrt->max_size )
         panic("SLRT is larger than its max size: %#08x > %#08x!\n",
               slrt->size, slrt->max_size);
@@ -101,14 +139,18 @@ void tpm_measure_slrt(void)
 
     if ( slrt->revision == 1 )
     {
-        /* In revision one of the SLRT, only Intel info table is measured. */
-        struct slr_entry_intel_info *intel_info =
-            (void *)slr_next_entry_by_tag(slrt, NULL, SLR_ENTRY_INTEL_INFO);
-        if ( intel_info == NULL )
-            panic("SLRT is missing Intel-specific information!\n");
+        if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+        {
+            /* In revision one of the SLRT, only Intel info table is
+             * measured. */
+            struct slr_entry_intel_info *intel_info =
+                (void *)slr_next_entry_by_tag(slrt, NULL, SLR_ENTRY_INTEL_INFO);
+            if ( intel_info == NULL )
+                panic("SLRT is missing Intel-specific information!\n");
 
-        tpm_hash_extend(DRTM_LOC, DRTM_DATA_PCR, (uint8_t *)intel_info,
-                        sizeof(*intel_info), DLE_EVTYPE_SLAUNCH, NULL, 0);
+            tpm_hash_extend(DRTM_LOC, DRTM_DATA_PCR, (uint8_t *)intel_info,
+                            sizeof(*intel_info), DLE_EVTYPE_SLAUNCH, NULL, 0);
+        }
     }
     else
     {
