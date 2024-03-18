@@ -645,6 +645,7 @@ void set_in_mcu_opt_ctrl(uint32_t mask, uint32_t val);
 enum ap_boot_method {
     AP_BOOT_NORMAL,
     AP_BOOT_SKINIT,
+    AP_BOOT_TXT,
 };
 extern enum ap_boot_method ap_boot_method;
 

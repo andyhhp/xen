@@ -15,6 +15,7 @@
 #include <asm/apic.h>
 #include <asm/random.h>
 #include <asm/setup.h>
+#include <asm/intel_txt.h>
 #include <asm/shstk.h>
 #include <mach_apic.h>
 #include <public/sysctl.h> /* for XEN_INVALID_{SOCKET,CORE}_ID */
@@ -974,6 +975,13 @@ void cpu_init(void)
 	write_debugreg(3, 0);
 	write_debugreg(6, X86_DR6_DEFAULT);
 	write_debugreg(7, X86_DR7_DEFAULT);
+
+	/*
+	 * If the platform is performing a Secure Launch via TXT, secondary
+	 * CPUs (APs) will need to be woken up in a TXT-specific way.
+	 */
+	if ( slaunch_active && boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
+		ap_boot_method = AP_BOOT_TXT;
 
 	/*
 	 * If the platform is performing a Secure Launch via SKINIT, GIF is

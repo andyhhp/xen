@@ -432,7 +432,7 @@ void start_secondary(unsigned int cpu)
     startup_cpu_idle_loop();
 }
 
-static int slaunch_wake_aps(unsigned long trampoline_rm)
+static int wake_aps_in_txt(unsigned long trampoline_rm)
 {
     struct txt_sinit_mle_data *sinit_mle =
               txt_sinit_mle_data_start(__va(read_txt_reg(TXTCR_HEAP_BASE)));
@@ -482,8 +482,8 @@ static int wakeup_secondary_cpu(int phys_apicid, unsigned long start_eip)
     if ( tboot_in_measured_env() && !tboot_wake_ap(phys_apicid, start_eip) )
         return 0;
 
-    if ( slaunch_active )
-        return slaunch_wake_aps(start_eip);
+    if ( ap_boot_method == AP_BOOT_TXT )
+        return wake_aps_in_txt(start_eip);
 
     /*
      * Use destination shorthand for broadcasting IPIs during boot.
