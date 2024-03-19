@@ -57,6 +57,7 @@
 #include <asm/pv/domain.h>
 #include <asm/intel_txt.h>
 #include <asm/slaunch.h>
+#include <asm/tpm.h>
 
 /* opt_nosmp: If true, secondary processors are ignored. */
 static bool __initdata opt_nosmp;

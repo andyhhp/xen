@@ -30,6 +30,7 @@ asm (
 #include "boot/defs.h"
 #include "include/asm/intel_txt.h"
 #include "include/asm/slaunch.h"
+#include "include/asm/tpm.h"
 #ifdef __va
 #error "__va defined in non-paged mode!"
 #endif
@@ -66,13 +67,13 @@ void *memcpy(void *dest, const void *src, size_t n)
 #include <xen/types.h>
 #include <asm/intel_txt.h>
 #include <asm/slaunch.h>
+#include <asm/tpm.h>
 
 #endif  /* __EARLY_TPM__ */
 
 #include <xen/sha1.h>
 #include <xen/sha256.h>
 
-#define TPM_TIS_BASE            0xFED40000
 #define TPM_LOC_REG(loc, reg)   (0x1000 * (loc) + (reg))
 
 #define TPM_ACCESS_(x)          TPM_LOC_REG(x, 0x00)

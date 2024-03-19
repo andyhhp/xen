@@ -3,6 +3,7 @@
 #include <asm/page.h>
 #include <asm/processor.h>
 #include <asm/slaunch.h>
+#include <asm/tpm.h>
 #include <xen/init.h>
 #include <xen/mm.h>
 #include <xen/multiboot.h>

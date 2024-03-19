@@ -2,7 +2,6 @@
 #define _ASM_X86_SLAUNCH_H_
 
 #include <xen/types.h>
-#include <xen/multiboot.h>
 #include <xen/slr_table.h>
 
 #define DRTM_LOC                   2
@@ -48,18 +47,5 @@ static inline void find_evt_log(struct slr_table *slrt, void **evt_log,
  * maps, effectively dropping all existing mappings.
  */
 extern int map_l2(unsigned long paddr, unsigned long size);
-
-void tpm_hash_extend(unsigned loc, unsigned pcr, uint8_t *buf, unsigned size,
-                     uint32_t type, uint8_t *log_data, unsigned log_data_size);
-
-/* Measures essential parts of SLR table before making use of them. */
-void tpm_measure_slrt(void);
-
-/* Takes measurements of DRTM policy entries except for MBI and SLRT which
- * should have been measured by the time this is called. Also performs sanity
- * checks of the policy and panics on failure. In particular, the function
- * verifies that DRTM is consistent with MultibootInfo (MBI) (the MBI address
- * is assumed to be virtual). */
-void tpm_process_drtm_policy(const multiboot_info_t *mbi);
 
 #endif /* _ASM_X86_SLAUNCH_H_ */
