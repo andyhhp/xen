@@ -18,6 +18,7 @@
 #define DLE_EVTYPE_SLAUNCH_END     (TXT_EVTYPE_BASE + 0x104)
 
 extern bool slaunch_active;
+extern uint32_t slaunch_slrt; /* physical address */
 
 /* evt_log is a physical address and the caller must map it to virtual, if
  * needed. */

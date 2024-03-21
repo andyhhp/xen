@@ -527,21 +527,33 @@ __start:
         jmp     trampoline_bios_setup
 
 .Lslaunch_proto:
+        /* Upon reaching here, CPU state mostly matches the one setup by the
+         * bootloader with ESP, ESI and EDX being clobbered above. */
+
         /* Save information that TrenchBoot slaunch was used. */
         movb    $1, sym_esi(slaunch_active)
 
-        /* Push arguments to stack and call txt_early_tests(). */
+        /* Prepare space for output parameter of slaunch_early_tests(), which is
+         * a structure of two uint32_t fields. */
+        sub     $8, %esp
+
+        /* Push arguments to stack and call slaunch_early_tests(). */
+        push    %esp                        /* pointer to output structure */
         push    $sym_offs(__2M_rwdata_end)  /* end of target image */
         push    $sym_offs(_start)           /* target base address */
         push    %esi                        /* load base address */
-        call    txt_early_tests
+        call    slaunch_early_tests
 
-        /*
-         * txt_early_tests() returns MBI address, pass it to tpm_extend_mbi()
-         * and store for later in EBX.
-         */
-        push    %eax
-        movl    %eax,%ebx
+        /* Move outputs of slaunch_early_tests() from stack into registers. */
+        pop     %ebx  /* physical MBI address */
+        pop     %edx  /* physical SLRT address */
+
+        /* Save physical address of SLRT for C code. */
+        mov     %edx, sym_esi(slaunch_slrt)
+
+        /* Push arguments to stack and call tpm_extend_mbi(). */
+        push    %edx  /* SLRT address because early code has no slaunch_slrt */
+        push    %ebx  /* MBI address */
         call    tpm_extend_mbi
 
         /* Move magic number expected by Multiboot 2 to EAX and fall through. */
@@ -878,8 +890,8 @@ reloc:
         .incbin "reloc.bin"
 
         ALIGN
-txt_early_tests:
-        .incbin "txt_early.bin"
+slaunch_early_tests:
+        .incbin "slaunch_early.bin"
 
         ALIGN
 tpm_extend_mbi:

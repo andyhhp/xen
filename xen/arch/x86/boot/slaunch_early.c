@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2022-2023 3mdeb Sp. z o.o. All rights reserved.
+ * Copyright (c) 2022-2024 3mdeb Sp. z o.o. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -23,11 +23,18 @@ asm (
     "    .text                         \n"
     "    .globl _start                 \n"
     "_start:                           \n"
-    "    jmp  txt_early_tests          \n"
+    "    jmp  slaunch_early_tests      \n"
     );
 
 #include "defs.h"
 #include "../include/asm/intel_txt.h"
+#include "../include/asm/slaunch.h"
+
+struct early_tests_results
+{
+    uint32_t mbi_pa;
+    uint32_t slrt_pa;
+} __packed;
 
 static void verify_pmr_ranges(struct txt_os_mle_data *os_mle,
                               struct txt_os_sinit_data *os_sinit,
@@ -104,9 +111,10 @@ static void verify_pmr_ranges(struct txt_os_mle_data *os_mle,
     */
 }
 
-uint32_t __stdcall txt_early_tests(uint32_t load_base_addr,
+void __stdcall slaunch_early_tests(uint32_t load_base_addr,
                                    uint32_t tgt_base_addr,
-                                   uint32_t tgt_end_addr)
+                                   uint32_t tgt_end_addr,
+                                   struct early_tests_results *result)
 {
     void *txt_heap;
     struct txt_os_mle_data *os_mle;
@@ -127,5 +135,6 @@ uint32_t __stdcall txt_early_tests(uint32_t load_base_addr,
 
     verify_pmr_ranges(os_mle, os_sinit, load_base_addr, tgt_base_addr, size);
 
-    return os_mle->boot_params_addr;
+    result->mbi_pa = os_mle->boot_params_addr;
+    result->slrt_pa = os_mle->slrt;
 }

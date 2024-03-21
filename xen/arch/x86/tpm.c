@@ -36,6 +36,8 @@ asm (
 #endif
 #define __va(x)     _p(x)
 
+uint32_t slaunch_slrt;
+
 /*
  * The implementation is necessary if compiler chooses to not use an inline
  * builtin.
@@ -926,9 +928,7 @@ void tpm_hash_extend(unsigned loc, unsigned pcr, uint8_t *buf, unsigned size,
     void *evt_log_addr;
     uint32_t evt_log_size;
 
-    struct slr_table *slrt = __va(txt_find_slrt());
-
-    find_evt_log(slrt, &evt_log_addr, &evt_log_size);
+    find_evt_log(__va(slaunch_slrt), &evt_log_addr, &evt_log_size);
     evt_log_addr = __va(evt_log_addr);
 
     if ( is_tpm12() ) {
@@ -962,8 +962,12 @@ void tpm_hash_extend(unsigned loc, unsigned pcr, uint8_t *buf, unsigned size,
 }
 
 #ifdef __EARLY_TPM__
-void __stdcall tpm_extend_mbi(uint32_t *mbi)
+void __stdcall tpm_extend_mbi(uint32_t *mbi, uint32_t slrt_pa)
 {
+    /* Early TPM code isn't linked with the rest but still needs to have this
+     * variable with correct value. */
+    slaunch_slrt = slrt_pa;
+
     /* MBI starts with uint32_t total_size. */
     tpm_hash_extend(DRTM_LOC, DRTM_DATA_PCR, (uint8_t *)mbi, *mbi,
                     DLE_EVTYPE_SLAUNCH, NULL, 0);

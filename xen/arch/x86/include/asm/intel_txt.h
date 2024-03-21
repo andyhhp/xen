@@ -322,14 +322,6 @@ static inline int is_in_pmr(struct txt_os_sinit_data *os_sinit, uint64_t base,
     return 0;
 }
 
-/* Returns physical address. */
-static inline uint32_t txt_find_slrt(void)
-{
-    struct txt_os_mle_data *os_mle =
-        txt_os_mle_data_start(_txt(read_txt_reg(TXTCR_HEAP_BASE)));
-    return os_mle->slrt;
-}
-
 extern void map_txt_mem_regions(void);
 extern void protect_txt_mem_regions(void);
 extern void txt_restore_mtrrs(bool e820_verbose);

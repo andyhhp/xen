@@ -1,5 +1,4 @@
 #include <xen/types.h>
-#include <asm/intel_txt.h>
 #include <asm/page.h>
 #include <asm/processor.h>
 #include <asm/slaunch.h>
@@ -9,6 +8,7 @@
 #include <xen/multiboot.h>
 
 bool __initdata slaunch_active;
+uint32_t __initdata slaunch_slrt;
 
 static void __maybe_unused compile_time_checks(void)
 {
@@ -37,10 +37,9 @@ int __init map_l2(unsigned long paddr, unsigned long size)
 
 static struct slr_table *slr_get_table(void)
 {
-    uint32_t slrt_pa = txt_find_slrt();
-    struct slr_table *slrt = __va(slrt_pa);
+    struct slr_table *slrt = __va(slaunch_slrt);
 
-    map_l2(slrt_pa, PAGE_SIZE);
+    map_l2(slaunch_slrt, PAGE_SIZE);
 
     if ( slrt->magic != SLR_TABLE_MAGIC )
         panic("SLRT has invalid magic value: %#08x!\n", slrt->magic);
@@ -55,7 +54,7 @@ static struct slr_table *slr_get_table(void)
               slrt->size, slrt->max_size);
 
     if ( slrt->size > PAGE_SIZE )
-        map_l2(slrt_pa, slrt->size);
+        map_l2(slaunch_slrt, slrt->size);
 
     return slrt;
 }
