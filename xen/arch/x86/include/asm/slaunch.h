@@ -17,6 +17,23 @@
 #define DLE_EVTYPE_SLAUNCH_START   (TXT_EVTYPE_BASE + 0x103)
 #define DLE_EVTYPE_SLAUNCH_END     (TXT_EVTYPE_BASE + 0x104)
 
+#ifndef cpuid
+/*
+ * Generic CPUID function
+ * clear %ecx since some cpus (Cyrix MII) do not set or clear %ecx
+ * resulting in stale register contents being returned.
+ *
+ * Copied from processor.h because that header can't be included by early code.
+ */
+#define cpuid(_op,_eax,_ebx,_ecx,_edx)          \
+    asm volatile ( "cpuid"                      \
+          : "=a" (*(int *)(_eax)),              \
+            "=b" (*(int *)(_ebx)),              \
+            "=c" (*(int *)(_ecx)),              \
+            "=d" (*(int *)(_edx))               \
+          : "0" (_op), "2" (0) )
+#endif
+
 extern bool slaunch_active;
 extern uint32_t slaunch_slrt; /* physical address */
 

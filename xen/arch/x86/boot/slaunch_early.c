@@ -29,12 +29,23 @@ asm (
 #include "defs.h"
 #include "../include/asm/intel_txt.h"
 #include "../include/asm/slaunch.h"
+#include "../include/asm/x86-vendors.h"
 
 struct early_tests_results
 {
     uint32_t mbi_pa;
     uint32_t slrt_pa;
 } __packed;
+
+static bool is_intel_cpu(void)
+{
+    /* No boot_cpu_data in early code. */
+    uint32_t eax, ebx, ecx, edx;
+    cpuid(0x00000000, &eax, &ebx, &ecx, &edx);
+    return ebx == X86_VENDOR_INTEL_EBX
+        && ecx == X86_VENDOR_INTEL_ECX
+        && edx == X86_VENDOR_INTEL_EDX;
+}
 
 static void verify_pmr_ranges(struct txt_os_mle_data *os_mle,
                               struct txt_os_sinit_data *os_sinit,
@@ -114,12 +125,31 @@ static void verify_pmr_ranges(struct txt_os_mle_data *os_mle,
 void __stdcall slaunch_early_tests(uint32_t load_base_addr,
                                    uint32_t tgt_base_addr,
                                    uint32_t tgt_end_addr,
+                                   uint32_t multiboot_param,
+                                   uint32_t slaunch_param,
                                    struct early_tests_results *result)
 {
     void *txt_heap;
     struct txt_os_mle_data *os_mle;
     struct txt_os_sinit_data *os_sinit;
     uint32_t size = tgt_end_addr - tgt_base_addr;
+
+    if ( !is_intel_cpu() )
+    {
+        /*
+         * Not an Intel CPU. Currently the only other option is AMD with SKINIT
+         * and secure-kernel-loader.
+         */
+
+        const uint16_t *sl_header = (void *)slaunch_param;
+        /* secure-kernel-loader passes MBI as a parameter for Multiboot
+         * kernel. */
+        result->mbi_pa = multiboot_param;
+        /* The forth 16-bit integer of SKL's header is an offset to
+         * bootloader's data, which is SLRT. */
+        result->slrt_pa = slaunch_param + sl_header[3];
+        return;
+    }
 
     /* Clear the TXT error registers for a clean start of day */
     write_txt_reg(TXTCR_ERRORCODE, 0);

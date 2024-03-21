@@ -539,6 +539,8 @@ __start:
 
         /* Push arguments to stack and call slaunch_early_tests(). */
         push    %esp                        /* pointer to output structure */
+        push    %ebp                        /* Slaunch parameter on AMD */
+        push    %ebx                        /* Multiboot parameter */
         push    $sym_offs(__2M_rwdata_end)  /* end of target image */
         push    $sym_offs(_start)           /* target base address */
         push    %esi                        /* load base address */
