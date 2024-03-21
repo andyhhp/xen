@@ -54,6 +54,10 @@ static inline void find_evt_log(struct slr_table *slrt, void **evt_log,
     }
 }
 
+void map_slaunch_mem_regions(void);
+
+void protect_slaunch_mem_regions(void);
+
 /*
  * This helper function is used to map memory using L2 page tables by aligning
  * mapped regions to 2MB. This way page allocator (which at this point isn't

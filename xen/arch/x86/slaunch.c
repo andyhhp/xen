@@ -1,4 +1,6 @@
 #include <xen/types.h>
+#include <asm/e820.h>
+#include <asm/intel_txt.h>
 #include <asm/page.h>
 #include <asm/processor.h>
 #include <asm/slaunch.h>
@@ -33,6 +35,40 @@ int __init map_l2(unsigned long paddr, unsigned long size)
     return map_pages_to_xen((unsigned long)__va(aligned_paddr),
                             maddr_to_mfn(aligned_paddr),
                             pages, PAGE_HYPERVISOR);
+}
+
+void __init map_slaunch_mem_regions(void)
+{
+    void *evt_log_addr;
+    uint32_t evt_log_size;
+
+    map_l2(TPM_TIS_BASE, TPM_TIS_SIZE);
+
+    find_evt_log(__va(slaunch_slrt), &evt_log_addr, &evt_log_size);
+    map_l2((unsigned long)evt_log_addr, evt_log_size);
+
+    /* Vendor-specific part. */
+    map_txt_mem_regions();
+}
+
+void __init protect_slaunch_mem_regions(void)
+{
+    void *evt_log_addr;
+    uint32_t evt_log_size;
+
+    find_evt_log(__va(slaunch_slrt), &evt_log_addr, &evt_log_size);
+    if ( evt_log_addr != 0 )
+    {
+        printk("SLAUNCH: reserving event log (%#lx - %#lx)\n",
+               (uint64_t)evt_log_addr,
+               (uint64_t)evt_log_addr + evt_log_size);
+        e820_change_range_type(&e820_raw, (uint64_t)evt_log_addr,
+                               (uint64_t)evt_log_addr + evt_log_size,
+                               E820_RAM, E820_RESERVED);
+    }
+
+    /* Vendor-specific part. */
+    protect_txt_mem_regions();
 }
 
 static struct slr_table *slr_get_table(void)
