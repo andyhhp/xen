@@ -88,11 +88,12 @@ trampoline_protmode_entry:
          */
         mov     $MSR_APIC_BASE, %ecx
         rdmsr
-        and     $APIC_BASE_EXTD, %eax
+        test    $APIC_BASE_EXTD, %eax
         jnz     .Lx2apic
 
         /* Not x2APIC, read from MMIO */
-        mov     $(APIC_DEFAULT_PHYS_BASE + APIC_ID), %esp
+        and     $APIC_BASE_ADDR_MASK, %eax
+        mov     APIC_ID(%eax), %esp
         shr     $24, %esp
         jmp     1f
 
