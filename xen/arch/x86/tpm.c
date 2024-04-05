@@ -276,6 +276,21 @@ struct TPM12_PCREvent {
     uint8_t Data[];
 };
 
+struct tpm1_spec_id_event {
+    uint32_t pcrIndex;
+    uint32_t eventType;
+    uint8_t digest[20];
+    uint32_t eventSize;
+    uint8_t signature[16];
+    uint32_t platformClass;
+    uint8_t specVersionMinor;
+    uint8_t specVersionMajor;
+    uint8_t specErrata;
+    uint8_t uintnSize;
+    uint8_t vendorInfoSize;
+    uint8_t vendorInfo[0];  /* variable number of members */
+} __packed;
+
 struct txt_ev_log_container_12 {
     char        Signature[20];      /* "TXT Event Container", null-terminated */
     uint8_t     Reserved[12];
@@ -408,6 +423,15 @@ static void *create_log_event12(struct txt_ev_log_container_12 *evt_log,
                                 unsigned data_size)
 {
     struct TPM12_PCREvent *new_entry;
+
+    if ( is_amd_cpu() ) {
+        /*
+         * On AMD, TXT-compatible structure is stored as vendor data of
+         * TCG-defined event log header.
+         */
+        struct tpm1_spec_id_event *spec_id = (void *)evt_log;
+        evt_log = (struct txt_ev_log_container_12 *)&spec_id->vendorInfo[0];
+    }
 
     new_entry = (void *)(((uint8_t *)evt_log) + evt_log->NextEventOffset);
 
