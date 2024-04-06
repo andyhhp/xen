@@ -35,14 +35,14 @@ static bool __ro_after_init opt_ibpb_entry_dom0;
 
 static int8_t __ro_after_init opt_bhb_entry_pv = -1;
 static int8_t __ro_after_init opt_bhb_entry_hvm = -1;
-static bool __ro_after_init opt_bhb_entry_dom0;
+static bool __ro_after_init opt_bhb_entry_dom0 = 1;
 static enum bhb_thunk {
     BHB_DEFAULT,
     BHB_NONE,
     BHB_TSX,
     BHB_SHORT,
     BHB_LONG,
-} opt_bhb_seq __initdata;
+} opt_bhb_seq __initdata = BHB_TSX;
 
 /* Cmdline controls for Xen's speculative settings. */
 static enum ind_thunk {

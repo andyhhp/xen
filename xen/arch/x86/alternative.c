@@ -165,6 +165,11 @@ text_poke(void *addr, const void *opcode, size_t len)
 extern void *const __initdata_cf_clobber_start[];
 extern void *const __initdata_cf_clobber_end[];
 
+void __init alt_sample(void)
+{
+    //alternative("", "int3; .byte 0xf1; .byte 0xeb, -10 ", X86_FEATURE_FPU);
+}
+
 /*
  * Replace instructions with better alternatives for this CPU type.
  * This runs before SMP is initialized to avoid SMP problems with
@@ -202,6 +207,85 @@ static void init_or_livepatch _apply_alternatives(struct alt_instr *start,
         BUG_ON(a->repl_len > total_len);
         BUG_ON(total_len > sizeof(buf));
         BUG_ON(a->cpuid >= NCAPINTS * 32);
+
+        if ( 0 && a->repl_len /* && */
+             /* a->cpuid != X86_FEATURE_ALWAYS && */
+             /* a->cpuid != X86_FEATURE_BMI1 && */
+             /* a->cpuid != X86_FEATURE_WRMSRNS && */
+             /* a->cpuid != X86_FEATURE_MFENCE_RDTSC && */
+             /* a->cpuid != X86_FEATURE_SC_RSB_PV && */
+             /* a->cpuid != X86_FEATURE_SC_RSB_HVM && */
+             /* a->cpuid != X86_FEATURE_SC_RSB_IDLE && */
+             /* a->cpuid != X86_FEATURE_SC_MSR_PV && */
+             /* a->cpuid != X86_FEATURE_SC_MSR_HVM && */
+             /* a->cpuid != X86_FEATURE_SC_MSR_IDLE && */
+             /* a->cpuid != X86_FEATURE_SC_VERW_IDLE && */
+             /* a->cpuid != X86_FEATURE_SC_DIV && */
+             /* a->cpuid != X86_FEATURE_IBPB_ENTRY_PV && */
+             /* a->cpuid != X86_FEATURE_IBPB_ENTRY_HVM && */
+             /* a->cpuid != X86_FEATURE_XEN_SHSTK && */
+             /* a->cpuid != X86_FEATURE_XEN_SMEP && */
+             /* a->cpuid != X86_FEATURE_XEN_SMAP && */
+             /* a->cpuid != X86_FEATURE_XEN_LBR && */
+             /* a->cpuid != X86_BUG_IBPB_NO_RET && */
+             /* a->cpuid != X86_SPEC_BHB_TSX && */
+             /* a->cpuid != X86_SPEC_BHB_LOOPS && */
+             /* a->cpuid != X86_SPEC_BHB_LOOPS_LONG */
+            )
+        {
+            void *ip = repl, *end = ip + a->repl_len;
+            x86_decode_lite_t res;
+
+            do {
+                res = x86_decode_lite(ip, end);
+
+                if ( res.len < 1 )
+                {
+                    printk("Was: %ps sz %u <- Feat %u*32+%u, sz %u [%*ph]\n",
+                          orig, total_len,
+                          a->cpuid >> 5, a->cpuid & 31,
+                          a->repl_len, a->repl_len, repl);
+                    panic("BAD\n");
+                }
+
+                if ( res.rel )
+                {
+                    if ( res.len == 2 &&
+                         res.rel == ip + 1 )
+                    {
+                        int8_t *d8 = res.rel;
+                        void *target = ip + res.len + *d8;
+
+                        printk("*** disp8  at [%*ph <%1ph> %*ph]\n",
+                               (int)(unsigned int)((void *)d8 - (void *)repl), repl,
+                               d8,
+                               (int)(unsigned int)(end - ((void *)d8 + 1)), d8 + 1);
+
+                        if ( target < (void *)repl || target > end )
+                            panic("d8 leaves\n");
+                    }
+                    else
+                    {
+                        uint32_t *d32 = res.rel;
+                        void *target = ip + res.len + *d32;
+                        const char *s;
+
+                        if ( target < (void *)repl || target > end )
+                            s = "outside";
+                        else
+                            s = "inside";
+
+                        printk("*** disp32 at [%*ph <%4ph> %*ph], %s\n",
+                               (int)(unsigned int)((void *)d32 - (void *)repl), repl,
+                               d32,
+                               (int)(unsigned int)(end - ((void *)d32 + 4)), d32 + 4, s);
+                    }
+                }
+
+                ip += res.len;
+
+            } while ( ip < end );
+        }
 
         /*
          * Detect sequences of alt_instr's patching the same origin site, and
@@ -350,10 +434,20 @@ static void init_or_livepatch _apply_alternatives(struct alt_instr *start,
                      * Target doesn't leave the replacement block.  e.g. RSB
                      * stuffing.  Leave it unmodified.
                      */
+                    /* printk("Alternative for %ps [%*ph]\n", */
+                    /*        orig, a->repl_len, buf); */
+                    /* printk("  disp32 at +%u stays within - skipping\n", */
+                    /*        (unsigned int)(unsigned long)(ip - buf)); */
                     continue;
                 }
 
                 *d32 += repl - orig;
+
+                target = orig + (ip - buf) + res.len + *d32;
+                printk("Alternative for %ps [%*ph]\n",
+                       orig, a->repl_len, buf);
+                printk("  disp32 at +%u adjusted to %ps\n",
+                       (unsigned int)(unsigned long)(ip - buf), target);
             }
         }
 
@@ -555,6 +649,7 @@ void __init alternative_instructions(void)
     }
 
     _alternative_instructions(false);
+    //panic("Done\n");
 }
 
 void __init alternative_branches(void)

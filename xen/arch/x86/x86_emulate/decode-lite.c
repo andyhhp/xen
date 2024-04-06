@@ -243,3 +243,15 @@ x86_decode_lite_t init_or_livepatch x86_decode_lite(void *ip, void *end)
 
 #undef FETCH
 }
+
+char foo_len;
+char foo_type;
+void *foo_rel;
+void foo(void *ip, void *end)
+{
+    x86_decode_lite_t r = x86_decode_lite(ip, end);
+
+    foo_len = r.len;
+    foo_type = r.rel_type;
+    foo_rel = r.rel;
+}
