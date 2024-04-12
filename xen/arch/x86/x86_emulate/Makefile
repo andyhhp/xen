@@ -6,3 +6,9 @@ obj-y += decode.o
 obj-$(CONFIG_HVM) += fpu.o
 obj-y += util.o
 obj-y += util-xen.o
+
+ifeq ($(CONFIG_LIVEPATCH),y)
+obj-y += decode-lite.o
+else
+obj-bin-y += decode-lite.init.o
+endif
