@@ -9,7 +9,9 @@
 #ifdef __XEN__
 
 # include <xen/bug.h>
+# include <xen/init.h>
 # include <xen/kernel.h>
+# include <xen/livepatch.h>
 # include <asm/endbr.h>
 # include <asm/msr-index.h>
 # include <asm/x86-vendors.h>

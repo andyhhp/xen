@@ -842,4 +842,21 @@ static inline void x86_emul_reset_event(struct x86_emulate_ctxt *ctxt)
     ctxt->event = (struct x86_event){};
 }
 
+/*
+ * x86_decode_lite().  Very minimal decoder for managing alternatives.
+ *
+ * @len is -1 on error, or positive on success.  If the instruction has a
+ * relative field, REL_TYPE_* gives the size, and @rel points at the field.
+ */
+typedef struct {
+    int8_t len;
+    uint8_t rel_type;
+#define REL_TYPE_NONE 0
+#define REL_TYPE_d8   1
+#define REL_TYPE_d32  2
+    void *rel;
+} x86_decode_lite_t;
+
+x86_decode_lite_t x86_decode_lite(void *ip, void *end);
+
 #endif /* __X86_EMULATE_H__ */
