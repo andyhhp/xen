@@ -15,6 +15,7 @@
 #include <asm/traps.h>
 #include <asm/nmi.h>
 #include <asm/nops.h>
+#include <asm/x86_emulate.h>
 #include <xen/livepatch.h>
 
 #define MAX_PATCH_LEN (255-1)
@@ -464,6 +465,54 @@ static void __init _alternative_instructions(bool force)
 void __init alternative_instructions(void)
 {
     arch_init_ideal_nops();
+
+    /*
+     * Walk all replacement instructions with x86_decode_lite().  This checks
+     * both that we can decode all instructions within the replacement, and
+     * that any near branch with a disp8 stays within the alternative itself.
+     */
+    if ( IS_ENABLED(CONFIG_DEBUG) )
+    {
+        struct alt_instr *a;
+
+        for ( a = __alt_instructions;
+              a < __alt_instructions_end; ++a )
+        {
+            void *repl = ALT_REPL_PTR(a);
+            void *ip = repl, *end = ip + a->repl_len;
+
+            if ( !a->repl_len )
+                continue;
+
+            for ( x86_decode_lite_t res; ip < end; ip += res.len )
+            {
+                res = x86_decode_lite(ip, end);
+
+                if ( res.len <= 0 )
+                {
+                    printk("Alternative for %ps [%*ph]\n",
+                           ALT_ORIG_PTR(a), a->repl_len, repl);
+                    panic("Unable to decode instruction at +%u in alternative\n",
+                          (unsigned int)(unsigned long)(ip - repl));
+                }
+
+                if ( res.rel_type == REL_TYPE_d8 )
+                {
+                    int8_t *d8 = res.rel;
+                    void *target = ip + res.len + *d8;
+
+                    if ( target < repl || target > end )
+                    {
+                        printk("Alternative for %ps [%*ph]\n",
+                               ALT_ORIG_PTR(a), a->repl_len, repl);
+                        panic("'JMP/Jcc disp8' at +%u leaves alternative block\n",
+                              (unsigned int)(unsigned long)(ip - repl));
+                    }
+                }
+            }
+        }
+    }
+
     _alternative_instructions(false);
 }
 
