@@ -264,10 +264,31 @@ static int init_or_livepatch _apply_alternatives(struct alt_instr *start,
 
         memcpy(buf, repl, a->repl_len);
 
+        /* Walk buf[] and adjust any insn-relative operands. */
+        if ( a->repl_len )
         {
-            /* 0xe8/0xe9 are relative branches; fix the offset. */
-            if ( a->repl_len >= 5 && (*buf & 0xfe) == 0xe8 )
+            uint8_t *ip = buf, *end = ip + a->repl_len;
+
+            for ( x86_decode_lite_t res; ip < end; ip += res.len )
             {
+                int32_t *d32;
+                const uint8_t *target;
+
+                res = x86_decode_lite(ip, end);
+
+                if ( res.len == 0 )
+                {
+                    printk("Alt for %ps [%*ph]\n"
+                           "  Unable to decode instruction at +%lu in alternative\n",
+                           ALT_ORIG_PTR(a), a->repl_len, repl, ip - repl);
+                    return -EINVAL;
+                }
+
+                if ( res.rel_sz != 4 )
+                    continue;
+
+                d32 = res.rel;
+
                 /*
                  * Detect the special case of indirect-to-direct branch patching:
                  * - replacement is a direct CALL/JMP (opcodes 0xE8/0xE9; already
@@ -337,14 +358,23 @@ static int init_or_livepatch _apply_alternatives(struct alt_instr *start,
                          */
                         goto skip_this_alternative;
                     }
+
+                    continue;
                 }
-                else if ( force && system_state < SYS_STATE_active )
-                    ASSERT_UNREACHABLE();
-                else
-                    *(int32_t *)(buf + 1) += repl - orig;
+
+                target = ip + res.len + *d32;
+
+                if ( target >= buf && target <= end )
+                {
+                    /*
+                     * Target doesn't leave the replacement block.  e.g. RSB
+                     * stuffing.  Leave it unmodified.
+                     */
+                    continue;
+                }
+
+                *d32 += repl - orig;
             }
-            else if ( force && system_state < SYS_STATE_active )
-                ASSERT_UNREACHABLE();
         }
 
         a->priv = 1;
