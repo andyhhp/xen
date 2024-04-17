@@ -264,78 +264,80 @@ static int init_or_livepatch _apply_alternatives(struct alt_instr *start,
 
         memcpy(buf, repl, a->repl_len);
 
-        /* 0xe8/0xe9 are relative branches; fix the offset. */
-        if ( a->repl_len >= 5 && (*buf & 0xfe) == 0xe8 )
         {
-            /*
-             * Detect the special case of indirect-to-direct branch patching:
-             * - replacement is a direct CALL/JMP (opcodes 0xE8/0xE9; already
-             *   checked above),
-             * - replacement's displacement is -5 (pointing back at the very
-             *   insn, which makes no sense in a real replacement insn),
-             * - original is an indirect CALL/JMP (opcodes 0xFF/2 or 0xFF/4)
-             *   using RIP-relative addressing.
-             * Some branch destinations may still be NULL when we come here
-             * the first time. Defer patching of those until the post-presmp-
-             * initcalls re-invocation (with force set to true). If at that
-             * point the branch destination is still NULL, insert "UD2; UD0"
-             * (for ease of recognition) instead of CALL/JMP.
-             */
-            if ( a->cpuid == X86_FEATURE_ALWAYS &&
-                 *(int32_t *)(buf + 1) == -5 &&
-                 a->orig_len >= 6 &&
-                 orig[0] == 0xff &&
-                 orig[1] == (*buf & 1 ? 0x25 : 0x15) )
+            /* 0xe8/0xe9 are relative branches; fix the offset. */
+            if ( a->repl_len >= 5 && (*buf & 0xfe) == 0xe8 )
             {
-                long disp = *(int32_t *)(orig + 2);
-                const uint8_t *dest = *(void **)(orig + 6 + disp);
-
-                if ( dest )
+                /*
+                 * Detect the special case of indirect-to-direct branch patching:
+                 * - replacement is a direct CALL/JMP (opcodes 0xE8/0xE9; already
+                 *   checked above),
+                 * - replacement's displacement is -5 (pointing back at the very
+                 *   insn, which makes no sense in a real replacement insn),
+                 * - original is an indirect CALL/JMP (opcodes 0xFF/2 or 0xFF/4)
+                 *   using RIP-relative addressing.
+                 * Some branch destinations may still be NULL when we come here
+                 * the first time. Defer patching of those until the post-presmp-
+                 * initcalls re-invocation (with force set to true). If at that
+                 * point the branch destination is still NULL, insert "UD2; UD0"
+                 * (for ease of recognition) instead of CALL/JMP.
+                 */
+                if ( a->cpuid == X86_FEATURE_ALWAYS &&
+                     *(int32_t *)(buf + 1) == -5 &&
+                     a->orig_len >= 6 &&
+                     orig[0] == 0xff &&
+                     orig[1] == (*buf & 1 ? 0x25 : 0x15) )
                 {
-                    /*
-                     * When building for CET-IBT, all function pointer targets
-                     * should have an endbr64 instruction.
-                     *
-                     * If this is not the case, leave a warning because
-                     * something is probably wrong with the build.  A CET-IBT
-                     * enabled system might have exploded already.
-                     *
-                     * Otherwise, skip the endbr64 instruction.  This is a
-                     * marginal perf improvement which saves on instruction
-                     * decode bandwidth.
-                     */
-                    if ( IS_ENABLED(CONFIG_XEN_IBT) )
+                    long disp = *(int32_t *)(orig + 2);
+                    const uint8_t *dest = *(void **)(orig + 6 + disp);
+
+                    if ( dest )
                     {
-                        if ( is_endbr64(dest) )
-                            dest += ENDBR64_LEN;
-                        else
-                            printk(XENLOG_WARNING
-                                   "altcall %ps dest %ps has no endbr64\n",
-                                   orig, dest);
-                    }
+                        /*
+                         * When building for CET-IBT, all function pointer targets
+                         * should have an endbr64 instruction.
+                         *
+                         * If this is not the case, leave a warning because
+                         * something is probably wrong with the build.  A CET-IBT
+                         * enabled system might have exploded already.
+                         *
+                         * Otherwise, skip the endbr64 instruction.  This is a
+                         * marginal perf improvement which saves on instruction
+                         * decode bandwidth.
+                         */
+                        if ( IS_ENABLED(CONFIG_XEN_IBT) )
+                        {
+                            if ( is_endbr64(dest) )
+                                dest += ENDBR64_LEN;
+                            else
+                                printk(XENLOG_WARNING
+                                       "altcall %ps dest %ps has no endbr64\n",
+                                       orig, dest);
+                        }
 
-                    disp = dest - (orig + 5);
-                    ASSERT(disp == (int32_t)disp);
-                    *(int32_t *)(buf + 1) = disp;
+                        disp = dest - (orig + 5);
+                        ASSERT(disp == (int32_t)disp);
+                        *(int32_t *)(buf + 1) = disp;
+                    }
+                    else if ( force )
+                    {
+                        buf[0] = 0x0f;
+                        buf[1] = 0x0b;
+                        buf[2] = 0x0f;
+                        buf[3] = 0xff;
+                        buf[4] = 0xff;
+                    }
+                    else
+                        continue;
                 }
-                else if ( force )
-                {
-                    buf[0] = 0x0f;
-                    buf[1] = 0x0b;
-                    buf[2] = 0x0f;
-                    buf[3] = 0xff;
-                    buf[4] = 0xff;
-                }
+                else if ( force && system_state < SYS_STATE_active )
+                    ASSERT_UNREACHABLE();
                 else
-                    continue;
+                    *(int32_t *)(buf + 1) += repl - orig;
             }
             else if ( force && system_state < SYS_STATE_active )
                 ASSERT_UNREACHABLE();
-            else
-                *(int32_t *)(buf + 1) += repl - orig;
         }
-        else if ( force && system_state < SYS_STATE_active  )
-            ASSERT_UNREACHABLE();
 
         a->priv = 1;
 
