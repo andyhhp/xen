@@ -308,7 +308,15 @@ static void init_or_livepatch _apply_alternatives(struct alt_instr *start,
                         buf[4] = 0xff;
                     }
                     else
-                        continue;
+                    {
+                        /*
+                         * The function pointer we're wanting to devirtualise
+                         * is still NULL, and we're not sealing yet.  Leave
+                         * the alternative fully un-processed, in order to
+                         * process it the next time around.
+                         */
+                        goto skip_this_alternative;
+                    }
                 }
                 else if ( force && system_state < SYS_STATE_active )
                     ASSERT_UNREACHABLE();
@@ -323,6 +331,7 @@ static void init_or_livepatch _apply_alternatives(struct alt_instr *start,
 
         add_nops(buf + a->repl_len, total_len - a->repl_len);
         text_poke(orig, buf, total_len);
+    skip_this_alternative:;
     }
 
     /*
