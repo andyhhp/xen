@@ -62,12 +62,12 @@ FUNC(vmx_asm_vmexit_handler)
          * Clear the BHB to mitigate BHI.  Used on eIBRS parts, and uses RETs
          * itself so must be after we've perfomed all the RET-safety we can.
          */
-        testb $SCF_entry_bhb, CPUINFO_scf(%rsp)
-        jz .L_skip_bhb
-        ALTERNATIVE_2 "",                                    \
-            "call clear_bhb_loops", X86_SPEC_BHB_LOOPS,      \
-            "call clear_bhb_tsx", X86_SPEC_BHB_TSX
-.L_skip_bhb:
+        .macro VMX_BHB_SEQ fn:req
+            DO_COND_BHB_SEQ \fn scf=CPUINFO_scf(%rsp)
+        .endm
+        ALTERNATIVE_2 "",                                         \
+            "VMX_BHB_SEQ fn=clear_bhb_loops", X86_SPEC_BHB_LOOPS, \
+            "VMX_BHB_SEQ fn=clear_bhb_tsx",   X86_SPEC_BHB_TSX
 
         ALTERNATIVE "lfence", "", X86_SPEC_NO_LFENCE_ENTRY_VMX
         /* WARNING! `ret`, `call *`, `jmp *` not safe before this point. */

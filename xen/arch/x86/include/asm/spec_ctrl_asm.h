@@ -92,6 +92,21 @@
 .L\@_skip:
 .endm
 
+.macro DO_COND_BHB_SEQ fn:req, scf=%bl
+/*
+ * Requires SCF (defaults to %rbx), fn=clear_bhb_{loops,tsx}
+ * Clobbers %rax, %rcx
+ *
+ * Conditionally use a BHB clearing software sequence.
+ */
+    testb  $SCF_entry_bhb, \scf
+    jz     .L\@_skip_bhb
+
+    call   \fn
+
+.L\@_skip_bhb:
+.endm
+
 .macro DO_OVERWRITE_RSB tmp=rax, xu
 /*
  * Requires nothing
@@ -277,12 +292,9 @@
      * Clear the BHB to mitigate BHI.  Used on eIBRS parts, and uses RETs
      * itself so must be after we've perfomed all the RET-safety we can.
      */
-    testb $SCF_entry_bhb, %bl
-    jz .L\@_skip_bhb
-    ALTERNATIVE_2 "",                                    \
-        "call clear_bhb_loops", X86_SPEC_BHB_LOOPS,      \
-        "call clear_bhb_tsx", X86_SPEC_BHB_TSX
-.L\@_skip_bhb:
+    ALTERNATIVE_2 "",                                          \
+        "DO_COND_BHB_SEQ clear_bhb_loops", X86_SPEC_BHB_LOOPS, \
+        "DO_COND_BHB_SEQ clear_bhb_tsx",   X86_SPEC_BHB_TSX
 
     ALTERNATIVE "lfence", "", X86_SPEC_NO_LFENCE_ENTRY_PV
 .endm
@@ -322,12 +334,9 @@
     ALTERNATIVE "", __stringify(DO_SPEC_CTRL_ENTRY maybexen=1),         \
         X86_FEATURE_SC_MSR_PV
 
-    testb $SCF_entry_bhb, %bl
-    jz .L\@_skip_bhb
-    ALTERNATIVE_2 "",                                    \
-        "call clear_bhb_loops", X86_SPEC_BHB_LOOPS,      \
-        "call clear_bhb_tsx", X86_SPEC_BHB_TSX
-.L\@_skip_bhb:
+    ALTERNATIVE_2 "",                                          \
+        "DO_COND_BHB_SEQ clear_bhb_loops", X86_SPEC_BHB_LOOPS, \
+        "DO_COND_BHB_SEQ clear_bhb_tsx",   X86_SPEC_BHB_TSX
 
     ALTERNATIVE "lfence", "", X86_SPEC_NO_LFENCE_ENTRY_INTR
 .endm
@@ -433,13 +442,9 @@
      * Clear the BHB to mitigate BHI.  Used on eIBRS parts, and uses RETs
      * itself so must be after we've perfomed all the RET-safety we can.
      */
-    testb $SCF_entry_bhb, %bl
-    jz .L\@_skip_bhb
-
-    ALTERNATIVE_2 "",                                    \
-        "call clear_bhb_loops", X86_SPEC_BHB_LOOPS,      \
-        "call clear_bhb_tsx", X86_SPEC_BHB_TSX
-.L\@_skip_bhb:
+    ALTERNATIVE_2 "",                                          \
+        "DO_COND_BHB_SEQ clear_bhb_loops", X86_SPEC_BHB_LOOPS, \
+        "DO_COND_BHB_SEQ clear_bhb_tsx",   X86_SPEC_BHB_TSX
 
     lfence
 .endm
