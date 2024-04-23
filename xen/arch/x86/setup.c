@@ -115,8 +115,7 @@ static void __init dump_mods(unsigned int nr, const module_t *m)
 
     for ( unsigned int i = 0; i < nr; ++i )
         printk("*** M[%u] { %08x, %08x }\n",
-               i, m[i].mod_start << 12,
-               (m[i].mod_start << 12) + m[i].mod_end);
+               i, m[i].mod_start, m[i].mod_end);
 }
 
 #define DUMP_MODS() dump_mods(mbi->mods_count, mod)
@@ -1418,7 +1417,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
     bootstrap_map(NULL);
 
     printk("*** mod[0] headroom: %lu, sz %#x\n",
-           modules_headroom, mod->mod_end);
+           modules_headroom, mod->mod_end - mod->mod_start);
 
     DUMP_MODS();
 
