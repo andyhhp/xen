@@ -680,6 +680,9 @@ int __init e820_change_range_type(
 /* Set E820_RAM area (@s,@e) as RESERVED in specified e820 map. */
 int __init reserve_e820_ram(struct e820map *e820, uint64_t s, uint64_t e)
 {
+    printk("*** %s(, 0x%08"PRIx64", 0x%08"PRIx64")\n",
+           __func__, s, e);
+
     return e820_change_range_type(e820, s, e, E820_RAM, E820_RESERVED);
 }
 

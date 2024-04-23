@@ -647,6 +647,9 @@ int __init dom0_construct_pv(struct domain *d,
 
         iommu_memory_setup(d, "initrd", mfn_to_page(_mfn(initrd_mfn)),
                            PFN_UP(initrd_len), &flush_flags);
+
+        printk("*** initrd: mfn 0x%08lx, pfn 0x%08lx, len %#lx\n",
+               initrd_mfn, initrd_pfn, initrd_len);
     }
 
     printk("PHYSICAL MEMORY ARRANGEMENT:\n"

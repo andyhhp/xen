@@ -108,6 +108,19 @@ static bool __initdata opt_xen_ibt = true;
 #define opt_xen_ibt false
 #endif
 
+static void __init dump_mods(unsigned int nr, const module_t *m)
+{
+    printk("%s() from %ps\n",
+           __func__, __builtin_return_address(0));
+
+    for ( unsigned int i = 0; i < nr; ++i )
+        printk("*** M[%u] { %08x, %08x }\n",
+               i, m[i].mod_start << 12,
+               (m[i].mod_start << 12) + m[i].mod_end);
+}
+
+#define DUMP_MODS() dump_mods(mbi->mods_count, mod)
+
 static int __init cf_check parse_cet(const char *s)
 {
     const char *ss;
@@ -282,6 +295,8 @@ unsigned long __init initial_images_nrpages(nodeid_t node)
     unsigned long nr;
     unsigned int i;
 
+    dump_mods(nr_initial_images, initial_images);
+
     for ( nr = i = 0; i < nr_initial_images; ++i )
     {
         unsigned long start = initial_images[i].mod_start;
@@ -297,6 +312,8 @@ unsigned long __init initial_images_nrpages(nodeid_t node)
 void __init discard_initial_images(void) /* a.k.a. free multiboot modules */
 {
     unsigned int i;
+
+    dump_mods(nr_initial_images, initial_images);
 
     for ( i = 0; i < nr_initial_images; ++i )
     {
@@ -406,12 +423,25 @@ void *__init bootstrap_map(const module_t *mod)
     void *ret;
 
     if ( system_state != SYS_STATE_early_boot )
-        return mod ? mfn_to_virt(mod->mod_start) : NULL;
+    {
+        if ( !mod )
+            goto unmap;
+
+        start = (uint64_t)mod->mod_start << PAGE_SHIFT;
+        end = start + mod->mod_end;
+
+        printk("*** %s(0x%08"PRIx64", 0x%08"PRIx64")\n",
+               __func__, start, end);
+
+        return mfn_to_virt(mod->mod_start);
+    }
 
     if ( !mod )
     {
         destroy_xen_mappings(BOOTSTRAP_MAP_BASE, BOOTSTRAP_MAP_LIMIT);
         map_cur = BOOTSTRAP_MAP_BASE;
+    unmap:
+        printk("*** %s(unmap)\n", __func__);
         return NULL;
     }
 
@@ -419,6 +449,9 @@ void *__init bootstrap_map(const module_t *mod)
     end = start + mod->mod_end;
     if ( start >= end )
         return NULL;
+
+    printk("*** %s(0x%08"PRIx64", 0x%08"PRIx64")\n",
+           __func__, start, end);
 
     ret = (void *)(map_cur + (unsigned long)(start & mask));
     start &= ~mask;
@@ -437,6 +470,9 @@ static void __init move_memory(
 {
     unsigned int blksz = BOOTSTRAP_MAP_LIMIT - BOOTSTRAP_MAP_BASE;
     unsigned int mask = (1L << L2_PAGETABLE_SHIFT) - 1;
+
+    printk("*** %s(0x%08"PRIx64", 0x%08"PRIx64", %#x)\n",
+           __func__, dst, src, size);
 
     if ( src + size > BOOTSTRAP_MAP_BASE )
         blksz >>= 1;
@@ -594,7 +630,7 @@ static void __init noinline move_xen(void)
 
 #undef BOOTSTRAP_MAP_LIMIT
 
-static uint64_t __init consider_modules(
+static uint64_t __init _consider_modules(
     uint64_t s, uint64_t e, uint32_t size, const module_t *mod,
     unsigned int nr_mods, unsigned int this_mod)
 {
@@ -613,17 +649,29 @@ static uint64_t __init consider_modules(
 
         if ( s < end && start < e )
         {
-            end = consider_modules(end, e, size, mod + i + 1,
+            end = _consider_modules(end, e, size, mod + i + 1,
                                    nr_mods - i - 1, this_mod - i - 1);
             if ( end )
                 return end;
 
-            return consider_modules(s, start, size, mod + i + 1,
+            return _consider_modules(s, start, size, mod + i + 1,
                                     nr_mods - i - 1, this_mod - i - 1);
         }
     }
 
     return e;
+}
+
+static uint64_t __init consider_modules(
+    uint64_t s, uint64_t e, uint32_t size, const module_t *mod,
+    unsigned int nr_mods, unsigned int this_mod)
+{
+    uint64_t res = _consider_modules(s, e, size, mod, nr_mods, this_mod);
+
+    printk("*** %s(0x%08"PRIx64", 0x%08"PRIx64", %#x,, %u, %u) = 0x%08"PRIx64"\n",
+           __func__, s, e, size, nr_mods, this_mod, res);
+
+    return res;
 }
 
 static void __init setup_max_pdx(unsigned long top_page)
@@ -1340,6 +1388,8 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
         mod[i].reserved = 0;
     }
 
+    DUMP_MODS();
+
     /*
      * TODO: load ucode earlier once multiboot modules become accessible
      * at an earlier stage.
@@ -1361,6 +1411,11 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
 
     modules_headroom = bzimage_headroom(bootstrap_map(mod), mod->mod_end);
     bootstrap_map(NULL);
+
+    printk("*** mod[0] headroom: %lu, sz %#x\n",
+           modules_headroom, mod->mod_end);
+
+    DUMP_MODS();
 
 #ifndef highmem_start
     /* Don't allow split below 4Gb. */
@@ -1492,6 +1547,8 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
 #endif
     }
 
+    DUMP_MODS();
+
     if ( modules_headroom && !mod->reserved )
         panic("Not enough memory to relocate the dom0 kernel image\n");
     for ( i = 0; i < mbi->mods_count; ++i )
@@ -1536,12 +1593,17 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
         if ( boot_e820.map[i].type != E820_RAM )
             continue;
 
+        printk("E820[%u/%u] is RAM\n", i, boot_e820.nr_map);
+
         /* Only page alignment required now. */
         s = (boot_e820.map[i].addr + mask) & ~mask;
         e = (boot_e820.map[i].addr + boot_e820.map[i].size) & ~mask;
         s = max_t(uint64_t, s, 1<<20);
         if ( s >= e )
+        {
+            printk("  E[%u] s>=e\n", i);
             continue;
+        }
 
         if ( !acpi_boot_table_init_done &&
              s >= (1ULL << 32) )
@@ -1649,6 +1711,7 @@ void asmlinkage __init noreturn __start_xen(unsigned long mbi_p)
         }
     }
 
+    printk("PDX+MAP mods\n");
     for ( i = 0; i < mbi->mods_count; ++i )
     {
         set_pdx_range(mod[i].mod_start,

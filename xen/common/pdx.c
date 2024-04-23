@@ -47,6 +47,9 @@ void set_pdx_range(unsigned long smfn, unsigned long emfn)
 {
     unsigned long idx, eidx;
 
+    printk("*** %s(0x%08lx, 0x%08lx)\n",
+           __func__, smfn, emfn);
+
     idx = pfn_to_pdx(smfn) / PDX_GROUP_COUNT;
     eidx = (pfn_to_pdx(emfn - 1) + PDX_GROUP_COUNT) / PDX_GROUP_COUNT;
 

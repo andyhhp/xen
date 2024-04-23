@@ -5207,6 +5207,10 @@ int map_pages_to_xen(
     int rc = -ENOMEM;
     struct page_info *current_l3page;
 
+    if ( 0 )
+    printk("*** %s(%p, 0x%08lx, %#lx, %#x)\n",
+           __func__, _p(virt), mfn_x(mfn), nr_mfns, flags);
+
 #define flush_flags(oldf) do {                 \
     unsigned int o_ = (oldf);                  \
     if ( (o_) & _PAGE_GLOBAL )                 \
