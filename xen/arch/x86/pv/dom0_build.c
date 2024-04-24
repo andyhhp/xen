@@ -630,9 +630,6 @@ int __init dom0_construct_pv(struct domain *d,
                 }
             memcpy(page_to_virt(page), mfn_to_virt(initrd->mod_start),
                    initrd_len);
-            mpt_alloc = (paddr_t)initrd->mod_start << PAGE_SHIFT;
-            init_domheap_pages(mpt_alloc,
-                               mpt_alloc + PAGE_ALIGN(initrd_len));
             initrd->mod_start = initrd_mfn = mfn_x(page_to_mfn(page));
         }
         else
@@ -640,8 +637,12 @@ int __init dom0_construct_pv(struct domain *d,
             while ( count-- )
                 if ( assign_pages(mfn_to_page(_mfn(mfn++)), 1, d, 0) )
                     BUG();
+            /*
+             * Mapped rather than copied.  Tell discard_initial_images() to
+             * ignore it.
+             */
+            initrd->mod_end = 0;
         }
-        initrd->mod_end = 0;
 
         iommu_memory_setup(d, "initrd", mfn_to_page(_mfn(initrd_mfn)),
                            PFN_UP(initrd_len), &flush_flags);

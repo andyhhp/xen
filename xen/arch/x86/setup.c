@@ -294,13 +294,20 @@ unsigned long __init initial_images_nrpages(nodeid_t node)
     return nr;
 }
 
-void __init discard_initial_images(void)
+void __init discard_initial_images(void) /* a.k.a. free multiboot modules */
 {
     unsigned int i;
 
     for ( i = 0; i < nr_initial_images; ++i )
     {
         uint64_t start = (uint64_t)initial_images[i].mod_start << PAGE_SHIFT;
+
+        /*
+         * Sometimes the initrd is mapped, rather than copied, into dom0.
+         * end=0 signifies that we should leave it alone.
+         */
+        if ( initial_images[i].mod_end == 0 )
+            continue;
 
         init_domheap_pages(start,
                            start + PAGE_ALIGN(initial_images[i].mod_end));
