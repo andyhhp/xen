@@ -630,7 +630,7 @@ int __init dom0_construct_pv(struct domain *d,
                 }
             memcpy(page_to_virt(page), mfn_to_virt(initrd->mod_start),
                    initrd_len);
-            initrd->mod_start = initrd_mfn = mfn_x(page_to_mfn(page));
+            initrd_mfn = mfn_x(page_to_mfn(page));
         }
         else
         {
@@ -643,6 +643,7 @@ int __init dom0_construct_pv(struct domain *d,
              */
             initrd->mod_end = 0;
         }
+        initrd = LIST_POISON1; /* No longer valid to use. */
 
         iommu_memory_setup(d, "initrd", mfn_to_page(_mfn(initrd_mfn)),
                            PFN_UP(initrd_len), &flush_flags);
@@ -654,12 +655,10 @@ int __init dom0_construct_pv(struct domain *d,
     if ( domain_tot_pages(d) < nr_pages )
         printk(" (%lu pages to be allocated)",
                nr_pages - domain_tot_pages(d));
-    if ( initrd )
-    {
-        mpt_alloc = (paddr_t)initrd->mod_start << PAGE_SHIFT;
+    if ( initrd_len )
         printk("\n Init. ramdisk: %"PRIpaddr"->%"PRIpaddr,
-               mpt_alloc, mpt_alloc + initrd_len);
-    }
+               pfn_to_paddr(initrd_mfn),
+               pfn_to_paddr(initrd_mfn) + initrd_len);
 
     printk("\nVIRTUAL MEMORY ARRANGEMENT:\n");
     printk(" Loaded kernel: %p->%p\n", _p(vkern_start), _p(vkern_end));
@@ -882,7 +881,7 @@ int __init dom0_construct_pv(struct domain *d,
         if ( pfn >= initrd_pfn )
         {
             if ( pfn < initrd_pfn + PFN_UP(initrd_len) )
-                mfn = initrd->mod_start + (pfn - initrd_pfn);
+                mfn = initrd_mfn + (pfn - initrd_pfn);
             else
                 mfn -= PFN_UP(initrd_len);
         }
