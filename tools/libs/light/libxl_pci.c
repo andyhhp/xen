@@ -226,7 +226,7 @@ out:
 static int libxl__device_pci_remove_xenstore(libxl__gc *gc, uint32_t domid, libxl_device_pci *pci)
 {
     libxl_ctx *ctx = libxl__gc_owner(gc);
-    char *be_path, *num_devs_path, *num_devs, *xsdev, *tmp, *tmppath;
+    char *be_path, *num_devs_path, *num_devs, *xsdev, *tmp, *tmppath, *state_before;
     int num, i, j;
     xs_transaction_t t;
 
@@ -237,12 +237,13 @@ static int libxl__device_pci_remove_xenstore(libxl__gc *gc, uint32_t domid, libx
     if (!num_devs)
         return ERROR_INVAL;
     num = atoi(num_devs);
+    state_before = libxl__xs_read(gc, XBT_NULL, libxl__sprintf(gc, "%s/state", be_path));
 
     libxl_domain_type domtype = libxl__domain_type(gc, domid);
     if (domtype == LIBXL_DOMAIN_TYPE_INVALID)
         return ERROR_FAIL;
 
-    if (domtype == LIBXL_DOMAIN_TYPE_PV) {
+    if (domtype == LIBXL_DOMAIN_TYPE_PV && state_before && atoi(state_before) != 6) {
         if (libxl__wait_for_backend(gc, be_path, GCSPRINTF("%d", XenbusStateConnected)) < 0) {
             LOGD(DEBUG, domid, "pci backend at %s is not ready", be_path);
             return ERROR_FAIL;
@@ -264,6 +265,8 @@ static int libxl__device_pci_remove_xenstore(libxl__gc *gc, uint32_t domid, libx
     }
 
 retry_transaction:
+    if (state_before && atoi(state_before) == XenbusStateClosed)
+        goto retry_transaction2;
     t = xs_transaction_start(ctx->xsh);
     xs_write(ctx->xsh, t, GCSPRINTF("%s/state-%d", be_path, i), GCSPRINTF("%d", XenbusStateClosing), 1);
     xs_write(ctx->xsh, t, GCSPRINTF("%s/state", be_path), GCSPRINTF("%d", XenbusStateReconfiguring), 1);
@@ -1240,6 +1243,8 @@ static void pci_add_qmp_device_add(libxl__egc *egc, pci_add_state *pas)
      */
     if (pci->permissive)
         libxl__qmp_param_add_bool(gc, &args, "permissive", true);
+    if (pci->power_mgmt)
+        libxl__qmp_param_add_bool(gc, &args, "power_mgmt", true);
 
     qmp->ao = pas->aodev->ao;
     qmp->domid = domid;
@@ -1431,10 +1436,6 @@ static void pci_add_dm_done(libxl__egc *egc,
 
     if (rc) goto out;
 
-    /* stubdomain is always running by now, even at create time */
-    if (isstubdom)
-        starting = false;
-
     sysfs_path = GCSPRINTF(SYSFS_PCI_DEV"/"PCI_BDF"/resource", pci->domain,
                            pci->bus, pci->dev, pci->func);
     f = fopen(sysfs_path, "r");
@@ -1513,6 +1514,17 @@ static void pci_add_dm_done(libxl__egc *egc,
             rc = ERROR_FAIL;
             goto out;
         }
+    } else if (libxl_is_stubdom(ctx, domid, NULL)) {
+        /* Allow acces to MSI enable flag in PCI config space for the stubdom */
+        if ( sysfs_write_bdf(gc, SYSFS_PCIBACK_DRIVER"/allow_interrupt_control",
+                             pci) < 0 ) {
+            if ( sysfs_write_bdf(gc, SYSFS_PCIBACK_DRIVER"/allow_msi_enable",
+                                 pci) < 0 ) {
+                LOGD(ERROR, domainid, "Setting allow_msi_enable for device");
+                rc = ERROR_FAIL;
+                goto out;
+            }
+        }
     }
 
 out_no_irq:
@@ -1527,8 +1539,10 @@ out_no_irq:
         r = xc_assign_device(ctx->xch, domid, pci_encode_bdf(pci), flag);
         if (r < 0 && (hvm || errno != ENOSYS)) {
             LOGED(ERROR, domainid, "xc_assign_device failed");
-            rc = ERROR_FAIL;
-            goto out;
+            if (hvm || errno != EOPNOTSUPP || !libxl__is_insecure_pv_passthrough_enabled(gc)) {
+                rc = ERROR_FAIL;
+                goto out;
+            }
         }
     }
 
@@ -1577,6 +1591,41 @@ static int libxl__device_pci_reset(libxl__gc *gc, unsigned int domain, unsigned 
         LOGED(ERROR, domain, "Failed to access reset path %s", reset);
     }
     return -1;
+}
+
+bool libxl__is_insecure_pv_passthrough_enabled(libxl__gc *gc)
+{
+    FILE *f = fopen("/proc/cmdline", "r");
+    char cmdline[4096], *tok;
+    size_t read_s;
+    static int is_enabled = -1;
+
+    if (is_enabled != -1)
+        return is_enabled;
+
+    if (!f) {
+        LOG(WARN, "Failed to open /proc/cmdline: %d", errno);
+        return false;
+    }
+    read_s = fread(cmdline, 1, sizeof(cmdline) - 1, f);
+    if (!feof(f) || ferror(f)) {
+        LOG(WARN, "Failed to read /proc/cmdline: %d", errno);
+        fclose(f);
+        return false;
+    }
+    cmdline[read_s] = 0;
+    fclose(f);
+
+    tok = strtok(cmdline, " \n");
+    while (tok) {
+        if (strcmp(tok, "qubes.enable_insecure_pv_passthrough") == 0) {
+            is_enabled = 1;
+            return true;
+        }
+        tok = strtok(NULL, " \n");
+    }
+    is_enabled = 0;
+    return false;
 }
 
 int libxl__device_pci_setdefault(libxl__gc *gc, uint32_t domid,
@@ -1667,6 +1716,13 @@ void libxl__device_pci_add(libxl__egc *egc, uint32_t domid,
     rc = libxl__device_pci_setdefault(gc, domid, pci, !starting);
     if (rc) goto out;
 
+    stubdomid = libxl_get_stubdom_id(ctx, domid);
+    if (stubdomid != 0 && starting) {
+        /* Initial work already done when attaching to the stubdom */
+        device_pci_add_stubdom_done(egc, pas, 0); /* must be last */
+        return;
+    }
+
     if (pci->seize && !pciback_dev_is_assigned(gc, pci)) {
         rc = libxl__device_pci_assignable_add(gc, pci, 1);
         if ( rc )
@@ -1685,8 +1741,7 @@ void libxl__device_pci_add(libxl__egc *egc, uint32_t domid,
 
     libxl__device_pci_reset(gc, pci->domain, pci->bus, pci->dev, pci->func);
 
-    stubdomid = libxl_get_stubdom_id(ctx, domid);
-    if (stubdomid != 0) {
+    if (stubdomid != 0 && !starting) {
         pas->callback = device_pci_add_stubdom_wait;
 
         do_pci_add(egc, stubdomid, pas); /* must be last */
@@ -1828,9 +1883,9 @@ typedef struct {
 
 static void add_pcis_done(libxl__egc *, libxl__multidev *, int rc);
 
-static void libxl__add_pcis(libxl__egc *egc, libxl__ao *ao, uint32_t domid,
-                            libxl_domain_config *d_config,
-                            libxl__multidev *multidev)
+void libxl__add_pcis(libxl__egc *egc, libxl__ao *ao, uint32_t domid,
+                     libxl_domain_config *d_config,
+                     libxl__multidev *multidev)
 {
     AO_GC;
     add_pcis_state *apds;
@@ -2524,17 +2579,128 @@ void libxl__device_pci_destroy_all(libxl__egc *egc, uint32_t domid,
     libxl_device_pci_list_free(pcis, num);
 }
 
+static int libxl__grant_legacy_vga_permissions(libxl__gc *gc, const uint32_t domid) {
+    int ret, i;
+    uint64_t vga_iomem_start = 0xa0000 >> XC_PAGE_SHIFT;
+    uint64_t vga_iomem_npages = 0x20; // vga ram + vbios
+    uint64_t vga_vbios_start = 0xc0000 >> XC_PAGE_SHIFT;
+    uint64_t vga_vbios_npages = 0x20;
+    uint32_t stubdom_domid = libxl_get_stubdom_id(CTX, domid);
+    uint64_t vga_ioport_start[] = {0x3B0, 0x3C0};
+    uint64_t vga_ioport_size[] = {0xC, 0x20};
+
+    // VGA RAM
+    ret = xc_domain_iomem_permission(CTX->xch, stubdom_domid,
+                                     vga_iomem_start, vga_iomem_npages, 1);
+    if (ret < 0) {
+        LOGED(ERROR, domid,
+              "failed to give stubdom%d access to iomem range "
+              "%"PRIx64"-%"PRIx64" for VGA passthru",
+              stubdom_domid,
+              vga_iomem_start, (vga_iomem_start + (vga_iomem_npages << XC_PAGE_SHIFT) - 1));
+        return ret;
+    }
+    ret = xc_domain_iomem_permission(CTX->xch, domid,
+                                     vga_iomem_start, vga_iomem_npages, 1);
+    if (ret < 0) {
+        LOGED(ERROR, domid,
+              "failed to give dom%d access to iomem range "
+              "%"PRIx64"-%"PRIx64" for VGA passthru",
+              domid, vga_iomem_start, (vga_iomem_start + (vga_iomem_npages << XC_PAGE_SHIFT) - 1));
+        return ret;
+    }
+
+    // VGA ROM
+    ret = xc_domain_memory_mapping(CTX->xch, stubdom_domid, vga_vbios_start, vga_vbios_start, vga_vbios_npages, DPCI_ADD_MAPPING);
+    if (ret < 0) {
+        LOGED(ERROR, domid, "failed to map VBIOS to stubdom%d", stubdom_domid);
+        return ret;
+    }
+
+    // VGA IOPORTS
+    for (i = 0 ; i < 2 ; i++) {
+        ret = xc_domain_ioport_permission(CTX->xch, stubdom_domid,
+                                          vga_ioport_start[i], vga_ioport_size[i], 1);
+        if (ret < 0) {
+            LOGED(ERROR, domid,
+                  "failed to give stubdom%d access to ioport range "
+                  "%"PRIx64"-%"PRIx64" for VGA passthru",
+                  stubdom_domid,
+                  vga_ioport_start[i], (vga_ioport_start[i] + vga_ioport_size[i] - 1));
+            return ret;
+        }
+        ret = xc_domain_ioport_permission(CTX->xch, domid,
+                                          vga_ioport_start[i], vga_ioport_size[i], 1);
+        if (ret < 0) {
+            LOGED(ERROR, domid,
+                  "failed to give dom%d access to ioport range "
+                  "%"PRIx64"-%"PRIx64" for VGA passthru",
+                  domid, vga_ioport_start[i], (vga_ioport_start[i] + vga_ioport_size[i] - 1));
+            return ret;
+        }
+    }
+
+    return 0;
+}
+
+static int libxl__grant_igd_opregion_permission(libxl__gc *gc, const uint32_t domid) {
+    char* sysfs_path;
+    FILE* f;
+    uint32_t igd_host_opregion;
+    int ret = 0;
+    uint32_t stubdom_domid = libxl_get_stubdom_id(CTX, domid);
+
+    sysfs_path = GCSPRINTF(SYSFS_PCI_DEV"/"PCI_BDF"/config", 0, 0, 2, 0);
+    f = fopen(sysfs_path, "r");
+    if (!f) {
+        LOGED(ERROR, domid, "Unable to access IGD config space");
+        return ERROR_FAIL;
+    }
+
+    ret = fseek(f, 0xfc, SEEK_SET);
+    if (ret < 0) {
+        LOGED(ERROR, domid, "Unable to lseek in PCI config space");
+        goto out;
+    }
+
+    ret = fread((void*)&igd_host_opregion, 4, 1, f);
+    if (ret < 0) {
+        LOGED(ERROR, domid, "Unable to read opregion register");
+        goto out;
+    }
+
+    ret = xc_domain_iomem_permission(CTX->xch, stubdom_domid,
+                                     (unsigned long)(igd_host_opregion >> XC_PAGE_SHIFT), 0x3, 1);
+    if (ret < 0) {
+        LOGED(ERROR, domid,
+              "failed to give stubdom%d access to %"PRIx32" opregions for igd passthrough", stubdom_domid, igd_host_opregion);
+        goto out;
+    }
+
+    ret = xc_domain_iomem_permission(CTX->xch, domid,
+                                     (unsigned long)(igd_host_opregion >> XC_PAGE_SHIFT), 0x3, 1);
+    if (ret < 0) {
+        LOGED(ERROR, domid,
+              "failed to give dom%d access to %"PRIx32" opregions for igd passthrough", domid, igd_host_opregion);
+        goto out;
+    }
+
+    out:
+    if(f)
+        fclose(f);
+    return ret;
+}
+
 int libxl__grant_vga_iomem_permission(libxl__gc *gc, const uint32_t domid,
                                       libxl_domain_config *const d_config)
 {
-    int i, ret;
+    int i, ret = 0;
+    bool vga_found = false, igd_found = false;
 
     if (!libxl_defbool_val(d_config->b_info.u.hvm.gfx_passthru))
         return 0;
 
-    for (i = 0 ; i < d_config->num_pcidevs ; i++) {
-        uint64_t vga_iomem_start = 0xa0000 >> XC_PAGE_SHIFT;
-        uint32_t stubdom_domid;
+    for (i = 0 ; i < d_config->num_pcidevs && !igd_found ; i++) {
         libxl_device_pci *pci = &d_config->pcidevs[i];
         unsigned long pci_device_class;
 
@@ -2543,30 +2709,19 @@ int libxl__grant_vga_iomem_permission(libxl__gc *gc, const uint32_t domid,
         if (pci_device_class != 0x030000) /* VGA class */
             continue;
 
-        stubdom_domid = libxl_get_stubdom_id(CTX, domid);
-        ret = xc_domain_iomem_permission(CTX->xch, stubdom_domid,
-                                         vga_iomem_start, 0x20, 1);
-        if (ret < 0) {
-            LOGED(ERROR, domid,
-                  "failed to give stubdom%d access to iomem range "
-                  "%"PRIx64"-%"PRIx64" for VGA passthru",
-                  stubdom_domid,
-                  vga_iomem_start, (vga_iomem_start + 0x20 - 1));
-            return ret;
-        }
-        ret = xc_domain_iomem_permission(CTX->xch, domid,
-                                         vga_iomem_start, 0x20, 1);
-        if (ret < 0) {
-            LOGED(ERROR, domid,
-                  "failed to give dom%d access to iomem range "
-                  "%"PRIx64"-%"PRIx64" for VGA passthru",
-                  domid, vga_iomem_start, (vga_iomem_start + 0x20 - 1));
-            return ret;
-        }
-        break;
+        vga_found = true;
+        if (pci->bus == 0 && pci->dev == 2 && pci->func == 0)
+            igd_found = true;
     }
 
-    return 0;
+    if (vga_found)
+        ret = libxl__grant_legacy_vga_permissions(gc, domid);
+    if (ret < 0)
+        return ret;
+    if (igd_found)
+        ret = libxl__grant_igd_opregion_permission(gc, domid);
+
+    return ret;
 }
 
 static int libxl_device_pci_compare(const libxl_device_pci *d1,

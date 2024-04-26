@@ -20,7 +20,7 @@ OBJDUMP    = $(CROSS_COMPILE)objdump
 SIZEUTIL   = $(CROSS_COMPILE)size
 
 # Allow git to be wrappered in the environment
-GIT        ?= git
+GIT        ?= false
 
 INSTALL      = install
 INSTALL_DIR  = $(INSTALL) -d -m0755 -p

@@ -15,10 +15,10 @@ ifeq ($(origin XEN_DOMAIN), undefined)
 export XEN_DOMAIN	:= $(shell ([ -x /bin/dnsdomainname ] && /bin/dnsdomainname) || ([ -x /bin/domainname ] && /bin/domainname || echo [unknown]))
 endif
 ifeq ($(origin XEN_BUILD_DATE), undefined)
-export XEN_BUILD_DATE	:= $(shell LC_ALL=C date)
+export XEN_BUILD_DATE	:= $(shell LC_ALL=C date $(DATE_EPOCH_OPTS))
 endif
 ifeq ($(origin XEN_BUILD_TIME), undefined)
-export XEN_BUILD_TIME	:= $(shell LC_ALL=C date +%T)
+export XEN_BUILD_TIME	:= $(shell LC_ALL=C date $(DATE_EPOCH_OPTS) +%T)
 endif
 ifeq ($(origin XEN_BUILD_HOST), undefined)
 export XEN_BUILD_HOST	:= $(shell hostname)
@@ -404,6 +404,8 @@ ifneq ($(CONFIG_CC_IS_CLANG),y)
 # but has an excessively large symbol table.
 CFLAGS += -Wa,--strip-local-absolute
 endif
+
+CFLAGS += -ffile-prefix-map=$(XEN_ROOT)=.
 
 AFLAGS += -D__ASSEMBLY__
 

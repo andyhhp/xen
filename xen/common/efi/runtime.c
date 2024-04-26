@@ -270,7 +270,7 @@ int efi_get_info(uint32_t idx, union xenpf_efi_info *info)
         for ( i = 0; i < efi_memmap_size; i += efi_mdesc_size )
         {
             EFI_MEMORY_DESCRIPTOR *desc = efi_memmap + i;
-            u64 len = desc->NumberOfPages << EFI_PAGE_SHIFT;
+            uint64_t len = efi_memory_descriptor_len(desc);
 
             if ( info->mem.addr >= desc->PhysicalStart &&
                  info->mem.addr < desc->PhysicalStart + len )

@@ -3,7 +3,7 @@ include $(XEN_ROOT)/Config.mk
 -include $(XEN_ROOT)/config/Docs.mk
 
 VERSION		:= $(shell $(MAKE) -C $(XEN_ROOT)/xen --no-print-directory xenversion)
-DATE		:= $(shell date +%Y-%m-%d)
+PANDOC_REL_DATE	?= $(shell date $(DATE_EPOCH_OPTS) +%Y-%m-%d)
 
 DOC_ARCHES      := arm x86_32 x86_64
 MAN_SECTIONS    := 1 5 7 8
@@ -98,7 +98,7 @@ man$(1)/%.$(1): man/%.$(1).pandoc Makefile
 ifneq ($(PANDOC),)
 	@$(INSTALL_DIR) $$(@D)
 	$(PANDOC) --standalone -V title=$$* -V section=$(1) \
-		      -V date="$(DATE)" -V footer="$(VERSION)" \
+		      -V date="$(PANDOC_REL_DATE)" -V footer="$(VERSION)" \
 			  -V header=Xen $$< -t man --output $$@
 else
 	@echo "pandoc not installed; skipping $$@"

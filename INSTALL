@@ -240,6 +240,13 @@ XEN_BUILD_DATE=<output of date(1)>
 XEN_BUILD_TIME=hh:mm:ss
 SMBIOS_REL_DATE=mm/dd/yyyy
 VGABIOS_REL_DATE="dd Mon yyyy"
+PANDOC_REL_DATE="+%Y-%m-%d"
+
+It is sufficient to define only SOURCE_DATE_EPOCH instead of the above
+variables for having reproducible builds. By default, they use
+SOURCE_DATE_EPOCH if defined. For specifications of SOURCE_DATE_EPOCH,
+we refer to https://reproducible-builds.org/docs/source-date-epoch.
+SOURCE_DATE_EPOCH=
 
 This variable can be used to point to a different git binary to be used.
 GIT=

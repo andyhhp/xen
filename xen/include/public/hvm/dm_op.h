@@ -70,7 +70,9 @@ typedef struct xen_dm_op_create_ioreq_server xen_dm_op_create_ioreq_server_t;
  * not contain XEN_DMOP_no_gfns then these pages will be made available and
  * the frame numbers passed back in gfns <ioreq_gfn> and <bufioreq_gfn>
  * respectively. (If the IOREQ Server is not handling buffered emulation
- * only <ioreq_gfn> will be valid).
+ * only <ioreq_gfn> will be valid). When Xen returns XEN_DMOP_all_msix_writes
+ * flag set, it will notify the IOREQ server about all writes to MSI-X table
+ * (if it's handled by this IOREQ server), not only those clearing a mask bit.
  *
  * NOTE: To access the synchronous ioreq structures and buffered ioreq
  *       ring, it is preferable to use the XENMEM_acquire_resource memory
@@ -81,11 +83,13 @@ typedef struct xen_dm_op_create_ioreq_server xen_dm_op_create_ioreq_server_t;
 struct xen_dm_op_get_ioreq_server_info {
     /* IN - server id */
     ioservid_t id;
-    /* IN - flags */
+    /* IN/OUT - flags */
     uint16_t flags;
 
-#define _XEN_DMOP_no_gfns 0
-#define XEN_DMOP_no_gfns (1u << _XEN_DMOP_no_gfns)
+#define _XEN_DMOP_no_gfns         0  /* IN */
+#define _XEN_DMOP_all_msix_writes 1  /* OUT */
+#define XEN_DMOP_no_gfns         (1u << _XEN_DMOP_no_gfns)
+#define XEN_DMOP_all_msix_writes (1u << _XEN_DMOP_all_msix_writes)
 
     /* OUT - buffered ioreq port */
     evtchn_port_t bufioreq_port;

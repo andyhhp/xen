@@ -979,6 +979,25 @@ static int cf_check read_msr(
         *val = 0;
         return X86EMUL_OKAY;
 
+    case MSR_PKG_C2_RESIDENCY:
+    case MSR_PKG_C3_RESIDENCY:
+    case MSR_PKG_C6_RESIDENCY:
+    case MSR_PKG_C7_RESIDENCY:
+    case MSR_PKG_C8_RESIDENCY:
+    case MSR_PKG_C9_RESIDENCY:
+    case MSR_PKG_C10_RESIDENCY:
+        if ( boot_cpu_data.x86_vendor != X86_VENDOR_INTEL )
+            break;
+        if ( !is_hardware_domain(currd) )
+            break;
+        if ( nr_sockets > 1 ) {
+            // When being rescheduled the VM might see inconsistent data when
+            // running on a system with multiple sockets, since those MSRs are
+            // per package.
+            break;
+        }
+        goto normal;
+
     case MSR_P6_PERFCTR(0) ... MSR_P6_PERFCTR(7):
     case MSR_P6_EVNTSEL(0) ... MSR_P6_EVNTSEL(3):
     case MSR_CORE_PERF_FIXED_CTR0 ... MSR_CORE_PERF_FIXED_CTR2:

@@ -26,6 +26,36 @@
 
 #include <xen-xsm/flask/flask.h>
 
+/* The format of the string is:
+ * domid,aperture_size,gm_size,fence_size. This means we want the vgt
+ * driver to create a vgt instance for Domain domid with the required
+ * parameters. NOTE: aperture_size and gm_size are in MB.
+ */
+static void domcreate_vgt_instance(libxl__gc *gc, uint32_t domid,
+                              libxl_domain_build_info *b_info)
+{
+    const char *path = "/sys/kernel/vgt/control/create_vgt_instance";
+    FILE *vgt_file;
+    int low_gm = b_info->u.hvm.vgt_low_gm_sz ?: 64;
+    int high_gm = b_info->u.hvm.vgt_high_gm_sz ?: 448;
+    int fence = b_info->u.hvm.vgt_fence_sz ?: 4;
+
+    if ((vgt_file = fopen(path, "w")) == NULL) {
+        LOGD(ERROR, domid, "vGT: fopen failed\n");
+        return;
+    }
+
+    LOGD(INFO, domid, "vGT: fprintf %u,%u,%u,%u,-1,0\n",
+		    domid, low_gm, high_gm, fence);
+
+    if (fprintf(vgt_file, "%u,%u,%u,%u,-1,0\n",
+               domid, low_gm, high_gm, fence) < 0)
+        LOGD(ERROR, domid, "vGT: fprintf failed %d\n", errno);
+
+    fclose(vgt_file);
+    return;
+}
+
 int libxl__domain_create_info_setdefault(libxl__gc *gc,
                                          libxl_domain_create_info *c_info,
                                          const libxl_physinfo *info)
@@ -69,6 +99,22 @@ void libxl__rdm_setdefault(libxl__gc *gc, libxl_domain_build_info *b_info)
     if (b_info->u.hvm.rdm_mem_boundary_memkb == LIBXL_MEMKB_DEFAULT)
         b_info->u.hvm.rdm_mem_boundary_memkb =
                             LIBXL_RDM_MEM_BOUNDARY_MEMKB_DEFAULT;
+}
+
+static enum libxl_gfx_passthru_kind
+libxl__detect_gfx_passthru_kind(libxl__gc *gc,
+                                const libxl_domain_config *guest_config)
+{
+    const libxl_domain_build_info *b_info = &guest_config->b_info;
+
+    if (b_info->u.hvm.gfx_passthru_kind != LIBXL_GFX_PASSTHRU_KIND_DEFAULT)
+        return b_info->u.hvm.gfx_passthru_kind;
+
+    if (libxl__is_igd_vga_passthru(gc, guest_config)) {
+        return LIBXL_GFX_PASSTHRU_KIND_IGD;
+    }
+
+    return LIBXL_GFX_PASSTHRU_KIND_DEFAULT;
 }
 
 int libxl__domain_build_info_setdefault(libxl__gc *gc,
@@ -166,7 +212,8 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         /* Check HVM direct boot parameters, we should honour ->ramdisk and
          * ->cmdline iff ->kernel is set.
          */
-        if (!b_info->kernel && (b_info->ramdisk || b_info->cmdline)) {
+        if (!b_info->kernel && (b_info->ramdisk || (b_info->cmdline &&
+            !libxl_defbool_val(b_info->device_model_stubdomain)))) {
             LOG(ERROR, "direct boot parameters specified but kernel missing");
             return ERROR_INVAL;
         }
@@ -317,6 +364,7 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
                     return ERROR_INVAL;
                 }
                 break;
+            case LIBXL_VGA_INTERFACE_TYPE_XENGT:
             case LIBXL_VGA_INTERFACE_TYPE_CIRRUS:
             default:
                 if (b_info->video_memkb == LIBXL_MEMKB_DEFAULT)
@@ -374,7 +422,7 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
         libxl_defbool_setdefault(&b_info->u.hvm.vpt_align,          true);
         libxl_defbool_setdefault(&b_info->u.hvm.altp2m,             false);
         libxl_defbool_setdefault(&b_info->u.hvm.usb,                false);
-        libxl_defbool_setdefault(&b_info->u.hvm.vkb_device,         true);
+        libxl_defbool_setdefault(&b_info->u.hvm.vkb_device,         false);
         libxl_defbool_setdefault(&b_info->u.hvm.xen_platform_pci,   true);
 
         libxl_defbool_setdefault(&b_info->u.hvm.spice.enable, false);
@@ -412,6 +460,18 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
             libxl_defbool_setdefault(&b_info->u.hvm.sdl.opengl, false);
         }
 
+        libxl_defbool_setdefault(&b_info->u.hvm.qubes_gui.enable, false);
+        if (libxl_defbool_val(b_info->u.hvm.qubes_gui.enable)) {
+            if (b_info->u.hvm.qubes_gui.domname) {
+                if (libxl__resolve_domid(gc,
+                                         b_info->u.hvm.qubes_gui.domname,
+                                         &b_info->u.hvm.qubes_gui.domid) < 0) {
+                    LOG(ERROR, "Qubes GUI domain not found.");
+                    return ERROR_INVAL;
+                }
+            }
+        }
+
         if (libxl_defbool_val(b_info->u.hvm.spice.enable)) {
             libxl_defbool_setdefault(&b_info->u.hvm.spice.disable_ticketing,
                                      false);
@@ -423,7 +483,8 @@ int libxl__domain_build_info_setdefault(libxl__gc *gc,
 
         libxl_defbool_setdefault(&b_info->u.hvm.nographic, false);
 
-        libxl_defbool_setdefault(&b_info->u.hvm.gfx_passthru, false);
+        libxl_defbool_setdefault(&b_info->u.hvm.gfx_passthru,
+                b_info->u.hvm.gfx_passthru_kind != LIBXL_GFX_PASSTHRU_KIND_DEFAULT);
 
         libxl__rdm_setdefault(gc, b_info);
         break;
@@ -868,6 +929,9 @@ retry_transaction:
                     GCSPRINTF("%s/data", dom_path),
                     rwperm, ARRAY_SIZE(rwperm));
     libxl__xs_mknod(gc, t,
+                    GCSPRINTF("%s/error", dom_path),
+                    rwperm, ARRAY_SIZE(rwperm));
+    libxl__xs_mknod(gc, t,
                     GCSPRINTF("%s/drivers", dom_path),
                     rwperm, ARRAY_SIZE(rwperm));
     libxl__xs_mknod(gc, t,
@@ -1148,12 +1212,18 @@ int libxl__domain_config_setdefault(libxl__gc *gc,
      * This will be insufficient if and when ARM does PCI hotplug.
      */
     bool need_pt = d_config->num_pcidevs || d_config->num_dtdevs;
+    bool iommu_enabled = physinfo.cap_hvm_directio;
+    if (need_pt && !iommu_enabled &&
+            c_info->type == LIBXL_DOMAIN_TYPE_PV &&
+            libxl__is_insecure_pv_passthrough_enabled(gc)) {
+        /* allow insecure PV with IOMMU usage */
+        need_pt = false;
+    }
     if (c_info->passthrough == LIBXL_PASSTHROUGH_DEFAULT) {
         c_info->passthrough = need_pt
             ? LIBXL_PASSTHROUGH_ENABLED : LIBXL_PASSTHROUGH_DISABLED;
     }
 
-    bool iommu_enabled = physinfo.cap_hvm_directio;
     if (c_info->passthrough != LIBXL_PASSTHROUGH_DISABLED && !iommu_enabled) {
         LOGD(ERROR, domid,
              "passthrough not supported on this platform\n");
@@ -1233,6 +1303,14 @@ int libxl__domain_config_setdefault(libxl__gc *gc,
             (d_config->c_info.passthrough == LIBXL_PASSTHROUGH_SYNC_PT)
             ? libxl__get_required_iommu_memory(d_config->b_info.max_memkb)
             : 0;
+
+    if (d_config->b_info.type == LIBXL_DOMAIN_TYPE_HVM) {
+        if (d_config->b_info.u.hvm.gfx_passthru_kind == LIBXL_GFX_PASSTHRU_KIND_DEFAULT) {
+            /* this may also keep LIBXL_GFX_PASSTHRU_KIND_DEFAULT */
+            d_config->b_info.u.hvm.gfx_passthru_kind =
+                libxl__detect_gfx_passthru_kind(gc, d_config);
+        }
+    }
 
     ret = libxl__domain_build_info_setdefault(gc, &d_config->b_info);
     if (ret) {
@@ -1783,6 +1861,9 @@ static void domcreate_launch_dm(libxl__egc *egc, libxl__multidev *multidev,
         ret = libxl__grant_vga_iomem_permission(gc, domid, d_config);
         if ( ret )
             goto error_out;
+
+	if (d_config->b_info.u.hvm.vga.kind == LIBXL_VGA_INTERFACE_TYPE_XENGT)
+            domcreate_vgt_instance(gc, domid, &d_config->b_info);
 
         return;
     }

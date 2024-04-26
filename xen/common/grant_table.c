@@ -179,7 +179,7 @@ static int cf_check parse_gnttab_max_maptrack_frames(const char *arg)
 }
 
 #ifndef GNTTAB_MAX_VERSION
-#define GNTTAB_MAX_VERSION 2
+#define GNTTAB_MAX_VERSION 1
 #endif
 
 unsigned int __read_mostly opt_gnttab_max_version = GNTTAB_MAX_VERSION;

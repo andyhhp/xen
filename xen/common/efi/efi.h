@@ -51,3 +51,24 @@ void free_ebmalloc_unused_mem(void);
 
 const void *pe_find_section(const void *image_base, const size_t image_size,
                             const CHAR16 *section_name, UINTN *size_out);
+
+static inline UINT64
+efi_memory_descriptor_len(const EFI_MEMORY_DESCRIPTOR *desc)
+{
+    uint64_t remaining_space, limit = 1ULL << PADDR_BITS;
+
+    BUILD_BUG_ON(PADDR_BITS >= 64 || PADDR_BITS < 32);
+
+    if ( desc->PhysicalStart & (EFI_PAGE_SIZE - 1) )
+        return 0; /* misaligned start address */
+
+    if ( desc->PhysicalStart >= limit )
+        return 0; /* physical start out of range */
+
+    remaining_space = limit - desc->PhysicalStart;
+
+    if ( desc->NumberOfPages > (remaining_space >> EFI_PAGE_SHIFT) )
+        return 0; /* too many pages */
+
+    return desc->NumberOfPages << EFI_PAGE_SHIFT;
+}

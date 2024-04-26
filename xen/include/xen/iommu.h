@@ -306,15 +306,19 @@ struct iommu_ops {
 };
 
 /*
- * To be called by Xen internally, to register extra RMRR/IVMD ranges.
+ * To be called by Xen internally, to register extra RMRR/IVMD ranges for RAM
+ * pages.
  * Needs to be called before IOMMU initialization.
  */
 extern int iommu_add_extra_reserved_device_memory(unsigned long start,
                                                   unsigned long nr,
-                                                  pci_sbdf_t sbdf);
+                                                  pci_sbdf_t sbdf,
+                                                  const char *name);
 /*
  * To be called by specific IOMMU driver during initialization,
  * to fetch ranges registered with iommu_add_extra_reserved_device_memory().
+ * This has a side effect of marking requested ranges as "reserved" in the
+ * memory map.
  */
 extern int iommu_get_extra_reserved_device_memory(iommu_grdm_t *func,
                                                   void *ctxt);

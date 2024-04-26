@@ -2,7 +2,11 @@ AC_DEFUN([AX_CHECK_PYTHON_DEVEL], [
 ac_previous_cppflags=$CPPFLAGS
 ac_previous_ldflags=$LDFLAGS
 ac_previous_libs=$LIBS
-AC_PATH_PROG([pyconfig], [$PYTHON-config], [no])
+AS_IF([echo "$PYTHON" | grep -q "^/"], [
+    pyconfig="$PYTHON-config"
+], [
+    AC_PATH_PROG([pyconfig], [$PYTHON-config], [no])
+])
 AS_IF([test x"$pyconfig" = x"no"], [
     dnl For those that don't have python-config
     CPPFLAGS="$CFLAGS `$PYTHON -c 'import distutils.sysconfig; \

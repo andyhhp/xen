@@ -75,6 +75,25 @@ char *libxl__device_libxl_path(libxl__gc *gc, libxl__device *device)
                      device->devid);
 }
 
+const char *libxl__live_device_backend_path(libxl__gc *gc, libxl__device *device)
+{
+    const char *libxl_dom_path = libxl__device_libxl_path(gc, device);
+    const char *be_path;
+    int rc;
+
+    rc = libxl__xs_read_checked(gc, XBT_NULL,
+                                GCSPRINTF("%s/backend", libxl_dom_path),
+                                &be_path);
+    if (rc)
+        /* read failure */
+        return NULL;
+    if (be_path)
+        return be_path;
+
+    /* fallback to constructing the path */
+    return libxl__device_backend_path(gc, device);
+}
+
 char *libxl__domain_device_libxl_path(libxl__gc *gc,  uint32_t domid, uint32_t devid,
                                       libxl__device_kind device_kind)
 {
@@ -986,13 +1005,24 @@ void libxl__initiate_device_generic_remove(libxl__egc *egc,
 {
     STATE_AO_GC(aodev->ao);
     xs_transaction_t t = 0;
-    char *be_path = libxl__device_backend_path(gc, aodev->dev);
+    const char *be_path = libxl__live_device_backend_path(gc, aodev->dev);
     char *state_path = GCSPRINTF("%s/state", be_path);
     char *online_path = GCSPRINTF("%s/online", be_path);
     const char *state;
     libxl_dominfo info;
     uint32_t my_domid, domid = aodev->dev->domid;
     int rc = 0;
+
+    if (!aodev->dev->backend_domid) {
+        /*
+         * Deduce backend_domid if not given explicitly (left as 0), but don't
+         * override explicit non-zero value, to work also in the backend domain
+         * (not a toolstack domain).
+         */
+        rc = libxl__backendpath_parse_domid(gc, be_path,
+                                            &aodev->dev->backend_domid);
+        if (rc) goto out;
+    }
 
     libxl_dominfo_init(&info);
 
@@ -1047,6 +1077,13 @@ void libxl__initiate_device_generic_remove(libxl__egc *egc,
          * shutdown?), cleanup frontend only; rc=0 */
         if (!state) {
             LOG(INFO, "backend %s already removed, cleanup frontend only", be_path);
+            goto out;
+        }
+
+        /* if state_path is empty, assume backend is gone (backend domain
+         * shutdown?), cleanup frontend only; rc=0 */
+        if (!state) {
+            LOG(WARN, "backend %s already removed, cleanup frontend only", be_path);
             goto out;
         }
 

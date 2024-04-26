@@ -317,7 +317,7 @@ unsigned int get_measured_perf(unsigned int cpu, unsigned int flag)
     else
         perf_percent = 0;
 
-    return policy->cpuinfo.max_freq * perf_percent / 100;
+    return policy->cpuinfo.perf_freq * perf_percent / 100;
 }
 
 static unsigned int cf_check get_cur_freq_on_cpu(unsigned int cpu)
@@ -340,9 +340,8 @@ static unsigned int cf_check get_cur_freq_on_cpu(unsigned int cpu)
     return extract_freq(get_cur_val(cpumask_of(cpu)), data);
 }
 
-static void cf_check feature_detect(void *info)
+void intel_feature_detect(struct cpufreq_policy *policy)
 {
-    struct cpufreq_policy *policy = info;
     unsigned int eax;
 
     eax = cpuid_eax(6);
@@ -352,6 +351,11 @@ static void cf_check feature_detect(void *info)
             printk(XENLOG_INFO "CPU%u: Turbo Mode detected and enabled\n",
                    smp_processor_id());
     }
+}
+
+static void cf_check feature_detect(void *info)
+{
+    intel_feature_detect((struct cpufreq_policy *)info);
 }
 
 static unsigned int check_freqs(const cpumask_t *mask, unsigned int freq,
@@ -641,7 +645,10 @@ static int __init cf_check cpufreq_driver_init(void)
         switch ( boot_cpu_data.x86_vendor )
         {
         case X86_VENDOR_INTEL:
-            ret = cpufreq_register_driver(&acpi_cpufreq_driver);
+            if ( hwp_available() )
+                ret = hwp_register_driver();
+            else
+                ret = cpufreq_register_driver(&acpi_cpufreq_driver);
             break;
 
         case X86_VENDOR_AMD:

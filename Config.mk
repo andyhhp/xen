@@ -253,3 +253,5 @@ QEMU_UPSTREAM_LOC ?= $(call or,$(wildcard $(QEMU_UPSTREAM_INTREE)),\
                                $(QEMU_UPSTREAM_URL))
 
 CONFIG_TESTS       ?= y
+
+DATE_EPOCH_OPTS := $(if $(SOURCE_DATE_EPOCH),-u -d "@$(SOURCE_DATE_EPOCH)")

@@ -176,6 +176,8 @@ endif
 CFLAGS-$(CONFIG_X86_32) += $(call cc-option,$(CC),-mno-tls-direct-seg-refs)
 CFLAGS += $(CFLAGS-y)
 
+CFLAGS += -ffile-prefix-map=$(XEN_ROOT)=.
+
 CFLAGS += $(EXTRA_CFLAGS_XEN_TOOLS)
 
 INSTALL_PYTHON_PROG = \

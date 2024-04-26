@@ -362,9 +362,11 @@ void libxenvchan_close(struct libxenvchan *ctrl)
 	if (!ctrl)
 		return;
 	if (ctrl->read.order >= PAGE_SHIFT)
-		munmap(ctrl->read.buffer, 1 << ctrl->read.order);
+		xengntshr_unshare(ctrl->gntshr, ctrl->read.buffer,
+				1 << (ctrl->read.order - PAGE_SHIFT));
 	if (ctrl->write.order >= PAGE_SHIFT)
-		munmap(ctrl->write.buffer, 1 << ctrl->write.order);
+		xengntshr_unshare(ctrl->gntshr, ctrl->write.buffer,
+				1 << (ctrl->write.order - PAGE_SHIFT));
 	if (ctrl->ring) {
 		if (ctrl->is_server) {
 			ctrl->ring->srv_live = 0;

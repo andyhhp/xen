@@ -1528,6 +1528,7 @@ _hidden char *libxl__domain_device_backend_path(libxl__gc *gc, uint32_t backend_
 _hidden char *libxl__device_libxl_path(libxl__gc *gc, libxl__device *device);
 _hidden char *libxl__domain_device_libxl_path(libxl__gc *gc, uint32_t domid, uint32_t devid,
                                               libxl__device_kind device_kind);
+_hidden const char *libxl__live_device_backend_path(libxl__gc *gc, libxl__device *device);
 _hidden int libxl__parse_backend_path(libxl__gc *gc, const char *path,
                                       libxl__device *dev);
 _hidden int libxl__console_tty_path(libxl__gc *gc, uint32_t domid, int cons_num,
@@ -1733,6 +1734,9 @@ _hidden int libxl__device_pci_setdefault(libxl__gc *gc, uint32_t domid,
                                          libxl_device_pci *pci, bool hotplug);
 _hidden bool libxl__is_igd_vga_passthru(libxl__gc *gc,
                                         const libxl_domain_config *d_config);
+_hidden void libxl__add_pcis(libxl__egc *egc, libxl__ao *ao, uint32_t domid,
+                             libxl_domain_config *d_config,
+                             libxl__multidev *multidev);
 
 /* from libxl_dtdev */
 
@@ -3629,6 +3633,7 @@ struct libxl__domain_suspend_state {
                               struct libxl__domain_suspend_state*, int rc);
     void (*callback_common_done)(libxl__egc*,
                                  struct libxl__domain_suspend_state*, int ok);
+    struct libxl__domain_suspend_state *dm_dsps, *parent_dsps;
 };
 int libxl__domain_suspend_init(libxl__egc *egc,
                                libxl__domain_suspend_state *dsps,
@@ -4847,6 +4852,8 @@ static inline const char *libxl__qemu_qmp_path(libxl__gc *gc, int domid)
 {
     return GCSPRINTF("%s/qmp-libxl-%d", libxl__run_dir_path(), domid);
 }
+
+_hidden bool libxl__is_insecure_pv_passthrough_enabled(libxl__gc *gc);
 
 /* Send control commands over xenstore and wait for an Ack. */
 _hidden int libxl__domain_pvcontrol(libxl__egc *egc,

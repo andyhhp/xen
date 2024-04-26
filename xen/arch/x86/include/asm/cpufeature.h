@@ -22,8 +22,17 @@
 #define cpu_has(c, bit)		test_bit(bit, (c)->x86_capability)
 #define boot_cpu_has(bit)	test_bit(bit, boot_cpu_data.x86_capability)
 
-#define CPUID_PM_LEAF                    6
-#define CPUID6_ECX_APERFMPERF_CAPABILITY 0x1
+#define CPUID_PM_LEAF                                6
+#define CPUID6_EAX_HWP                               (_AC(1, U) <<  7)
+#define CPUID6_EAX_HWP_NOTIFICATION                  (_AC(1, U) <<  8)
+#define CPUID6_EAX_HWP_ACTIVITY_WINDOW               (_AC(1, U) <<  9)
+#define CPUID6_EAX_HWP_ENERGY_PERFORMANCE_PREFERENCE (_AC(1, U) << 10)
+#define CPUID6_EAX_HWP_PACKAGE_LEVEL_REQUEST         (_AC(1, U) << 11)
+#define CPUID6_EAX_HDC                               (_AC(1, U) << 13)
+#define CPUID6_EAX_HWP_PECI                          (_AC(1, U) << 16)
+#define CPUID6_EAX_HW_FEEDBACK                       (_AC(1, U) << 19)
+#define CPUID6_ECX_APERFMPERF_CAPABILITY             0x1
+#define CPUID6_ECX_IA32_ENERGY_PERF_BIAS             0x8
 
 /* CPUID level 0x00000001.edx */
 #define cpu_has_fpu             1

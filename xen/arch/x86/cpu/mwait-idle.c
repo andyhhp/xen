@@ -71,14 +71,19 @@
 #undef PREFIX
 #define PREFIX "mwait-idle: "
 
+#define pr_err(fmt...) printk(KERN_ERR fmt)
+
 #ifdef DEBUG
 # define pr_debug(fmt...) printk(KERN_DEBUG fmt)
 #else
 # define pr_debug(fmt...)
 #endif
 
-static __initdata bool opt_mwait_idle = true;
+static bool opt_mwait_idle = true;
 boolean_param("mwait-idle", opt_mwait_idle);
+
+static bool opt_mwait_idle_acpi = false;
+boolean_param("mwait-idle-acpi", opt_mwait_idle_acpi);
 
 static unsigned int mwait_substates;
 
@@ -92,7 +97,7 @@ static unsigned int mwait_substates;
  * exclusive C-states, this parameter has no effect.
  */
 static unsigned int __ro_after_init preferred_states_mask;
-static char __initdata preferred_states[64];
+static char preferred_states[64];
 string_param("preferred-cstates", preferred_states);
 
 #define LAPIC_TIMER_ALWAYS_RELIABLE 0xFFFFFFFF
@@ -1151,6 +1156,9 @@ static const struct idle_cpu idle_cpu_snr = {
 	.c1e_promotion = C1E_PROMOTION_DISABLE,
 };
 
+static struct idle_cpu __read_mostly idle_cpu_acpi = {
+};
+
 #define ICPU(model, cpu) \
 	{ X86_VENDOR_INTEL, 6, INTEL_FAM6_ ## model, X86_FEATURE_ALWAYS, \
 	  &idle_cpu_ ## cpu}
@@ -1436,21 +1444,92 @@ static void __init mwait_idle_state_table_update(void)
 	}
 }
 
-static int __init mwait_idle_probe(void)
-{
-	unsigned int eax, ebx, ecx;
-	const struct x86_cpu_id *id = x86_match_cpu(intel_idle_ids);
-	const char *str;
+static int mwait_idle_state_table_from_acpi(void) {
+	// Linux tries every CPU until it finds one that declares FFH as entry
+	// method for all C-states in it's ACPI table. It assumes that the
+	// config is identical for all CPUs. So let's just check the first CPU.
 
-	if (!id) {
-		pr_debug(PREFIX "does not run on family %d model %d\n",
-			 boot_cpu_data.x86, boot_cpu_data.x86_model);
-		return -ENODEV;
+	int rc = -EINVAL;
+	struct acpi_processor_power *acpi_power = processor_powers[0];
+	struct cpuidle_state *state_table = xzalloc_array(
+			struct cpuidle_state,
+			acpi_power->count + 1 /* NULL at end */ - 1 /* no C0 */
+			);
+
+	if (state_table == NULL) {
+		pr_err(PREFIX "failed to allocate state table\n");
+		rc = -ENOMEM;
+		goto ret;
 	}
 
-	if (!boot_cpu_has(X86_FEATURE_MONITOR)) {
-		pr_debug(PREFIX "Please enable MWAIT in BIOS SETUP\n");
-		return -ENODEV;
+	for (unsigned int cstate = 1; cstate < acpi_power->count; ++cstate) {
+		struct acpi_processor_cx *acpi_cx = &acpi_power->states[cstate];
+		struct cpuidle_state *idle_cx = &state_table[cstate - 1];
+		if (acpi_cx->entry_method != ACPI_CSTATE_EM_FFH) {
+			pr_debug(PREFIX "ACPI based config not usable: Entry method for C-state %u isn't FFH\n", cstate);
+			rc = -ENODEV;
+			goto ret;
+		}
+
+		snprintf(idle_cx->name, sizeof(idle_cx->name), "C%u", cstate);
+
+		idle_cx->flags = MWAIT2flg(acpi_cx->address);
+		if (acpi_cx->type > ACPI_STATE_C2)
+			idle_cx->flags |= CPUIDLE_FLAG_TLB_FLUSHED;
+		// Like Linux we don't set CPUIDLE_FLAG_IBRS
+
+		idle_cx->exit_latency = acpi_cx->latency;
+
+		idle_cx->target_residency = acpi_cx->latency;
+		if (acpi_cx->type > ACPI_STATE_C1)
+			idle_cx->target_residency *= 3;
+	}
+
+	idle_cpu_acpi.state_table = state_table;
+	rc = 0;
+	pr_debug(PREFIX "config read from ACPI\n");
+
+ret:
+	if (rc < 0 && state_table != NULL) {
+		xfree(state_table);
+	}
+	return rc;
+}
+
+static int mwait_idle_probe(bool from_acpi)
+{
+	unsigned int eax, ebx, ecx;
+	const char *str;
+
+	if (from_acpi) {
+		int rc;
+
+		if (boot_cpu_data.x86_vendor != X86_VENDOR_INTEL ||
+		    boot_cpu_data.x86 != 6 ||
+		    !boot_cpu_has(X86_FEATURE_MONITOR)) {
+			pr_debug(PREFIX "skipping ACPI check on unsupported CPU\n");
+			return -ENODEV;
+		}
+
+		rc = mwait_idle_state_table_from_acpi();
+		if (rc < 0)
+			return rc;
+
+		icpu = &idle_cpu_acpi;
+	} else {
+		const struct x86_cpu_id *id = x86_match_cpu(intel_idle_ids);
+		if (!id) {
+			pr_debug(PREFIX "no interal config for family %d model %d\n",
+				 boot_cpu_data.x86, boot_cpu_data.x86_model);
+			return -ENODEV;
+		}
+
+		if (!boot_cpu_has(X86_FEATURE_MONITOR)) {
+			pr_debug(PREFIX "Please enable MWAIT in BIOS SETUP\n");
+			return -ENODEV;
+		}
+
+		icpu = id->driver_data;
 	}
 
 	if (boot_cpu_data.cpuid_level < CPUID_MWAIT_LEAF)
@@ -1470,7 +1549,6 @@ static int __init mwait_idle_probe(void)
 
 	pr_debug(PREFIX "MWAIT substates: %#x\n", mwait_substates);
 
-	icpu = id->driver_data;
 	cpuidle_state_table = icpu->state_table;
 
 	if (boot_cpu_has(X86_FEATURE_ARAT))
@@ -1515,7 +1593,8 @@ static int __init mwait_idle_probe(void)
 	if (str[0])
 		printk("unrecognized \"preferred-cstates=%s\"\n", str);
 
-	mwait_idle_state_table_update();
+	if (!from_acpi)
+		mwait_idle_state_table_update();
 
 	return 0;
 }
@@ -1624,14 +1703,19 @@ static int cf_check mwait_idle_cpu_init(
 	return NOTIFY_DONE;
 }
 
-int __init mwait_idle_init(struct notifier_block *nfb)
+int mwait_idle_init(struct notifier_block *nfb, bool from_acpi)
 {
 	int err;
+
+	if (from_acpi && !opt_mwait_idle_acpi) {
+		pr_debug(PREFIX "ACPI based config disabled\n");
+		return -EPERM;
+	}
 
 	if (pm_idle_save)
 		return -ENODEV;
 
-	err = mwait_idle_probe();
+	err = mwait_idle_probe(from_acpi);
 	if (!err && !boot_cpu_has(X86_FEATURE_ARAT)) {
 		hpet_broadcast_init();
 		if (xen_cpuidle < 0 && !hpet_broadcast_is_available())

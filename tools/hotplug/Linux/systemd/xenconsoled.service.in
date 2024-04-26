@@ -6,8 +6,8 @@ ConditionPathExists=/proc/xen/capabilities
 
 [Service]
 Type=simple
-Environment=XENCONSOLED_ARGS=
-Environment=XENCONSOLED_TRACE=none
+Environment=XENCONSOLED_ARGS="--replace-escape --timestamp=all"
+Environment=XENCONSOLED_TRACE=all
 Environment=XENCONSOLED_LOG_DIR=@XEN_LOG_DIR@/console
 EnvironmentFile=-@CONFIG_DIR@/@CONFIG_LEAF_DIR@/xencommons
 ExecStartPre=/bin/grep -q control_d /proc/xen/capabilities

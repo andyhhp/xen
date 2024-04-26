@@ -357,7 +357,6 @@ AS_IF([test -z "$PYTHON"], [AC_CHECK_PROGS([PYTHON], [python3 python python2], e
 AS_IF([test "$PYTHON" = "err"], [AC_MSG_ERROR([No python interpreter found])])
 AS_IF([echo "$PYTHON" | grep -q "^/"], [], [AC_PATH_PROG([PYTHON], [$PYTHON])])
 PYTHONPATH=$PYTHON
-PYTHON=`basename $PYTHONPATH`
 
 AX_PATH_PROG_OR_FAIL([PYTHONPATH], [$PYTHON])
 AX_CHECK_PYTHON_VERSION([2], [6])

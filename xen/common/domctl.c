@@ -408,31 +408,21 @@ long do_domctl(XEN_GUEST_HANDLE_PARAM(xen_domctl_t) u_domctl)
     case XEN_DOMCTL_createdomain:
     {
         domid_t        dom;
-        static domid_t rover = 0;
+        static domid_t rover = 1;
 
-        dom = op->domain;
-        if ( (dom > 0) && (dom < DOMID_FIRST_RESERVED) )
-        {
-            ret = -EEXIST;
-            if ( !is_free_domid(dom) )
-                break;
+        /* Refuse explicit domid via op->domain */
+        if ( (op->domain > 0) && (op->domain < DOMID_FIRST_RESERVED) )
+            return -EINVAL;
+
+        if ( rover >= DOMID_FIRST_RESERVED ) {
+            printk(XENLOG_ERR
+                   "domctl: out of available domid values, reboot the system\n");
+            return -ENOMEM;
         }
-        else
-        {
-            for ( dom = rover + 1; dom != rover; dom++ )
-            {
-                if ( dom == DOMID_FIRST_RESERVED )
-                    dom = 1;
-                if ( is_free_domid(dom) )
-                    break;
-            }
 
-            ret = -ENOMEM;
-            if ( dom == rover )
-                break;
-
-            rover = dom;
-        }
+        dom = rover++;
+        if ( ! is_free_domid(dom) )
+            return -EEXIST;
 
         d = domain_create(dom, &op->u.createdomain, false);
         if ( IS_ERR(d) )

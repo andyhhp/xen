@@ -78,6 +78,7 @@
 static void cf_check lapic_timer_nop(void) { }
 void (*__read_mostly lapic_timer_off)(void);
 void (*__read_mostly lapic_timer_on)(void);
+static struct notifier_block cpu_nfb;
 
 bool lapic_timer_init(void)
 {
@@ -155,6 +156,12 @@ static void cf_check do_get_hw_residencies(void *arg)
 
     switch ( c->x86_model )
     {
+    /* Tiger Lake */
+    case 0x8C:
+    case 0x8D:
+    /* Alder Lake */
+    case 0x97:
+    case 0x9A:
     /* 4th generation Intel Core (Haswell) */
     case 0x45:
         GET_PC8_RES(hw_res->pc8);
@@ -185,9 +192,6 @@ static void cf_check do_get_hw_residencies(void *arg)
     case 0x6C:
     case 0x7D:
     case 0x7E:
-    /* Tiger Lake */
-    case 0x8C:
-    case 0x8D:
     /* Kaby Lake */
     case 0x8E:
     case 0x9E:
@@ -1313,6 +1317,26 @@ static void print_cx_pminfo(uint32_t cpu, struct xen_processor_power *power)
 #define print_cx_pminfo(c, p)
 #endif
 
+
+static void repark_cpu(int cpu_id)
+{
+    uint32_t apic_id = x86_cpu_to_apicid[cpu_id];
+
+    /*
+     * If we've just learned of more available C states, wake the CPU if
+     * it's parked, so it can go back to sleep in perhaps a deeper state.
+     */
+    if ( park_offline_cpus && apic_id != BAD_APICID )
+    {
+        unsigned long flags;
+
+        local_irq_save(flags);
+        apic_wait_icr_idle();
+        apic_icr_write(APIC_DM_NMI | APIC_DEST_PHYSICAL, apic_id);
+        local_irq_restore(flags);
+    }
+}
+
 long set_cx_pminfo(uint32_t acpi_id, struct xen_processor_power *power)
 {
     XEN_GUEST_HANDLE(xen_processor_cx_t) states;
@@ -1360,24 +1384,27 @@ long set_cx_pminfo(uint32_t acpi_id, struct xen_processor_power *power)
         set_cx(acpi_power, &xen_cx);
     }
 
-    if ( !cpu_online(cpu_id) )
-    {
-        uint32_t apic_id = x86_cpu_to_apicid[cpu_id];
-
-        /*
-         * If we've just learned of more available C states, wake the CPU if
-         * it's parked, so it can go back to sleep in perhaps a deeper state.
-         */
-        if ( park_offline_cpus && apic_id != BAD_APICID )
-        {
-            unsigned long flags;
-
-            local_irq_save(flags);
-            apic_wait_icr_idle();
-            apic_icr_write(APIC_DM_NMI | APIC_DEST_PHYSICAL, apic_id);
-            local_irq_restore(flags);
+    if ( cpu_id == 0 && pm_idle_save == NULL ) {
+        /* Now that we have the ACPI info from dom0, try again to setup
+         * mwait-idle*/
+        ret = mwait_idle_init(&cpu_nfb, true);
+        if (ret >= 0) {
+            unsigned int cpu;
+            /* mwait-idle took over, call it's initializer for all CPUs*/
+            for_each_present_cpu ( cpu )
+            {
+                cpu_nfb.notifier_call(&cpu_nfb, CPU_UP_PREPARE, (void *)(long)cpu);
+                cpu_nfb.notifier_call(&cpu_nfb, CPU_ONLINE, (void *)(long)cpu);
+                if ( !cpu_online(cpu) ) {
+                    repark_cpu(cpu);
+                }
+            }
+            return 0;
         }
     }
+
+    if ( !cpu_online(cpu_id) )
+        repark_cpu(cpu_id);
     else if ( cpuidle_current_governor->enable )
     {
         ret = cpuidle_current_governor->enable(acpi_power);
@@ -1677,7 +1704,7 @@ static int __init cf_check cpuidle_presmp_init(void)
     if ( !xen_cpuidle )
         return 0;
 
-    mwait_idle_init(&cpu_nfb);
+    mwait_idle_init(&cpu_nfb, false);
     cpu_nfb.notifier_call(&cpu_nfb, CPU_UP_PREPARE, cpu);
     cpu_nfb.notifier_call(&cpu_nfb, CPU_ONLINE, cpu);
     register_cpu_notifier(&cpu_nfb);

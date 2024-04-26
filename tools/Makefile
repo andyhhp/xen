@@ -6,38 +6,15 @@ include $(XEN_ROOT)/tools/Rules.mk
 
 SUBDIRS-y :=
 SUBDIRS-y += libs
-SUBDIRS-y += flask
-SUBDIRS-y += fuzz
 SUBDIRS-y += xenstore
-SUBDIRS-y += misc
-SUBDIRS-y += examples
 SUBDIRS-y += hotplug
-SUBDIRS-y += xentrace
-SUBDIRS-$(CONFIG_XCUTILS) += xcutils
-SUBDIRS-$(CONFIG_X86) += firmware
-SUBDIRS-y += console
-SUBDIRS-y += xenmon
-SUBDIRS-$(XENSTAT_XENTOP) += xentop
-SUBDIRS-y += libfsimage
 SUBDIRS-$(CONFIG_Linux) += vchan
 
-# do not recurse in to a dir we are about to delete
-ifneq "$(MAKECMDGOALS)" "distclean"
-SUBDIRS-$(CONFIG_QEMU_TRAD) += qemu-xen-traditional-dir
-SUBDIRS-$(CONFIG_QEMU_XEN) += qemu-xen-dir
-endif
-
-SUBDIRS-y += xenpmd
 SUBDIRS-$(CONFIG_GOLANG) += golang
 SUBDIRS-y += xl
 SUBDIRS-y += helpers
-SUBDIRS-$(CONFIG_X86) += xenpaging
-SUBDIRS-$(CONFIG_X86) += debugger
-SUBDIRS-$(CONFIG_TESTS) += tests
 
 SUBDIRS-y += python
-SUBDIRS-y += pygrub
-SUBDIRS-$(OCAML_TOOLS) += ocaml
 
 ifeq ($(CONFIG_RUMP),y)
 SUBDIRS-y := libs

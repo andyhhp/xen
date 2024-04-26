@@ -31,6 +31,7 @@
  * One client is served at a time, clients needs to coordinate this themselves.
  */
 
+#define _GNU_SOURCE
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -54,6 +55,9 @@ static void usage(char** argv)
         "\t-m, --mode=client|server - vchan connection mode (client by default)\n"
         "\t-s, --state-path=path - xenstore path where write \"running\" to \n"
         "\t                        at startup\n"
+        "\t-r, --reconnect-marker=value - send(client)/expect(server) a\n"
+        "\t                single-byte marker to detect quick reconnects and\n"
+        "\t                force reconnecting UNIX socket\n"
         "\t-v, --verbose - verbose logging\n"
         "\n"
         "client: client of a vchan connection, fourth parameter can be:\n"
@@ -61,7 +65,7 @@ static void usage(char** argv)
         "\t             whenever new connection is accepted;\n"
         "\t             handle multiple _subsequent_ connections, until terminated\n"
         "\n"
-        "\tfile-no:     except open FD of a socket in listen mode;\n"
+        "\tfile-no:     expect open FD of a socket in listen mode;\n"
         "\t             otherwise similar to socket-path\n"
         "\n"
         "\t-:           open vchan connection immediately and pass the data\n"
@@ -88,6 +92,7 @@ char outbuf[BUFSIZE];
 int insiz = 0;
 int outsiz = 0;
 int verbose = 0;
+int reconnect_marker_value = -1;
 
 struct vchan_proxy_state {
     struct libxenvchan *ctrl;
@@ -291,6 +296,7 @@ int data_loop(struct vchan_proxy_state *state)
     int ret;
     int libxenvchan_fd;
     int max_fd;
+    bool just_connected = true;
 
     libxenvchan_fd = libxenvchan_fd_for_select(state->ctrl);
     for (;;) {
@@ -368,8 +374,33 @@ int data_loop(struct vchan_proxy_state *state)
                 exit(1);
             if (verbose)
                 fprintf(stderr, "from-vchan: %.*s\n", ret, outbuf + outsiz);
+            if (reconnect_marker_value != -1) {
+                char *reconnect_found =
+                    memrchr(outbuf + outsiz, reconnect_marker_value, ret);
+                if (just_connected && reconnect_found == outbuf + outsiz) {
+                    /* skip reconnect marker at the very first byte of the data
+                     * stream */
+                    memmove(outbuf + outsiz, outbuf + outsiz + 1, ret - 1);
+                    ret -= 1;
+                } else if (reconnect_found) {
+                    size_t newsiz = outbuf + outsiz + ret - reconnect_found - 1;
+                    if (verbose)
+                        fprintf(stderr, "reconnect marker found\n");
+                    /* discard everything before and including the reconnect
+                     * marker */
+                    memmove(outbuf, reconnect_found + 1, newsiz);
+                    outsiz = newsiz;
+                    /* then handle it as the client had just disconnected */
+                    close(state->output_fd);
+                    state->output_fd = -1;
+                    close(state->input_fd);
+                    state->input_fd = -1;
+                    return 0;
+                }
+            }
             outsiz += ret;
             socket_wr(state->output_fd);
+            just_connected = false;
         }
     }
     return 0;
@@ -385,6 +416,7 @@ static struct option options[] = {
     { "mode",       required_argument, NULL, 'm' },
     { "verbose",          no_argument, NULL, 'v' },
     { "state-path", required_argument, NULL, 's' },
+    { "reconnect-marker", required_argument, NULL, 'r' },
     { }
 };
 
@@ -420,6 +452,14 @@ int main(int argc, char **argv)
                 break;
             case 's':
                 state_path = optarg;
+                break;
+            case 'r':
+                reconnect_marker_value = atoi(optarg);
+                if (reconnect_marker_value < 0 || reconnect_marker_value > 255) {
+                    fprintf(stderr, "invalid argument for --reconnect-marker, "
+                                    "must be a number between 0 and 255\n");
+                    usage(argv);
+                }
                 break;
             case '?':
                 usage(argv);
@@ -508,6 +548,15 @@ int main(int argc, char **argv)
                 perror("vchan client init");
                 ret = 1;
                 break;
+            }
+            if (reconnect_marker_value != -1) {
+                const char marker_buf[] = { reconnect_marker_value };
+
+                if (libxenvchan_write(state.ctrl, marker_buf, sizeof(marker_buf))
+                        != sizeof(marker_buf)) {
+                    fprintf(stderr, "failed to send reconnect marker\n");
+                    break;
+                }
             }
             if (data_loop(&state) != 0)
                 break;

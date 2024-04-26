@@ -184,19 +184,13 @@ SECTIONS
        __note_gnu_build_id_end = .;
   } PHDR(note) PHDR(text)
 #elif defined(BUILD_ID_EFI)
+  . = ALIGN(32);
   DECL_SECTION(.buildid) {
        __note_gnu_build_id_start = .;
        *(.buildid)
        __note_gnu_build_id_end = .;
   }
 #endif
-#endif
-
-#ifndef EFI
-  /* Retain these just for the purpose of possible analysis tools. */
-  DECL_SECTION(.note) {
-       *(.note.*)
-  } PHDR(note) PHDR(text)
 #endif
 
   _erodata = .;

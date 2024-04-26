@@ -77,6 +77,17 @@ static int __init cf_check acpi_parse_madt(struct acpi_table_header *table)
 	return 0;
 }
 
+static bool __init acpi_is_processor_usable(uint32_t lapic_flags)
+{
+	if (lapic_flags & ACPI_MADT_ENABLED)
+		return true;
+
+	if (madt_revision >= 5 && (lapic_flags & ACPI_MADT_ONLINE_CAPABLE))
+		return true;
+
+	return false;
+}
+
 static int __init cf_check
 acpi_parse_x2apic(struct acpi_subtable_header *header, const unsigned long end)
 {
@@ -88,9 +99,7 @@ acpi_parse_x2apic(struct acpi_subtable_header *header, const unsigned long end)
 		return -EINVAL;
 
 	/* Don't register processors that cannot be onlined. */
-	if (madt_revision >= 5 &&
-	    !(processor->lapic_flags & ACPI_MADT_ENABLED) &&
-	    !(processor->lapic_flags & ACPI_MADT_ONLINE_CAPABLE))
+	if (!acpi_is_processor_usable(processor->lapic_flags))
 		return 0;
 
 	if ((processor->lapic_flags & ACPI_MADT_ENABLED) ||
@@ -144,9 +153,7 @@ acpi_parse_lapic(struct acpi_subtable_header * header, const unsigned long end)
 		return -EINVAL;
 
 	/* Don't register processors that cannot be onlined. */
-	if (madt_revision >= 5 &&
-	    !(processor->lapic_flags & ACPI_MADT_ENABLED) &&
-	    !(processor->lapic_flags & ACPI_MADT_ONLINE_CAPABLE))
+	if (!acpi_is_processor_usable(processor->lapic_flags))
 		return 0;
 
 	if ((processor->lapic_flags & ACPI_MADT_ENABLED) ||

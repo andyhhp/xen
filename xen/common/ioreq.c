@@ -743,7 +743,8 @@ static int ioreq_server_destroy(struct domain *d, ioservid_t id)
 static int ioreq_server_get_info(struct domain *d, ioservid_t id,
                                  unsigned long *ioreq_gfn,
                                  unsigned long *bufioreq_gfn,
-                                 evtchn_port_t *bufioreq_port)
+                                 evtchn_port_t *bufioreq_port,
+                                 uint16_t *flags)
 {
     struct ioreq_server *s;
     int rc;
@@ -778,6 +779,9 @@ static int ioreq_server_get_info(struct domain *d, ioservid_t id,
         if ( bufioreq_port )
             *bufioreq_port = s->bufioreq_evtchn;
     }
+
+    /* Advertise supported features/behaviors. */
+    *flags = XEN_DMOP_all_msix_writes;
 
     rc = 0;
 
@@ -1374,7 +1378,8 @@ int ioreq_server_dm_op(struct xen_dm_op *op, struct domain *d, bool *const_op)
                                    NULL : (unsigned long *)&data->ioreq_gfn,
                                    (data->flags & XEN_DMOP_no_gfns) ?
                                    NULL : (unsigned long *)&data->bufioreq_gfn,
-                                   &data->bufioreq_port);
+                                   &data->bufioreq_port, &data->flags);
+
         break;
     }
 

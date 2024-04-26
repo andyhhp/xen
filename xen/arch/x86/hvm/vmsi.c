@@ -180,6 +180,10 @@ static bool msixtbl_initialised(const struct domain *d)
     return d->arch.hvm.msixtbl_list.next;
 }
 
+/*
+ * Lookup an msixtbl_entry on the same page as given addr. It's up to the
+ * caller to check if address is strictly part of the table - if relevant.
+ */
 static struct msixtbl_entry *msixtbl_find_entry(
     struct vcpu *v, unsigned long addr)
 {
@@ -187,8 +191,8 @@ static struct msixtbl_entry *msixtbl_find_entry(
     struct domain *d = v->domain;
 
     list_for_each_entry( entry, &d->arch.hvm.msixtbl_list, list )
-        if ( addr >= entry->gtable &&
-             addr < entry->gtable + entry->table_len )
+        if ( PFN_DOWN(addr) >= PFN_DOWN(entry->gtable) &&
+             PFN_DOWN(addr) <= PFN_DOWN(entry->gtable + entry->table_len - 1) )
             return entry;
 
     return NULL;
@@ -213,6 +217,131 @@ static struct msi_desc *msixtbl_addr_to_desc(
     return NULL;
 }
 
+/*
+ * Returns:
+ *  - UINT_MAX if no handling should be done
+ *  - UINT_MAX-1 if write should be discarded
+ *  - a fixmap idx to use for handling
+ */
+#define ADJACENT_DONT_HANDLE UINT_MAX
+#define ADJACENT_DISCARD_WRITE (UINT_MAX - 1)
+static unsigned int adjacent_handle(
+    const struct msixtbl_entry *entry, unsigned long addr, bool write)
+{
+    unsigned int adj_type;
+    const struct arch_msix *msix;
+
+    if ( !entry || !entry->pdev )
+        return ADJACENT_DONT_HANDLE;
+
+    if ( PFN_DOWN(addr) == PFN_DOWN(entry->gtable) && addr < entry->gtable )
+        adj_type = ADJ_IDX_FIRST;
+    else if ( PFN_DOWN(addr) == PFN_DOWN(entry->gtable + entry->table_len - 1) &&
+              addr >= entry->gtable + entry->table_len )
+        adj_type = ADJ_IDX_LAST;
+    else
+        return ADJACENT_DONT_HANDLE;
+
+    msix = entry->pdev->msix;
+    ASSERT(msix);
+
+    if ( !msix->adj_access_idx[adj_type] )
+    {
+        gprintk(XENLOG_WARNING,
+                "Page for adjacent(%d) MSI-X table access not initialized for %pp (addr %#lx, gtable %#lx\n",
+                adj_type, &entry->pdev->sbdf, addr, entry->gtable);
+
+        return ADJACENT_DONT_HANDLE;
+    }
+
+    /* If PBA lives on the same page too, discard writes. */
+    if ( write &&
+         ((adj_type == ADJ_IDX_LAST &&
+           msix->table.last == msix->pba.first) ||
+          (adj_type == ADJ_IDX_FIRST &&
+           msix->table.first == msix->pba.last)) )
+    {
+        gprintk(XENLOG_WARNING,
+                "MSI-X table and PBA of %pp live on the same page, "
+                "writing to other registers there is not implemented\n",
+                &entry->pdev->sbdf);
+        return ADJACENT_DISCARD_WRITE;
+    }
+
+    return msix->adj_access_idx[adj_type];
+}
+
+static int adjacent_read(
+    unsigned int fixmap_idx,
+    paddr_t address, unsigned int len, uint64_t *pval)
+{
+    const void __iomem *hwaddr;
+
+    *pval = ~0UL;
+
+    ASSERT(fixmap_idx != ADJACENT_DISCARD_WRITE);
+
+    hwaddr = fix_to_virt(fixmap_idx) + PAGE_OFFSET(address);
+
+    switch ( len )
+    {
+    case 1:
+        *pval = readb(hwaddr);
+        break;
+
+    case 2:
+        *pval = readw(hwaddr);
+        break;
+
+    case 4:
+        *pval = readl(hwaddr);
+        break;
+
+    case 8:
+        *pval = readq(hwaddr);
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+    }
+    return X86EMUL_OKAY;
+}
+
+static int adjacent_write(
+        unsigned int fixmap_idx,
+        uint64_t address, uint32_t len, uint64_t val)
+{
+    void __iomem *hwaddr;
+
+    if ( fixmap_idx == ADJACENT_DISCARD_WRITE )
+        return X86EMUL_OKAY;
+
+    hwaddr = fix_to_virt(fixmap_idx) + PAGE_OFFSET(address);
+
+    switch ( len )
+    {
+    case 1:
+        writeb(val, hwaddr);
+        break;
+
+    case 2:
+        writew(val, hwaddr);
+        break;
+
+    case 4:
+        writel(val, hwaddr);
+        break;
+
+    case 8:
+        writeq(val, hwaddr);
+        break;
+
+    default:
+        ASSERT_UNREACHABLE();
+    }
+    return X86EMUL_OKAY;
+}
+
 static int cf_check msixtbl_read(
     const struct hvm_io_handler *handler, uint64_t address, uint32_t len,
     uint64_t *pval)
@@ -220,16 +349,31 @@ static int cf_check msixtbl_read(
     unsigned long offset;
     struct msixtbl_entry *entry;
     unsigned int nr_entry, index;
+    unsigned int adjacent_fixmap;
     int r = X86EMUL_UNHANDLEABLE;
 
-    if ( (len != 4 && len != 8) || (address & (len - 1)) )
+    if ( !IS_ALIGNED(address, len) )
         return r;
 
     rcu_read_lock(&msixtbl_rcu_lock);
-
     entry = msixtbl_find_entry(current, address);
     if ( !entry )
         goto out;
+
+    adjacent_fixmap = adjacent_handle(entry, address, false);
+    if ( adjacent_fixmap != ADJACENT_DONT_HANDLE )
+    {
+        r = adjacent_read(adjacent_fixmap, address, len, pval);
+        goto out;
+    }
+
+    if ( address < entry->gtable ||
+         address >= entry->gtable + entry->table_len )
+        goto out;
+
+    if ( len != 4 && len != 8 )
+        goto out;
+
     offset = address & (PCI_MSIX_ENTRY_SIZE - 1);
 
     if ( offset != PCI_MSIX_ENTRY_VECTOR_CTRL_OFFSET )
@@ -272,6 +416,14 @@ out:
     return r;
 }
 
+/*
+ * This function returns X86EMUL_UNHANDLEABLE even if write is properly
+ * handled, to propagate it to the device model (so it can keep its internal
+ * state in sync).
+ * len==0 means really len==4, but as a write completion that will return
+ * X86EMUL_OKAY on successful processing. Use WRITE_LEN4_COMPLETION to make it
+ * less confusing.
+ */
 static int msixtbl_write(struct vcpu *v, unsigned long address,
                          unsigned int len, unsigned long val)
 {
@@ -282,15 +434,29 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
     int r = X86EMUL_UNHANDLEABLE;
     unsigned long flags;
     struct irq_desc *desc;
+    unsigned int adjacent_fixmap;
 
-    if ( (len != 4 && len != 8) || (address & (len - 1)) )
-        return r;
+    if ( !IS_ALIGNED(address, len) )
+        return X86EMUL_OKAY;
 
     rcu_read_lock(&msixtbl_rcu_lock);
 
     entry = msixtbl_find_entry(v, address);
     if ( !entry )
         goto out;
+
+    adjacent_fixmap = adjacent_handle(entry, address, true);
+    if ( adjacent_fixmap != ADJACENT_DONT_HANDLE )
+    {
+        r = adjacent_write(adjacent_fixmap, address, len, val);
+        goto out;
+    }
+    if ( address < entry->gtable ||
+         address >= entry->gtable + entry->table_len )
+        goto out;
+    if ( len != 4 && len != 8 )
+        goto out;
+
     nr_entry = array_index_nospec(((address - entry->gtable) /
                                    PCI_MSIX_ENTRY_SIZE),
                                   MAX_MSIX_TABLE_ENTRIES);
@@ -345,8 +511,7 @@ static int msixtbl_write(struct vcpu *v, unsigned long address,
 
 unlock:
     spin_unlock_irqrestore(&desc->lock, flags);
-    if ( len == 4 )
-        r = X86EMUL_OKAY;
+    r = X86EMUL_OKAY;
 
 out:
     rcu_read_unlock(&msixtbl_rcu_lock);
@@ -357,7 +522,17 @@ static int cf_check _msixtbl_write(
     const struct hvm_io_handler *handler, uint64_t address, uint32_t len,
     uint64_t val)
 {
-    return msixtbl_write(current, address, len, val);
+    /* ignore unaligned writes */
+    if ( !IS_ALIGNED(address, len) )
+        return X86EMUL_OKAY;
+
+    /*
+     * This function returns X86EMUL_UNHANDLEABLE even if write is properly
+     * handled, to propagate it to the device model (so it can keep its
+     * internal state in sync).
+     */
+    msixtbl_write(current, address, len, val);
+    return X86EMUL_UNHANDLEABLE;
 }
 
 static bool cf_check msixtbl_range(
@@ -365,13 +540,21 @@ static bool cf_check msixtbl_range(
 {
     struct vcpu *curr = current;
     unsigned long addr = r->addr;
-    const struct msi_desc *desc;
+    const struct msixtbl_entry *entry;
+    const struct msi_desc *desc = NULL;
+    unsigned int adjacent_fixmap;
 
     ASSERT(r->type == IOREQ_TYPE_COPY);
 
     rcu_read_lock(&msixtbl_rcu_lock);
-    desc = msixtbl_addr_to_desc(msixtbl_find_entry(curr, addr), addr);
+    entry = msixtbl_find_entry(curr, addr);
+    adjacent_fixmap = adjacent_handle(entry, addr, false);
+    if ( adjacent_fixmap == ADJACENT_DONT_HANDLE )
+        desc = msixtbl_addr_to_desc(entry, addr);
     rcu_read_unlock(&msixtbl_rcu_lock);
+
+    if ( adjacent_fixmap != ADJACENT_DONT_HANDLE )
+        return 1;
 
     if ( desc )
         return 1;
@@ -613,12 +796,15 @@ void msix_write_completion(struct vcpu *v)
          v->arch.hvm.hvm_io.msix_snoop_gpa )
     {
         unsigned int token = hvmemul_cache_disable(v);
-        const struct msi_desc *desc;
+        const struct msi_desc *desc = NULL;
+        const struct msixtbl_entry *entry;
         uint32_t data;
 
         rcu_read_lock(&msixtbl_rcu_lock);
-        desc = msixtbl_addr_to_desc(msixtbl_find_entry(v, snoop_addr),
-                                    snoop_addr);
+        entry = msixtbl_find_entry(v, snoop_addr);
+        if ( entry && snoop_addr >= entry->gtable &&
+                      snoop_addr < entry->gtable + entry->table_len )
+            desc = msixtbl_addr_to_desc(entry, snoop_addr);
         rcu_read_unlock(&msixtbl_rcu_lock);
 
         if ( desc &&

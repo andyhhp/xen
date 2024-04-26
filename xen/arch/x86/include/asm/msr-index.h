@@ -155,6 +155,13 @@
 #define MSR_PL3_SSP                         0x000006a7
 #define MSR_INTERRUPT_SSP_TABLE             0x000006a8
 
+#define MSR_IA32_PM_ENABLE                  0x00000770
+#define  IA32_PM_ENABLE_HWP_ENABLE          (_AC(1, ULL) <<  0)
+
+#define MSR_IA32_HWP_CAPABILITIES           0x00000771
+#define MSR_IA32_HWP_INTERRUPT              0x00000773
+#define MSR_IA32_HWP_REQUEST                0x00000774
+
 #define MSR_X2APIC_FIRST                    0x00000800
 #define MSR_X2APIC_LAST                     0x000008ff
 
@@ -168,6 +175,11 @@
 #define MSR_PASID                           0x00000d93
 #define  PASID_PASID_MASK                   0x000fffff
 #define  PASID_VALID                        (_AC(1, ULL) << 31)
+
+#define MSR_IA32_PKG_HDC_CTL                0x00000db0
+#define  IA32_PKG_HDC_CTL_HDC_PKG_ENABLE    (_AC(1, ULL) <<  0)
+#define MSR_IA32_PM_CTL1                    0x00000db1
+#define  IA32_PM_CTL1_HDC_ALLOW_BLOCK       (_AC(1, ULL) <<  0)
 
 #define MSR_UARCH_MISC_CTRL                 0x00001b01
 #define  UARCH_CTRL_DOITM                   (_AC(1, ULL) <<  0)
@@ -509,6 +521,7 @@
 #define MSR_IA32_MISC_ENABLE_LIMIT_CPUID  (1<<22)
 #define MSR_IA32_MISC_ENABLE_XTPR_DISABLE (1<<23)
 #define MSR_IA32_MISC_ENABLE_XD_DISABLE	(1ULL << 34)
+#define MSR_IA32_MISC_ENABLE_TURBO_DISENGAGE (1ULL << 38)
 
 #define MSR_IA32_TSC_DEADLINE		0x000006E0
 #define MSR_IA32_ENERGY_PERF_BIAS	0x000001b0
@@ -709,5 +722,14 @@
 #define MSR_PKGC8_IRTL			0x00000633
 #define MSR_PKGC9_IRTL			0x00000634
 #define MSR_PKGC10_IRTL			0x00000635
+
+/* Package C-state residency counters */
+#define MSR_PKG_C2_RESIDENCY            0x0000060d
+#define MSR_PKG_C3_RESIDENCY            0x000003f8
+#define MSR_PKG_C6_RESIDENCY            0x000003f9
+#define MSR_PKG_C7_RESIDENCY            0x000003fa
+#define MSR_PKG_C8_RESIDENCY            0x00000630
+#define MSR_PKG_C9_RESIDENCY            0x00000631
+#define MSR_PKG_C10_RESIDENCY           0x00000632
 
 #endif /* __ASM_MSR_INDEX_H */

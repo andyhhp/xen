@@ -164,9 +164,11 @@ static void __init efi_arch_process_memory_map(EFI_SYSTEM_TABLE *SystemTable,
     for ( e820_raw.nr_map = i = 0; i < map_size; i += desc_size )
     {
         EFI_MEMORY_DESCRIPTOR *desc = map + i;
-        u64 len = desc->NumberOfPages << EFI_PAGE_SHIFT;
+        uint64_t len = efi_memory_descriptor_len(desc);
         u32 type;
 
+        if ( len == 0 )
+            continue;
         switch ( desc->Type )
         {
         case EfiBootServicesCode:
@@ -825,7 +827,7 @@ void __init efi_multiboot2(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable
 
     efi_relocate_esrt(SystemTable);
 
-    efi_exit_boot(ImageHandle, SystemTable);
+    efi_exit_boot(ImageHandle, SystemTable, true);
 }
 
 /*

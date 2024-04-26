@@ -229,6 +229,10 @@ struct __packed msg_address {
                                        PCI_MSIX_ENTRY_SIZE + \
                                        (~PCI_MSIX_BIRMASK & (PAGE_SIZE - 1)))
 
+/* indexes in adj_access_idx[] below */
+#define ADJ_IDX_FIRST 0
+#define ADJ_IDX_LAST  1
+
 struct arch_msix {
     unsigned int nr_entries, used_entries;
     struct {
@@ -236,6 +240,7 @@ struct arch_msix {
     } table, pba;
     int table_refcnt[MAX_MSIX_TABLE_PAGES];
     int table_idx[MAX_MSIX_TABLE_PAGES];
+    unsigned int adj_access_idx[2];
     spinlock_t table_lock;
     bool host_maskall, guest_maskall;
     domid_t warned;

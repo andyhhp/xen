@@ -56,10 +56,12 @@ static void disk_eject_xswatch_callback(libxl__egc *egc, libxl__ev_xswatch *w,
             "/local/domain/%d/backend/%" TOSTRING(BACKEND_STRING_SIZE)
            "[a-z]/%*d/%*d",
            &disk->backend_domid, backend_type);
-    if (!strcmp(backend_type, "tap") || !strcmp(backend_type, "vbd")) {
+    if (!strcmp(backend_type, "tap")) {
         disk->backend = LIBXL_DISK_BACKEND_TAP;
     } else if (!strcmp(backend_type, "qdisk")) {
         disk->backend = LIBXL_DISK_BACKEND_QDISK;
+    } else if (!strcmp(backend_type, "vbd")) {
+        disk->backend = LIBXL_DISK_BACKEND_PHY;
     } else {
         disk->backend = LIBXL_DISK_BACKEND_UNKNOWN;
     }
@@ -186,17 +188,6 @@ static int libxl__device_disk_setdefault(libxl__gc *gc, uint32_t domid,
     if (hotplug && disk->specification == LIBXL_DISK_SPECIFICATION_VIRTIO) {
         LOGD(ERROR, domid, "Hotplug isn't supported for specification virtio");
         return ERROR_FAIL;
-    }
-
-    /* Force Qdisk backend for CDROM devices of guests with a device model. */
-    if (disk->is_cdrom != 0 &&
-        libxl__domain_type(gc, domid) == LIBXL_DOMAIN_TYPE_HVM) {
-        if (!(disk->backend == LIBXL_DISK_BACKEND_QDISK ||
-              disk->backend == LIBXL_DISK_BACKEND_UNKNOWN)) {
-            LOGD(ERROR, domid, "Backend for CD devices on HVM guests must be Qdisk");
-            return ERROR_FAIL;
-        }
-        disk->backend = LIBXL_DISK_BACKEND_QDISK;
     }
 
     rc = libxl__device_disk_set_backend(gc, disk);

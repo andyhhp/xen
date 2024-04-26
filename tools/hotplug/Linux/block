@@ -3,6 +3,8 @@
 dir=$(dirname "$0")
 . "$dir/block-common.sh"
 
+HOTPLUG_STORE="/run/xen-hotplug/${XENBUS_PATH//\//-}"
+
 expand_dev() {
   local dev
   case $1 in
@@ -256,6 +258,9 @@ case "$command" in
       # script to be called twice, so just bail.
       exit 0
     fi
+    echo $p > "$HOTPLUG_STORE-params"
+    echo $mode > "$HOTPLUG_STORE-mode"
+    echo $truetype > "$HOTPLUG_STORE-type"
 
     FRONTEND_ID=$(xenstore_read "$XENBUS_PATH/frontend-id")
     FRONTEND_UUID=$(xenstore_read_default \
@@ -276,6 +281,12 @@ case "$command" in
         check_device_sharing "$dev" "$mode"
 	write_dev "$dev"
         release_lock "block"
+        # update QubesDB entries
+        if [ -f "/sys/class/block/$(basename $dev)/partition" ]; then
+            udevadm trigger --property-match=DEVNAME=$dev
+        else
+            udevadm trigger --parent-match=/sys/class/block/$(basename $dev)
+        fi
 	exit 0
 	;;
 
@@ -332,6 +343,7 @@ mount it read-write in a guest domain."
         fi
         do_or_die losetup $roflag "$loopdev" "$file"
         xenstore_write "$XENBUS_PATH/node" "$loopdev"
+        echo $loopdev > "$HOTPLUG_STORE-node"
         write_dev "$loopdev"
         release_lock "block"
         exit 0
@@ -346,15 +358,28 @@ mount it read-write in a guest domain."
     ;;
 
   remove)
+    truetype=$(cat $HOTPLUG_STORE-type || echo $truetype)
+    p=$(cat $HOTPLUG_STORE-params || echo $p)
     case $truetype in
       phy)
+        dev=$(expand_dev $p)
+        if [ -L "$dev" ]
+        then
+          dev=$(readlink -f "$dev") || fatal "$dev link does not exist."
+        fi
+        # update QubesDB entries
+        if [ -f "/sys/class/block/$(basename $dev)/partition" ]; then
+            udevadm trigger --property-match=DEVNAME=$dev
+        else
+            udevadm trigger --parent-match=/sys/class/block/$(basename $dev)
+        fi
 	exit 0
 	;;
 
       file)
         claim_lock "block"
-        node=$(xenstore_read "$XENBUS_PATH/node")
-	losetup -d "$node"
+        node=$(cat "$HOTPLUG_STORE-node")
+        losetup -d "$node"
         release_lock "block"
 	exit 0
 	;;

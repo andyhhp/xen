@@ -291,6 +291,11 @@ static int get_cpufreq_para(struct xen_sysctl_pm_op *op)
             &op->u.get_para.u.ondemand.sampling_rate,
             &op->u.get_para.u.ondemand.up_threshold);
     }
+
+    if ( !strncasecmp(op->u.get_para.scaling_governor, XEN_HWP_GOVERNOR,
+                      CPUFREQ_NAME_LEN) )
+        ret = get_hwp_para(policy, &op->u.get_para.u.hwp_para);
+
     op->u.get_para.turbo_enabled = cpufreq_get_turbo_status(op->cpuid);
 
     return ret;
@@ -394,6 +399,25 @@ static int set_cpufreq_para(struct xen_sysctl_pm_op *op)
     return ret;
 }
 
+static int set_cpufreq_hwp(struct xen_sysctl_pm_op *op)
+{
+    struct cpufreq_policy *policy;
+
+    if ( !cpufreq_governor_internal )
+        return -EINVAL;
+
+    policy = per_cpu(cpufreq_cpu_policy, op->cpuid);
+
+    if ( !policy || !policy->governor )
+        return -EINVAL;
+
+    if ( strncasecmp(policy->governor->name, XEN_HWP_GOVERNOR,
+                     CPUFREQ_NAME_LEN) )
+        return -EINVAL;
+
+    return set_hwp_para(policy, &op->u.set_hwp);
+}
+
 int do_pm_op(struct xen_sysctl_pm_op *op)
 {
     int ret = 0;
@@ -465,6 +489,10 @@ int do_pm_op(struct xen_sysctl_pm_op *op)
         ret = set_cpufreq_para(op);
         break;
     }
+
+    case SET_CPUFREQ_HWP:
+        ret = set_cpufreq_hwp(op);
+        break;
 
     case GET_CPUFREQ_AVGFREQ:
     {

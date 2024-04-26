@@ -3,30 +3,14 @@
 
 #include <xen/mm.h>
 
-/* These are the region types. They match the architectural specification. */
-#define MTRR_TYPE_UNCACHABLE 0
-#define MTRR_TYPE_WRCOMB     1
-#define MTRR_TYPE_WRTHROUGH  4
-#define MTRR_TYPE_WRPROT     5
-#define MTRR_TYPE_WRBACK     6
-#define MTRR_NUM_TYPES       7
+#define MTRR_NUM_TYPES       X86_MT_UCM
 #define MEMORY_NUM_TYPES     MTRR_NUM_TYPES
-#define NO_HARDCODE_MEM_TYPE    MTRR_NUM_TYPES
+#define NO_HARDCODE_MEM_TYPE MTRR_NUM_TYPES
 
 #define NORMAL_CACHE_MODE          0
 #define NO_FILL_CACHE_MODE         2
 
-enum {
-    PAT_TYPE_UNCACHABLE=0,
-    PAT_TYPE_WRCOMB=1,
-    PAT_TYPE_WRTHROUGH=4,
-    PAT_TYPE_WRPROT=5,
-    PAT_TYPE_WRBACK=6,
-    PAT_TYPE_UC_MINUS=7,
-    PAT_TYPE_NUMS
-};
-
-#define INVALID_MEM_TYPE PAT_TYPE_NUMS
+#define INVALID_MEM_TYPE X86_NUM_MT
 
 /* In the Intel processor's MTRR interface, the MTRR type is always held in
    an 8 bit field: */

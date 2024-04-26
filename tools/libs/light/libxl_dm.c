@@ -996,22 +996,6 @@ static char *dm_spice_options(libxl__gc *gc,
     return opt;
 }
 
-static enum libxl_gfx_passthru_kind
-libxl__detect_gfx_passthru_kind(libxl__gc *gc,
-                                const libxl_domain_config *guest_config)
-{
-    const libxl_domain_build_info *b_info = &guest_config->b_info;
-
-    if (b_info->u.hvm.gfx_passthru_kind != LIBXL_GFX_PASSTHRU_KIND_DEFAULT)
-        return b_info->u.hvm.gfx_passthru_kind;
-
-    if (libxl__is_igd_vga_passthru(gc, guest_config)) {
-        return LIBXL_GFX_PASSTHRU_KIND_IGD;
-    }
-
-    return LIBXL_GFX_PASSTHRU_KIND_DEFAULT;
-}
-
 /* colo mode */
 enum {
     LIBXL__COLO_NONE = 0,
@@ -1380,7 +1364,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             if (disks[i].is_cdrom) {
                 continue;
             }
-            if (strncmp(disks[i].vdev, "sd", 2) == 0) {
+            if (strncmp(disks[i].vdev, "sd", 2) == 0 || !disks[i].readwrite) {
                 flexarray_vappend(dm_args, "-device", "lsi53c895a", NULL);
                 break;
             }
@@ -1462,6 +1446,9 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                 GCSPRINTF("qxl-vga,vram_size_mb=%"PRIu64",ram_size_mb=%"PRIu64,
                 (b_info->video_memkb/2/1024), (b_info->video_memkb/2/1024) ) );
             break;
+        case LIBXL_VGA_INTERFACE_TYPE_XENGT:
+            flexarray_vappend(dm_args, "-vga", "xengt", NULL);
+	     break;
         default:
             LOGD(ERROR, guest_domid, "Invalid emulated video card specified");
             return ERROR_INVAL;
@@ -1479,18 +1466,20 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                 LOGD(ERROR, guest_domid, "Both usbdevice and usbdevice_list set");
                 return ERROR_INVAL;
             }
-            flexarray_append(dm_args, "-usb");
+            flexarray_append_pair(dm_args,
+                                  "-device", "usb-ehci,id=ehci");
             if (b_info->u.hvm.usbdevice) {
-                flexarray_vappend(dm_args,
-                                  "-usbdevice", b_info->u.hvm.usbdevice, NULL);
+                flexarray_vappend(dm_args, "-device",
+                                  GCSPRINTF("usb-%s,bus=ehci.0",
+                                            b_info->u.hvm.usbdevice),
+                                  NULL);
             } else if (b_info->u.hvm.usbdevice_list) {
                 char **p;
                 for (p = b_info->u.hvm.usbdevice_list;
                      *p;
                      p++) {
-                    flexarray_vappend(dm_args,
-                                      "-usbdevice",
-                                      *p, NULL);
+                    flexarray_vappend(dm_args, "-device",
+                                      GCSPRINTF("usb-%s,bus=ehci.0", *p), NULL);
                 }
             }
         } else if (b_info->u.hvm.usbversion) {
@@ -1734,6 +1723,13 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
             flexarray_append(dm_args, "-net");
             flexarray_append(dm_args, "none");
         }
+
+        if (libxl_defbool_val(b_info->u.hvm.qubes_gui.enable)) {
+            flexarray_append_pair(dm_args, "-display",
+                                  GCSPRINTF("qubes-gui,domid=%u,log-level=%i",
+                                            b_info->u.hvm.qubes_gui.domid,
+                                            b_info->u.hvm.qubes_gui.log_level));
+        }
     } else {
         if (!sdl && !vnc) {
             flexarray_append(dm_args, "-nographic");
@@ -1832,9 +1828,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
         }
 
         if (libxl_defbool_val(b_info->u.hvm.gfx_passthru)) {
-            enum libxl_gfx_passthru_kind gfx_passthru_kind =
-                            libxl__detect_gfx_passthru_kind(gc, guest_config);
-            switch (gfx_passthru_kind) {
+            switch (b_info->u.hvm.gfx_passthru_kind) {
             case LIBXL_GFX_PASSTHRU_KIND_IGD:
                 machinearg = GCSPRINTF("%s,igd-passthru=on", machinearg);
                 break;
@@ -1969,7 +1963,7 @@ static int libxl__build_device_model_args_new(libxl__gc *gc,
                     colo_mode = LIBXL__COLO_NONE;
                 }
 
-                if (strncmp(disks[i].vdev, "sd", 2) == 0) {
+                if (strncmp(disks[i].vdev, "sd", 2) == 0 || !disks[i].readwrite) {
                     const char *drive_id;
                     if (colo_mode == LIBXL__COLO_SECONDARY) {
                         drive = libxl__sprintf
@@ -2251,6 +2245,9 @@ static void spawn_stubdom_pvqemu_cb(libxl__egc *egc,
                                 libxl__dm_spawn_state *stubdom_dmss,
                                 int rc);
 
+static void spawn_stub_pcis_dm(libxl__egc *egc,
+                               libxl__multidev *multidev, int ret);
+
 static void spawn_stub_launch_dm(libxl__egc *egc,
                                  libxl__multidev *aodevs, int ret);
 
@@ -2466,10 +2463,37 @@ retry_transaction:
             goto retry_transaction;
 
     libxl__multidev_begin(ao, &sdss->multidev);
-    sdss->multidev.callback = spawn_stub_launch_dm;
+    sdss->multidev.callback = spawn_stub_pcis_dm;
     libxl__add_disks(egc, ao, dm_domid, dm_config, &sdss->multidev);
     libxl__multidev_prepared(egc, &sdss->multidev, 0);
 
+    return;
+
+out:
+    assert(ret);
+    spawn_stubdom_pvqemu_cb(egc, &sdss->pvqemu, ret);
+}
+
+static void spawn_stub_pcis_dm(libxl__egc *egc,
+                               libxl__multidev *multidev, int ret)
+{
+    libxl__stub_dm_spawn_state *sdss = CONTAINER_OF(multidev, *sdss, multidev);
+    STATE_AO_GC(sdss->dm.spawn.ao);
+
+    /* convenience aliases */
+    libxl_domain_config *const guest_config = sdss->dm.guest_config;
+    const int guest_domid = sdss->dm.guest_domid;
+    uint32_t dm_domid = sdss->pvqemu.guest_domid;
+
+    if (ret) {
+        LOGD(ERROR, guest_domid, "error connecting disk devices");
+        goto out;
+    }
+
+    libxl__multidev_begin(ao, &sdss->multidev);
+    sdss->multidev.callback = spawn_stub_launch_dm;
+    libxl__add_pcis(egc, ao, dm_domid, guest_config, &sdss->multidev);
+    libxl__multidev_prepared(egc, &sdss->multidev, 0);
     return;
 
 out:
@@ -2496,7 +2520,7 @@ static void spawn_stub_launch_dm(libxl__egc *egc,
     int need_qemu;
 
     if (ret) {
-        LOGD(ERROR, guest_domid, "error connecting disk devices");
+        LOGD(ERROR, guest_domid, "error connecting pci devices");
         goto out;
      }
 
@@ -2528,6 +2552,9 @@ static void spawn_stub_launch_dm(libxl__egc *egc,
         while (*(serial++))
             num_console++;
     }
+    else
+        /* Qubes hack */
+        num_console = 1;
 
     console = libxl__calloc(gc, num_console, sizeof(libxl__device_console));
 
@@ -2581,7 +2608,7 @@ static void spawn_stub_launch_dm(libxl__egc *egc,
      * Until xenconsoled learns how to handle multiple consoles, require qemu
      * in dom0 to serve consoles for a stubdomain - it require at least 3 of them.
      */
-    need_qemu = 1 || libxl__need_xenpv_qemu(gc, &sdss->dm_config);
+    need_qemu = libxl__need_xenpv_qemu(gc, &sdss->dm_config);
 
     for (i = 0; i < num_console; i++) {
         libxl__device device;
@@ -2635,10 +2662,11 @@ static void spawn_qmp_proxy(libxl__egc *egc,
     sdss->qmp_proxy_spawn.failure_cb = qmp_proxy_startup_failed;
     sdss->qmp_proxy_spawn.detached_cb = qmp_proxy_detached;
 
-    const int arraysize = 6;
+    const int arraysize = 7;
     GCNEW_ARRAY(args, arraysize);
     args[nr++] = STUBDOM_QMP_PROXY_PATH;
     args[nr++] = GCSPRINTF("--state-path=%s", sdss->qmp_proxy_spawn.xspath);
+    args[nr++] = "--reconnect-marker=1";
     args[nr++] = GCSPRINTF("%u", dm_domid);
     args[nr++] = GCSPRINTF("%s/device-model/%u/qmp-vchan", dom_path, guest_domid);
     args[nr++] = (char*)libxl__qemu_qmp_path(gc, guest_domid);
@@ -2717,7 +2745,7 @@ static void qmp_proxy_spawn_outcome(libxl__egc *egc,
      * Until xenconsoled learns how to handle multiple consoles, require qemu
      * in dom0 to serve consoles for a stubdomain - it require at least 3 of them.
      */
-    int need_pvqemu = 1 || libxl__need_xenpv_qemu(gc, &sdss->dm_config);
+    int need_pvqemu = libxl__need_xenpv_qemu(gc, &sdss->dm_config);
 
     if (rc) goto out;
 

@@ -38,6 +38,7 @@ libxl_ms_vm_genid = Builtin("ms_vm_genid", passby=PASS_BY_REFERENCE, check_defau
 #
 
 MemKB = UInt(64, init_val = "LIBXL_MEMKB_DEFAULT", json_gen_fn = "libxl__uint64_gen_json")
+VgtInt = UInt(32, init_val = "0UL")
 
 #
 # Constants / Enumerations
@@ -232,6 +233,7 @@ libxl_vga_interface_type = Enumeration("vga_interface_type", [
     (2, "STD"),
     (3, "NONE"),
     (4, "QXL"),
+    (5, "XENGT"),
     ], init_val = "LIBXL_VGA_INTERFACE_TYPE_UNKNOWN")
 
 libxl_vendor_device = Enumeration("vendor_device", [
@@ -341,6 +343,13 @@ libxl_sdl_info = Struct("sdl_info", [
     ("opengl",        libxl_defbool),
     ("display",       string),
     ("xauthority",    string),
+    ])
+
+libxl_qubes_gui_info = Struct("qubes_gui_info", [
+    ("enable", libxl_defbool),
+    ("domid", libxl_domid),
+    ("domname", string),
+    ("log_level", integer),
     ])
 
 libxl_dominfo = Struct("dominfo",[
@@ -608,6 +617,9 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("hdtype",           libxl_hdtype),
                                        ("nographic",        libxl_defbool),
                                        ("vga",              libxl_vga_interface_info),
+                                       ("vgt_low_gm_sz",    VgtInt),
+                                       ("vgt_high_gm_sz",   VgtInt),
+                                       ("vgt_fence_sz",     VgtInt),
                                        ("vnc",              libxl_vnc_info),
                                        # keyboard layout, default is en-us keyboard
                                        ("keymap",           string),
@@ -636,6 +648,8 @@ libxl_domain_build_info = Struct("domain_build_info",[
                                        ("rdm", libxl_rdm_reserve),
                                        ("rdm_mem_boundary_memkb", MemKB),
                                        ("mca_caps",         uint64),
+
+                                       ("qubes_gui", libxl_qubes_gui_info),
                                        ])),
                  ("pv", Struct(None, [("kernel", string, {'deprecated_by': 'kernel'}),
                                       ("slack_memkb", MemKB),

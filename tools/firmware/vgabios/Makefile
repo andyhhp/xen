@@ -5,7 +5,8 @@ BCC = bcc
 AS86 = as86
 
 RELEASE = `pwd | sed "s-.*/--"`
-VGABIOS_REL_DATE ?= `date '+%d %b %Y'`
+VGABIOS_REL_DATE ?= $(shell date $(DATE_EPOCH_OPTS) +%d %b %Y)
+
 RELVERS = `pwd | sed "s-.*/--" | sed "s/vgabios//" | sed "s/-//"`
 
 VGABIOS_DATE = "-DVGABIOS_DATE=\"$(VGABIOS_REL_DATE)\""

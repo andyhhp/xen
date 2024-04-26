@@ -145,7 +145,7 @@ static void efi_tables(void);
 static void setup_efi_pci(void);
 static void efi_variables(void);
 static void efi_set_gop_mode(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop, UINTN gop_mode);
-static void efi_exit_boot(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable);
+static void efi_exit_boot(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable, bool exit_boot_services);
 
 static const EFI_BOOT_SERVICES *__initdata efi_bs;
 static UINT32 __initdata efi_bs_revision;
@@ -156,6 +156,7 @@ static SIMPLE_TEXT_OUTPUT_INTERFACE *__initdata StdErr;
 
 static UINT32 __initdata mdesc_ver;
 static bool __initdata map_bs;
+static bool __initdata map_res = true;
 
 static struct file __initdata cfg;
 static struct file __initdata kernel;
@@ -591,15 +592,14 @@ static UINTN __initdata esrt = EFI_INVALID_TABLE_ADDR;
 
 static size_t __init get_esrt_size(const EFI_MEMORY_DESCRIPTOR *desc)
 {
-    size_t available_len, len;
+    UINT64 available_len, len = efi_memory_descriptor_len(desc);
     const UINTN physical_start = desc->PhysicalStart;
     const EFI_SYSTEM_RESOURCE_TABLE *esrt_ptr;
 
-    len = desc->NumberOfPages << EFI_PAGE_SHIFT;
     if ( esrt == EFI_INVALID_TABLE_ADDR )
-        return 0;
+        return 0; /* invalid ESRT */
     if ( physical_start > esrt || esrt - physical_start >= len )
-        return 0;
+        return 0; /* ESRT not in this memory region */
     /*
      * The specification requires EfiBootServicesData, but also accept
      * EfiRuntimeServicesData (for compatibility with buggy firmware)
@@ -1179,7 +1179,7 @@ static void __init efi_set_gop_mode(EFI_GRAPHICS_OUTPUT_PROTOCOL *gop, UINTN gop
 #define INVALID_VIRTUAL_ADDRESS (0xBAAADUL << \
                                  (EFI_PAGE_SHIFT + BITS_PER_LONG - 32))
 
-static void __init efi_exit_boot(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
+static void __init efi_exit_boot(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable, bool exit_boot_services)
 {
     EFI_STATUS status;
     UINTN info_size = 0, map_key;
@@ -1210,8 +1210,11 @@ static void __init efi_exit_boot(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *Syste
 
         efi_arch_pre_exit_boot();
 
-        status = SystemTable->BootServices->ExitBootServices(ImageHandle,
+        if (exit_boot_services)
+            status = SystemTable->BootServices->ExitBootServices(ImageHandle,
                                                              map_key);
+        else
+            status = 0;
         efi_bs = NULL;
         if ( status != EFI_INVALID_PARAMETER || retry )
             break;
@@ -1266,7 +1269,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
     EFI_SHIM_LOCK_PROTOCOL *shim_lock;
     EFI_GRAPHICS_OUTPUT_PROTOCOL *gop = NULL;
     union string section = { NULL }, name;
-    bool base_video = false;
+    bool base_video = false, exit_boot_services = true;
     const char *option_str;
     bool use_cfg_file;
     int dt_modules_found;
@@ -1316,6 +1319,8 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
                     base_video = true;
                 else if ( wstrcmp(ptr + 1, L"mapbs") == 0 )
                     map_bs = true;
+                else if ( wstrcmp(ptr + 1, L"noexitboot") == 0 )
+                    exit_boot_services = false;
                 else if ( wstrncmp(ptr + 1, L"cfg=", 4) == 0 )
                     cfg_file_name = ptr + 5;
                 else if ( i + 1 < argc && wstrcmp(ptr + 1, L"cfg") == 0 )
@@ -1326,6 +1331,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
                     PrintStr(L"Xen EFI Loader options:\r\n");
                     PrintStr(L"-basevideo   retain current video mode\r\n");
                     PrintStr(L"-mapbs       map EfiBootServices{Code,Data}\r\n");
+                    PrintStr(L"-noexitboot  Do not call ExitBootServices\r\n");
                     PrintStr(L"-cfg=<file>  specify configuration file\r\n");
                     PrintStr(L"-help, -?    display this help\r\n");
                     blexit(NULL);
@@ -1467,6 +1473,18 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
         name.s = get_value(&cfg, section.s, "options");
         efi_arch_handle_cmdline(argc ? *argv : NULL, options, name.s);
 
+        name.s = get_value(&cfg, section.s, "mapbs");
+        if ( name.s )
+        {
+            map_bs = name.s[0] == '1';
+        }
+
+        name.s = get_value(&cfg, section.s, "noexitboot");
+        if ( name.s )
+        {
+            exit_boot_services = name.s[0] == '0';
+        }
+
         if ( !base_video )
         {
             name.cs = get_value(&cfg, section.s, "video");
@@ -1543,7 +1561,7 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
 
     efi_relocate_esrt(SystemTable);
 
-    efi_exit_boot(ImageHandle, SystemTable);
+    efi_exit_boot(ImageHandle, SystemTable, exit_boot_services);
 
     efi_arch_post_exit_boot(); /* Doesn't return. */
 }
@@ -1669,7 +1687,7 @@ void __init efi_init_memory(void)
     for ( i = 0; i < efi_memmap_size; i += efi_mdesc_size )
     {
         EFI_MEMORY_DESCRIPTOR *desc = efi_memmap + i;
-        u64 len = desc->NumberOfPages << EFI_PAGE_SHIFT;
+        uint64_t len = efi_memory_descriptor_len(desc);
         unsigned long smfn, emfn;
         unsigned int prot = PAGE_HYPERVISOR_RWX;
 
@@ -1686,6 +1704,16 @@ void __init efi_init_memory(void)
             l1tf_safe_maddr =
                 max(l1tf_safe_maddr,
                     ROUNDUP(desc->PhysicalStart + len, PAGE_SIZE));
+        }
+
+        if ( len == 0 )
+        {
+            printk(XENLOG_ERR "BAD EFI MEMORY DESCRIPTOR: "
+                   "PhysicalStart=%016" PRIx64 " NumberOfPages=%016" PRIx64
+                   " type=%" PRIu32 " attr=%016" PRIx64 "\n",
+                   desc->PhysicalStart, desc->NumberOfPages,
+                   desc->Type, desc->Attribute);
+            continue;
         }
 
         if ( !efi_enabled(EFI_RS) )
@@ -1715,6 +1743,11 @@ void __init efi_init_memory(void)
                 if ( !map_bs )
                     continue;
                 break;
+
+            case EfiReservedMemoryType:
+                if ( !map_res )
+                    continue;
+                break;
             }
         }
 
@@ -1724,23 +1757,23 @@ void __init efi_init_memory(void)
         emfn = PFN_UP(desc->PhysicalStart + len);
 
         if ( desc->Attribute & EFI_MEMORY_WB )
-            /* nothing */;
+            prot |= _PAGE_WB;
         else if ( desc->Attribute & EFI_MEMORY_WT )
-            prot |= _PAGE_PWT | MAP_SMALL_PAGES;
+            prot |= _PAGE_WT | MAP_SMALL_PAGES;
         else if ( desc->Attribute & EFI_MEMORY_WC )
-            prot |= _PAGE_PAT | MAP_SMALL_PAGES;
+            prot |= _PAGE_WC | MAP_SMALL_PAGES;
         else if ( desc->Attribute & (EFI_MEMORY_UC | EFI_MEMORY_UCE) )
-            prot |= _PAGE_PWT | _PAGE_PCD | MAP_SMALL_PAGES;
+            prot |= _PAGE_UC | MAP_SMALL_PAGES;
         else if ( efi_bs_revision >= EFI_REVISION(2, 5) &&
                   (desc->Attribute & EFI_MEMORY_WP) )
-            prot |= _PAGE_PAT | _PAGE_PWT | MAP_SMALL_PAGES;
+            prot |= _PAGE_WP | MAP_SMALL_PAGES;
         else
         {
             printk(XENLOG_ERR "Unknown cachability for MFNs %#lx-%#lx%s\n",
                    smfn, emfn - 1, efi_map_uc ? ", assuming UC" : "");
             if ( !efi_map_uc )
                 continue;
-            prot |= _PAGE_PWT | _PAGE_PCD | MAP_SMALL_PAGES;
+            prot |= _PAGE_UC | MAP_SMALL_PAGES;
         }
 
         if ( desc->Attribute & (efi_bs_revision < EFI_REVISION(2, 5)

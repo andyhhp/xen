@@ -77,6 +77,7 @@ static void usage(const char *program) {
 	       "  -n, --num N      use console number N\n"
 	       "  --type TYPE      console type. must be 'pv', 'serial' or 'vuart'\n"
 	       "  --start-notify-fd N file descriptor used to notify parent\n"
+	       "  -r, --no-replace-escape Do not replace ESC character with dot\n"
 	       , program);
 }
 
@@ -174,7 +175,7 @@ static void restore_term(int fd, struct termios *old)
 }
 
 static int console_loop(int fd, struct xs_handle *xs, char *pty_path,
-		        bool interactive)
+		        bool interactive, bool replace_escape)
 {
 	int ret, xs_fd = xs_fileno(xs), max_fd = -1;
 
@@ -247,6 +248,12 @@ static int console_loop(int fd, struct xs_handle *xs, char *pty_path,
 				close(fd);
 				fd = -1;
 				continue;
+			}
+			if (replace_escape) {
+				int i;
+				for (i = 0; i < len; i++)
+					if (msg[i] == '\033')
+						msg[i] = '.';
 			}
 
 			if (!write_sync(STDOUT_FILENO, msg, len)) {
@@ -324,7 +331,7 @@ int main(int argc, char **argv)
 {
 	struct termios attr;
 	int domid;
-	const char *sopt = "hn:";
+	const char *sopt = "hn:r";
 	int ch;
 	unsigned int num = 0;
 	int opt_ind=0;
@@ -335,6 +342,7 @@ int main(int argc, char **argv)
 		{ "help",    0, 0, 'h' },
 		{ "start-notify-fd", 1, 0, 's' },
 		{ "interactive", 0, 0, 'i' },
+		{ "no-replace-escape", 0, 0, 'r' },
 		{ 0 },
 
 	};
@@ -344,7 +352,11 @@ int main(int argc, char **argv)
 	char *end;
 	console_type type = CONSOLE_INVAL;
 	bool interactive = 0;
+	bool replace_escape = 1;
 	const char *console_names = "serial, pv, vuart";
+
+	if (getenv("XEN_CONSOLE_REPLACE_ESCAPE"))
+		replace_escape = atoi(getenv("XEN_CONSOLE_REPLACE_ESCAPE"));
 
 	while((ch = getopt_long(argc, argv, sopt, lopt, &opt_ind)) != -1) {
 		switch(ch) {
@@ -374,6 +386,9 @@ int main(int argc, char **argv)
 			break;
 		case 'i':
 			interactive = 1;
+			break;
+		case 'r':
+			replace_escape = 0;
 			break;
 		default:
 			fprintf(stderr, "Invalid argument\n");
@@ -494,7 +509,7 @@ int main(int argc, char **argv)
 		close(start_notify_fd);
 	}
 
-	console_loop(spty, xs, path, interactive);
+	console_loop(spty, xs, path, interactive, replace_escape);
 
 	free(path);
 	free(dom_path);

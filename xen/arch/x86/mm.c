@@ -959,14 +959,16 @@ get_page_from_l1e(
             flip = _PAGE_RW;
         }
 
-        switch ( l1f & PAGE_CACHE_ATTRS )
+        switch ( 0xFF & (XEN_MSR_PAT >> (8 * pte_flags_to_cacheattr(l1f))) )
         {
-        case 0: /* WB */
-            flip |= _PAGE_PWT | _PAGE_PCD;
+        case X86_MT_UC:
+        case X86_MT_UCM:
+        case X86_MT_WC:
+            /* not cacheable, allow */
             break;
-        case _PAGE_PWT: /* WT */
-        case _PAGE_PWT | _PAGE_PAT: /* WP */
-            flip |= _PAGE_PCD | (l1f & _PAGE_PAT);
+        default:
+            /* potentially cacheable, force to UC */
+            flip |= ((l1f & PAGE_CACHE_ATTRS) ^ _PAGE_UC);
             break;
         }
 
@@ -4692,6 +4694,61 @@ static int cf_check handle_iomem_range(
     return err || s > e ? err : _handle_iomem_range(s, e, p);
 }
 
+static int get_mfn_from_pfn(XEN_GUEST_HANDLE(xen_get_mfn_from_pfn_t) arg)
+{
+    struct xen_get_mfn_from_pfn cmd_info;
+    struct domain *d;
+    int rc=0, i;
+    xen_pfn_t *pfns = NULL;
+    xen_pfn_t pfn;
+    struct p2m_domain *p2m;
+    p2m_type_t t;
+
+    if ( !is_hardware_domain(current->domain) )
+        return -EPERM;
+
+    if ( copy_from_guest(&cmd_info, arg, 1) )
+        return -EFAULT;
+
+    d = rcu_lock_domain_by_any_id(cmd_info.domid);
+    if ( d == NULL )
+        return -ESRCH;
+
+    /* sanity check for security */
+    if (cmd_info.nr_pfns > 2048 )
+        return -ENOMEM;
+
+    pfns = xmalloc_array(xen_pfn_t, cmd_info.nr_pfns);
+    if (pfns == NULL)
+        return -ENOMEM;
+
+    if (copy_from_guest(pfns, cmd_info.pfn_list, cmd_info.nr_pfns)){
+        rc = -EFAULT;
+        goto out;
+    }
+
+    p2m = p2m_get_hostp2m(d);
+    for(i=0; i < cmd_info.nr_pfns; i++){
+        pfn = pfns[i];
+        pfns[i] = mfn_x(get_gfn_query(d, pfn, &t));
+		if(pfns[i] == mfn_x(INVALID_MFN)){
+			rc = -EINVAL;
+			goto out;
+		}
+		put_gfn(d, pfn);
+    }
+
+    if (copy_to_guest(cmd_info.pfn_list, pfns, cmd_info.nr_pfns)){
+        rc = -EFAULT;
+        goto out;
+    }
+
+out:
+    rcu_unlock_domain(d);
+    xfree(pfns);
+    return rc;
+}
+
 long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
 {
     int rc;
@@ -4901,6 +4958,15 @@ long arch_memory_op(unsigned long cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
         return rc;
     }
 #endif
+
+#ifdef __x86_64__
+    case XENMEM_get_sharing_freed_pages:
+        return mem_sharing_get_nr_saved_mfns();
+#endif
+
+    case XENMEM_get_mfn_from_pfn:
+        return get_mfn_from_pfn(guest_handle_cast(arg, xen_get_mfn_from_pfn_t));
+        break;
 
     default:
         return subarch_memory_op(cmd, arg);
@@ -6358,6 +6424,80 @@ unsigned long get_upper_mfn_bound(void)
     max_mfn = min(max_mfn, 1UL << 32);
 #endif
     return min(max_mfn, 1UL << (paddr_bits - PAGE_SHIFT)) - 1;
+}
+
+
+/*
+ * A bunch of static assertions to check that the XEN_MSR_PAT is valid
+ * and consistent with the _PAGE_* macros, and that _PAGE_WB is zero.
+ */
+static void __init __maybe_unused build_assertions(void)
+{
+    /*
+     * _PAGE_WB must be zero for several reasons, not least because Linux
+     * assumes it.
+     */
+    BUILD_BUG_ON(_PAGE_WB);
+
+    /* A macro to convert from cache attributes to actual cacheability */
+#define PAT_ENTRY(v) (0xFF & (XEN_MSR_PAT >> (8 * (v))))
+
+    /* Validate at compile-time that v is a valid value for a PAT entry */
+#define CHECK_PAT_ENTRY_VALUE(v)                                               \
+    BUILD_BUG_ON((v) < 0 || (v) > 7 ||                                         \
+                 (v) == X86_MT_RSVD_2 || (v) == X86_MT_RSVD_3)
+
+    /* Validate at compile-time that PAT entry v is valid */
+#define CHECK_PAT_ENTRY(v) do {                                                \
+    BUILD_BUG_ON((v) < 0 || (v) > 7);                                          \
+    CHECK_PAT_ENTRY_VALUE(PAT_ENTRY(v));                                       \
+} while (0);
+
+    /*
+     * If one of these trips, the corresponding entry in XEN_MSR_PAT is invalid.
+     * This would cause Xen to crash (with #GP) at startup.
+     */
+    CHECK_PAT_ENTRY(0);
+    CHECK_PAT_ENTRY(1);
+    CHECK_PAT_ENTRY(2);
+    CHECK_PAT_ENTRY(3);
+    CHECK_PAT_ENTRY(4);
+    CHECK_PAT_ENTRY(5);
+    CHECK_PAT_ENTRY(6);
+    CHECK_PAT_ENTRY(7);
+
+#undef CHECK_PAT_ENTRY
+#undef CHECK_PAT_ENTRY_VALUE
+
+    /* Macro version of page_flags_to_cacheattr(), for use in BUILD_BUG_ON()s */
+#define PAGE_FLAGS_TO_CACHEATTR(page_value)                                    \
+    ((((page_value) >> 5) & 4) | (((page_value) >> 3) & 3))
+
+    /* Check that a PAT-related _PAGE_* macro is correct */
+#define CHECK_PAGE_VALUE(page_value) do {                                      \
+    /* Check that the _PAGE_* macros only use bits from PAGE_CACHE_ATTRS */    \
+    BUILD_BUG_ON(((_PAGE_##page_value) & PAGE_CACHE_ATTRS) !=                  \
+                  (_PAGE_##page_value));                                       \
+    /* Check that the _PAGE_* are consistent with XEN_MSR_PAT */               \
+    BUILD_BUG_ON(PAT_ENTRY(PAGE_FLAGS_TO_CACHEATTR(_PAGE_##page_value)) !=     \
+                 (X86_MT_##page_value));                                       \
+} while (0)
+
+    /*
+     * If one of these trips, the corresponding _PAGE_* macro is inconsistent
+     * with XEN_MSR_PAT.  This would cause Xen to use incorrect cacheability
+     * flags, with results that are undefined and probably harmful.
+     */
+    CHECK_PAGE_VALUE(WT);
+    CHECK_PAGE_VALUE(WB);
+    CHECK_PAGE_VALUE(WC);
+    CHECK_PAGE_VALUE(UC);
+    CHECK_PAGE_VALUE(UCM);
+    CHECK_PAGE_VALUE(WP);
+
+#undef CHECK_PAGE_VALUE
+#undef PAGE_FLAGS_TO_CACHEATTR
+#undef PAT_ENTRY
 }
 
 /*

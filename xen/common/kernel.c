@@ -583,6 +583,7 @@ DO(xen_version)(int cmd, XEN_GUEST_HANDLE_PARAM(void) arg)
                 fi.submap |= (1U << XENFEAT_direct_mapped);
             else
                 fi.submap |= (1U << XENFEAT_not_direct_mapped);
+            fi.submap |= (1U << XENFEAT_dm_msix_all_writes);
             break;
         default:
             return -EINVAL;
