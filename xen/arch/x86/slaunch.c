@@ -72,8 +72,8 @@ void __init map_slaunch_mem_regions(void)
     }
 
     find_evt_log(__va(slaunch_slrt), &evt_log_addr, &evt_log_size);
-    map_l2((unsigned long)evt_log_addr, evt_log_size);
-
+    if ( evt_log_addr != NULL )
+        map_l2((unsigned long)evt_log_addr, evt_log_size);
 }
 
 void __init protect_slaunch_mem_regions(void)
