@@ -61,9 +61,6 @@ void __init map_slaunch_mem_regions(void)
 
     map_l2(TPM_TIS_BASE, TPM_TIS_SIZE);
 
-    find_evt_log(__va(slaunch_slrt), &evt_log_addr, &evt_log_size);
-    map_l2((unsigned long)evt_log_addr, evt_log_size);
-
     /* Vendor-specific part. */
     if ( boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
     {
@@ -73,6 +70,10 @@ void __init map_slaunch_mem_regions(void)
     {
         map_l2(get_slb_start(), SKINIT_SLB_SIZE);
     }
+
+    find_evt_log(__va(slaunch_slrt), &evt_log_addr, &evt_log_size);
+    map_l2((unsigned long)evt_log_addr, evt_log_size);
+
 }
 
 void __init protect_slaunch_mem_regions(void)
