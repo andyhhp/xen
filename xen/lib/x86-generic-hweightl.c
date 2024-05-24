@@ -66,4 +66,6 @@ static void __init __constructor test_arch_generic_hweightl(void)
 
     RUNTIME_CHECK(arch_generic_hweightl, 1 | (1UL << (BITS_PER_LONG - 1)), 2);
     RUNTIME_CHECK(arch_generic_hweightl, -1UL, BITS_PER_LONG);
+
+    printk("*** %s() done\n", __func__);
 }

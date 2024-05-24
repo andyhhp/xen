@@ -66,5 +66,6 @@ static void __init __constructor test_generic_flsl(void)
     RUNTIME_CHECK(generic_flsl, 1 | (1UL << 32), 33);
     RUNTIME_CHECK(generic_flsl, 1 | (1UL << 63), 64);
 #endif
+    printk("*** %s() done\n", __func__);
 }
 #endif /* CONFIG_SELF_TESTS */

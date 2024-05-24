@@ -157,4 +157,15 @@ static void __init __constructor test_bitops(void)
 
     test_multiple_bits_set();
     test_hweight();
+
+    printk("*** %s() done\n", __func__);
 }
+
+void *__initdata refs[] = {
+    generic_ffsl,
+    generic_flsl,
+    generic_hweightl,
+#ifdef CONFIG_X86
+    arch_generic_hweightl,
+#endif
+};
