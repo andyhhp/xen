@@ -88,4 +88,8 @@ static void __init __constructor test_bitops(void)
 {
     test_ffs();
     test_fls();
+
+    printk("*** %s() done\n", __func__);
 }
+void __initdata *g1 = generic_flsl;
+void __initdata *g2 = generic_ffsl;
