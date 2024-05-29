@@ -11,7 +11,7 @@
 
 /* Hide a value from the optimiser. */
 #define HIDE(x)                                                         \
-    ({ typeof(x) _x = (x); asm volatile ( "" : "+r" (_x) ); _x; })
+    ({ typeof(x) _x = (x); asm volatile ( "" : "+rm" (_x) ); _x; })
 
 /*
  * Check that fn(val) can be calcuated by the compiler, and that it gives the
