@@ -92,7 +92,7 @@
     when: always
   only:
     variables:
-      - $XILINX_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
+      - $XILINX_JOBS == "true"
   tags:
     - xilinx
 
@@ -112,7 +112,7 @@
     when: always
   only:
     variables:
-      - $QUBES_JOBS == "true" && $CI_COMMIT_REF_PROTECTED == "true"
+      - $QUBES_JOBS == "true"
   tags:
     - qubes-hw2
 
