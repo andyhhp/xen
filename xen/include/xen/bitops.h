@@ -4,6 +4,17 @@
 #include <xen/compiler.h>
 #include <xen/types.h>
 
+#define BITOP_BITS_PER_WORD 32
+typedef uint32_t bitop_uint_t;
+
+#define BITOP_MASK(nr)  ((bitop_uint_t)1 << ((nr) % BITOP_BITS_PER_WORD))
+
+#define BITOP_WORD(nr)  ((nr) / BITOP_BITS_PER_WORD)
+
+extern void __bitop_bad_size(void);
+
+#define bitop_bad_size(addr) (sizeof(*(addr)) < sizeof(bitop_uint_t))
+
 #include <asm/bitops.h>
 
 /*
@@ -93,6 +104,141 @@ static always_inline __pure unsigned int fls64(uint64_t x)
 }
 
 /* --------------------- Please tidy below here --------------------- */
+
+static always_inline bool
+generic__test_and_set_bit(int nr, volatile void *addr)
+{
+    bitop_uint_t mask = BITOP_MASK(nr);
+    volatile bitop_uint_t *p = (volatile bitop_uint_t *)addr + BITOP_WORD(nr);
+    bitop_uint_t old = *p;
+
+    *p = old | mask;
+    return (old & mask);
+}
+
+static always_inline bool
+generic__test_and_clear_bit(int nr, volatile void *addr)
+{
+    bitop_uint_t mask = BITOP_MASK(nr);
+    volatile bitop_uint_t *p = (volatile bitop_uint_t *)addr + BITOP_WORD(nr);
+    bitop_uint_t old = *p;
+
+    *p = old & ~mask;
+    return (old & mask);
+}
+
+static always_inline bool
+generic__test_and_change_bit(int nr, volatile void *addr)
+{
+    bitop_uint_t mask = BITOP_MASK(nr);
+    volatile bitop_uint_t *p = (volatile bitop_uint_t *)addr + BITOP_WORD(nr);
+    bitop_uint_t old = *p;
+
+    *p = old ^ mask;
+    return (old & mask);
+}
+
+static always_inline bool generic_test_bit(int nr, const volatile void *addr)
+{
+    bitop_uint_t mask = BITOP_MASK(nr);
+    const volatile bitop_uint_t *p =
+        (const volatile bitop_uint_t *)addr + BITOP_WORD(nr);
+
+    return (*p & mask);
+}
+
+/**
+ * __test_and_set_bit - Set a bit and return its old value
+ * @nr: Bit to set
+ * @addr: Address to count from
+ *
+ * This operation is non-atomic and can be reordered.
+ * If two instances of this operation race, both may update memory with
+ * their view of the new value, not taking into account the update the
+ * respectively other one did. It should be protected from potentially
+ * racy behavior.
+ */
+static always_inline bool
+__test_and_set_bit(int nr, volatile void *addr)
+{
+#ifdef arch__test_and_set_bit
+    return arch__test_and_set_bit(nr, addr);
+#else
+    return generic__test_and_set_bit(nr, addr);
+#endif
+}
+#define __test_and_set_bit(nr, addr) ({             \
+    if ( bitop_bad_size(addr) ) __bitop_bad_size(); \
+    __test_and_set_bit(nr, addr);                   \
+})
+
+/**
+ * __test_and_clear_bit - Clear a bit and return its old value
+ * @nr: Bit to clear
+ * @addr: Address to count from
+ *
+ * This operation is non-atomic and can be reordered.
+ * If two instances of this operation race, both may update memory with
+ * their view of the new value, not taking into account the update the
+ * respectively other one did. It should be protected from potentially
+ * racy behavior.
+ */
+static always_inline bool
+__test_and_clear_bit(int nr, volatile void *addr)
+{
+#ifdef arch__test_and_clear_bit
+    return arch__test_and_clear_bit(nr, addr);
+#else
+    return generic__test_and_clear_bit(nr, addr);
+#endif
+}
+#define __test_and_clear_bit(nr, addr) ({           \
+    if ( bitop_bad_size(addr) ) __bitop_bad_size(); \
+    __test_and_clear_bit(nr, addr);                 \
+})
+
+/**
+ * __test_and_change_bit - Change a bit and return its old value
+ * @nr: Bit to change
+ * @addr: Address to count from
+ *
+ * This operation is non-atomic and can be reordered.
+ * If two instances of this operation race, both may update memory with
+ * their view of the new value, not taking into account the update the
+ * respectively other one did. It should be protected from potentially
+ * racy behavior.
+ */
+static always_inline bool
+__test_and_change_bit(int nr, volatile void *addr)
+{
+#ifdef arch__test_and_change_bit
+    return arch__test_and_change_bit(nr, addr);
+#else
+    return generic__test_and_change_bit(nr, addr);
+#endif
+}
+#define __test_and_change_bit(nr, addr) ({              \
+    if ( bitop_bad_size(addr) ) __bitop_bad_size();     \
+    __test_and_change_bit(nr, addr);                    \
+})
+
+/**
+ * test_bit - Determine whether a bit is set
+ * @nr: bit number to test
+ * @addr: Address to start counting from
+ */
+static always_inline bool test_bit(int nr, const volatile void *addr)
+{
+#ifdef arch_test_bit
+    return arch_test_bit(nr, addr);
+#else
+    return generic_test_bit(nr, addr);
+#endif
+}
+#define test_bit(nr, addr) ({                           \
+    if ( bitop_bad_size(addr) ) __bitop_bad_size();     \
+    test_bit(nr, addr);                                 \
+})
 
 #ifndef find_next_bit
 /**
