@@ -2908,18 +2908,18 @@ void hvm_emulate_init_per_insn(
 void hvm_emulate_writeback(
     struct hvm_emulate_ctxt *hvmemul_ctxt)
 {
-    enum x86_segment seg;
+    struct vcpu *curr;
+    unsigned int dirty = hvmemul_ctxt->seg_reg_dirty;
 
-    seg = find_first_bit(&hvmemul_ctxt->seg_reg_dirty,
-                         ARRAY_SIZE(hvmemul_ctxt->seg_reg));
+    if ( likely(!dirty) )
+        return;
 
-    while ( seg < ARRAY_SIZE(hvmemul_ctxt->seg_reg) )
-    {
-        hvm_set_segment_register(current, seg, &hvmemul_ctxt->seg_reg[seg]);
-        seg = find_next_bit(&hvmemul_ctxt->seg_reg_dirty,
-                            ARRAY_SIZE(hvmemul_ctxt->seg_reg),
-                            seg+1);
-    }
+    curr = current;
+
+    for_each_set_bit ( seg, dirty )
+        hvm_set_segment_register(curr, seg, &hvmemul_ctxt->seg_reg[seg]);
+
+    hvmemul_ctxt->seg_reg_dirty = 0;
 }
 
 /*
