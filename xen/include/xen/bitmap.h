@@ -271,6 +271,18 @@ static inline void bitmap_clear(unsigned long *map, unsigned int start,
 #undef bitmap_switch
 #undef bitmap_bytes
 
+/**
+ * bitmap_for_each - iterate over every set bit in a memory region
+ * @iter: The integer iterator
+ * @addr: The address to base the search on
+ * @size: The maximum size to search
+ */
+#define bitmap_for_each(iter, addr, size)                        \
+    for ( (iter) = find_first_bit(addr, size);                   \
+          (iter) < (size);                                       \
+          (iter) = find_next_bit(addr, size, (iter) + 1) )
+
+
 struct xenctl_bitmap;
 int xenctl_bitmap_to_bitmap(unsigned long *bitmap,
                             const struct xenctl_bitmap *xenctl_bitmap,
