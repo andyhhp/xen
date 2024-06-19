@@ -59,6 +59,8 @@
 #define BUILD_BUG_ON(cond) ((void)BUILD_BUG_ON_ZERO(cond))
 #endif
 
+#define BUILD_ERROR(msg) asm ( ".error \"" msg "\"" )
+
 /* Hide a value from the optimiser. */
 #define HIDE(x)                                 \
     ({                                          \
