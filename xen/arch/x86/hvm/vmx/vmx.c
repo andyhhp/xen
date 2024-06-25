@@ -2321,18 +2321,63 @@ static void cf_check vmx_deliver_posted_intr(struct vcpu *v, u8 vector)
 
 static void cf_check vmx_sync_pir_to_irr(struct vcpu *v)
 {
-    struct vlapic *vlapic = vcpu_vlapic(v);
-    unsigned int group, i;
-    DECLARE_BITMAP(pending_intr, X86_NR_VECTORS);
+    struct pi_desc *desc = &v->arch.hvm.vmx.pi_desc;
+    union {
+        uint64_t _64[X86_NR_VECTORS / (sizeof(uint64_t) * 8)];
+        uint32_t _32[X86_NR_VECTORS / (sizeof(uint32_t) * 8)];
+    } vec;
+    uint32_t *irr;
+    bool on;
 
-    if ( !pi_test_and_clear_on(&v->arch.hvm.vmx.pi_desc) )
+    /*
+     * The PIR is a contended cacheline which bounces between the CPU and
+     * IOMMU.  The IOMMU updates the entire PIR atomically, but we can't
+     * express the same on the CPU side, so care has to be taken.
+     *
+     * First, do a plain read of ON.  If the PIR hasn't been modified, this
+     * will keep the cacheline Shared and not pull it Excusive on the CPU.
+     */
+    if ( !pi_test_on(desc) )
         return;
 
-    for ( group = 0; group < ARRAY_SIZE(pending_intr); group++ )
-        pending_intr[group] = pi_get_pir(&v->arch.hvm.vmx.pi_desc, group);
+    /*
+     * Second, if the plain read said that ON was set, we must clear it with
+     * an atomic action.  This will bring the cachline to Exclusive on the
+     * CPU.
+     *
+     * This should always succeed because noone else should be playing with
+     * the PIR behind our back, but assert so just in case.
+     */
+    on = pi_test_and_clear_on(desc);
+    ASSERT(on);
 
-    for_each_set_bit(i, pending_intr, X86_NR_VECTORS)
-        vlapic_set_vector(i, &vlapic->regs->data[APIC_IRR]);
+    /*
+     * The cacheline is now Exclusive on the CPU, and the IOMMU has indicated
+     * (via ON being set) thatat least one vector is pending too.  Atomically
+     * read and clear the entire pending bitmap as fast as we, to reduce the
+     * window that the IOMMU may steal the cacheline back from us.
+     *
+     * It is a performance concern, but not a correctness concern.  If the
+     * IOMMU does steal the cacheline back, we'll just wait to get it back
+     * again.
+     */
+    for ( unsigned int i = 0; i < ARRAY_SIZE(vec._64); ++i )
+        vec._64[i] = xchg(&desc->pir[i], 0);
+
+    /*
+     * Finally, merge the pending vectors into IRR.  The IRR register is
+     * scattered in memory, so we have to do this 32 bits at a time.
+     */
+    irr = (uint32_t *)&vcpu_vlapic(v)->regs->data[APIC_IRR];
+    for ( unsigned int i = 0; i < ARRAY_SIZE(vec._32); ++i )
+    {
+        if ( !vec._32[i] )
+            continue;
+
+        asm ( "lock or %[val], %[irr]"
+              : [irr] "+m" (irr[i * 0x10])
+              : [val] "r" (vec._32[i]) );
+    }
 }
 
 static bool cf_check vmx_test_pir(const struct vcpu *v, uint8_t vec)
