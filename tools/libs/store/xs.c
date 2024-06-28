@@ -195,6 +195,7 @@ static int pipe_cloexec(int fds[2])
 #if HAVE_PIPE2
 	return pipe2(fds, O_CLOEXEC);
 #else
+#error "No pipe2()"
 	if (pipe(fds) < 0)
 		return -1;
 	if (!set_cloexec(fds[0]) ||
