@@ -83,6 +83,9 @@ PYTHON_PREFIX_ARG ?= --prefix="$(prefix)"
 # to permit the user to set PYTHON_PREFIX_ARG to '' to workaround this bug:
 #  https://bugs.launchpad.net/ubuntu/+bug/362570
 
+PYTHONWARNINGS ?= error
+export PYTHONWARNINGS
+
 # cc-option: Check if compiler supports first option, else fall back to second.
 #
 # This is complicated by the fact that with most gcc versions unrecognised
