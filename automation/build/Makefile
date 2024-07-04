@@ -1,6 +1,6 @@
 
 # the base of where these containers will appear
-REGISTRY := registry.gitlab.com/xen-project/xen
+REGISTRY ?= registry.gitlab.com/xen-project/people/andyhhp/xen
 CONTAINERS = $(subst .dockerfile,,$(wildcard */*.dockerfile))
 DOCKER_CMD ?= docker
 

@@ -1,7 +1,7 @@
 # Test jobs
 build-each-commit-gcc:
   stage: test
-  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  image: registry.gitlab.com/xen-project/people/andyhhp/xen/${CONTAINER}
   variables:
     CONTAINER: debian:stretch
     XEN_TARGET_ARCH: x86_64
@@ -24,7 +24,7 @@ build-each-commit-gcc:
 
 qemu-alpine-arm64-gcc:
   stage: test
-  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  image: registry.gitlab.com/xen-project/people/andyhhp/xen/${CONTAINER}
   variables:
     CONTAINER: debian:unstable-arm64v8
   script:
@@ -49,7 +49,7 @@ qemu-alpine-arm64-gcc:
 
 qemu-alpine-x86_64-gcc:
   stage: test
-  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  image: registry.gitlab.com/xen-project/people/andyhhp/xen/${CONTAINER}
   variables:
     CONTAINER: debian:stretch
   script:
@@ -73,7 +73,7 @@ qemu-alpine-x86_64-gcc:
 
 qemu-smoke-arm64-gcc:
   stage: test
-  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  image: registry.gitlab.com/xen-project/people/andyhhp/xen/${CONTAINER}
   variables:
     CONTAINER: debian:unstable-arm64v8
   script:
@@ -97,7 +97,7 @@ qemu-smoke-arm64-gcc:
 
 qemu-smoke-x86-64-gcc:
   stage: test
-  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  image: registry.gitlab.com/xen-project/people/andyhhp/xen/${CONTAINER}
   variables:
     CONTAINER: debian:stretch
   script:
@@ -119,7 +119,7 @@ qemu-smoke-x86-64-gcc:
 
 qemu-smoke-x86-64-clang:
   stage: test
-  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  image: registry.gitlab.com/xen-project/people/andyhhp/xen/${CONTAINER}
   variables:
     CONTAINER: debian:stretch
   script:
@@ -141,7 +141,7 @@ qemu-smoke-x86-64-clang:
 
 qemu-smoke-x86-64-gcc-pvh:
   stage: test
-  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  image: registry.gitlab.com/xen-project/people/andyhhp/xen/${CONTAINER}
   variables:
     CONTAINER: debian:stretch
   script:
@@ -163,7 +163,7 @@ qemu-smoke-x86-64-gcc-pvh:
 
 qemu-smoke-x86-64-clang-pvh:
   stage: test
-  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  image: registry.gitlab.com/xen-project/people/andyhhp/xen/${CONTAINER}
   variables:
     CONTAINER: debian:stretch
   script:

@@ -1,6 +1,6 @@
 .build-tmpl: &build
   stage: build
-  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  image: registry.gitlab.com/xen-project/people/andyhhp/xen/${CONTAINER}
   script:
     - ./automation/scripts/build 2>&1 | tee build.log
   artifacts:
