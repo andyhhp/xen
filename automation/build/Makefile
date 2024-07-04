@@ -1,6 +1,6 @@
 
 # the base of where these containers will appear
-REGISTRY := registry.gitlab.com/xen-project/xen
+REGISTRY ?= registry.gitlab.com/xen-project/people/andyhhp/xen
 CONTAINERS := $(filter-out yocto/%,$(subst .dockerfile,,$(wildcard */*.dockerfile)))
 CONTAINERS_EXTRA =
 DOCKER_CMD ?= docker
