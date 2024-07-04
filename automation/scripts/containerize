@@ -22,7 +22,7 @@ die() {
 # The caller is expected to override the CONTAINER environment
 # variable with the container they wish to launch.
 #
-BASE="registry.gitlab.com/xen-project/xen"
+BASE="registry.gitlab.com/xen-project/people/andyhhp/xen"
 case "_${CONTAINER}" in
     _alpine) CONTAINER="${BASE}/alpine:3.12" ;;
     _archlinux|_arch) CONTAINER="${BASE}/archlinux:current" ;;
