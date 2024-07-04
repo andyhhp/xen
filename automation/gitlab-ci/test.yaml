@@ -1,6 +1,6 @@
 .test-jobs-common:
   stage: test
-  image: registry.gitlab.com/xen-project/xen/${CONTAINER}
+  image: registry.gitlab.com/xen-project/people/andyhhp/xen/${CONTAINER}
   except:
     - master
     - smoke
