@@ -46,9 +46,10 @@ jobs:
       run: |
         make -j`nproc` mini-os-dir
 
-    - uses: vapier/coverity-scan-action@v1
+    - uses: andyhhp/coverity-scan-action@6476128221d4c7ebc5ca4f8e502bed26d7f9c7a8
       with:
         command: make -j`nproc` build && make -j`nproc` -C extras/mini-os/
         project: XenProject
         email: ${{ secrets.COVERITY_SCAN_EMAIL }}
         token: ${{ secrets.COVERITY_SCAN_TOKEN }}
+        dry_run: true
