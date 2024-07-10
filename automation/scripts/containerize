@@ -23,6 +23,17 @@ die() {
 # variable with the container they wish to launch.
 #
 BASE="registry.gitlab.com/xen-project/people/andyhhp/xen"
+
+#
+# Container images take the form:
+#   $BASE/$DISTRO:$VERSION-$ARCH[-suffix]
+#
+guess_container () {
+
+    echo guess
+
+}
+
 case "_${CONTAINER}" in
     _alpine) CONTAINER="${BASE}/alpine:3.18" ;;
     _alpine-arm64v8) CONTAINER="${BASE}/alpine:3.18-arm64v8" ;;
@@ -46,7 +57,12 @@ case "_${CONTAINER}" in
     _focal)  CONTAINER="${BASE}/ubuntu:20.04-x86_64" ;;
     _jammy)  CONTAINER="${BASE}/ubuntu:22.04-x86_64" ;;
     _noble)  CONTAINER="${BASE}/ubuntu:24.04-x86_64" ;;
+
+    *) guess_container ;;
 esac
+
+# echo $CONTAINER
+# exit 1
 
 # Use this variable to control whether root should be used
 case "_${CONTAINER_UID0}" in
