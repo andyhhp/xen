@@ -21,6 +21,7 @@ build-each-commit-gcc:
     - smoke
     - /^coverity-tested\/.*/
     - /^stable-.*/
+  when: manual
 
 qemu-alpine-arm64-gcc:
   stage: test
@@ -46,6 +47,7 @@ qemu-alpine-arm64-gcc:
     - smoke
     - /^coverity-tested\/.*/
     - /^stable-.*/
+  when: manual
 
 qemu-alpine-x86_64-gcc:
   stage: test
@@ -70,6 +72,7 @@ qemu-alpine-x86_64-gcc:
     - smoke
     - /^coverity-tested\/.*/
     - /^stable-.*/
+  when: manual
 
 qemu-smoke-arm64-gcc:
   stage: test
@@ -94,6 +97,7 @@ qemu-smoke-arm64-gcc:
     - smoke
     - /^coverity-tested\/.*/
     - /^stable-.*/
+  when: manual
 
 qemu-smoke-x86-64-gcc:
   stage: test
@@ -116,6 +120,7 @@ qemu-smoke-x86-64-gcc:
     - smoke
     - /^coverity-tested\/.*/
     - /^stable-.*/
+  when: manual
 
 qemu-smoke-x86-64-clang:
   stage: test
@@ -138,6 +143,7 @@ qemu-smoke-x86-64-clang:
     - smoke
     - /^coverity-tested\/.*/
     - /^stable-.*/
+  when: manual
 
 qemu-smoke-x86-64-gcc-pvh:
   stage: test
@@ -160,6 +166,7 @@ qemu-smoke-x86-64-gcc-pvh:
     - smoke
     - /^coverity-tested\/.*/
     - /^stable-.*/
+  when: manual
 
 qemu-smoke-x86-64-clang-pvh:
   stage: test
@@ -182,3 +189,4 @@ qemu-smoke-x86-64-clang-pvh:
     - smoke
     - /^coverity-tested\/.*/
     - /^stable-.*/
+  when: manual

@@ -15,6 +15,8 @@
     - smoke
     - /^coverity-tested\/.*/
     - /^stable-.*/
+  needs: []
+  when: manual
 
 .gcc-tmpl:
   variabes: &gcc
@@ -506,6 +508,7 @@ alpine-3.12-arm64-rootfs-export:
       - binaries/initrd.tar.gz
   tags:
     - arm64
+  when: manual
 
 kernel-5.9.9-arm64-export:
   stage: build
@@ -517,6 +520,7 @@ kernel-5.9.9-arm64-export:
       - binaries/Image
   tags:
     - arm64
+  when: manual
 
 qemu-system-aarch64-5.2.0-arm64-export:
   stage: build
@@ -528,6 +532,7 @@ qemu-system-aarch64-5.2.0-arm64-export:
       - binaries/qemu-system-aarch64
   tags:
     - arm64
+  when: manual
 
 
 # x86_64 test artifacts
@@ -542,6 +547,7 @@ alpine-3.12-rootfs-export:
       - binaries/initrd.tar.gz
   tags:
     - x86_64
+  when: manual
 
 kernel-5.10.74-export:
   stage: build
@@ -553,3 +559,4 @@ kernel-5.10.74-export:
       - binaries/bzImage
   tags:
     - x86_64
+  when: manual
