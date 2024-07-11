@@ -12,6 +12,7 @@
       - '*/*.log'
     when: always
   needs: []
+  when: manual
 
 .gcc-tmpl:
   variables: &gcc
@@ -220,6 +221,7 @@
       - binaries/
     when: always
   needs: []
+  when: manual
 
 .yocto-test-arm64:
   extends: .yocto-test
@@ -255,6 +257,7 @@
 .test-jobs-artifact-common:
   stage: build
   needs: []
+  when: manual
 
 # Arm test artifacts
 
