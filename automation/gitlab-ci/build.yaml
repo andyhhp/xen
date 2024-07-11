@@ -313,108 +313,148 @@ ubuntu-trusty-gcc-debug:
   variables:
     CONTAINER: ubuntu:trusty
 
-ubuntu-xenial-clang:
+ubuntu-16.04-x86_64-clang:
   extends: .clang-x86-64-build
   variables:
-    CONTAINER: ubuntu:xenial
+    CONTAINER: ubuntu:16.04-x86_64
 
-ubuntu-xenial-clang-debug:
+ubuntu-16.04-x86_64-clang-debug:
   extends: .clang-x86-64-build-debug
   variables:
-    CONTAINER: ubuntu:xenial
+    CONTAINER: ubuntu:16.04-x86_64
 
-ubuntu-xenial-gcc:
+ubuntu-16.04-x86_64-gcc:
   extends: .gcc-x86-64-build
   variables:
-    CONTAINER: ubuntu:xenial
+    CONTAINER: ubuntu:16.04-x86_64
 
-ubuntu-xenial-gcc-debug:
+ubuntu-16.04-x86_64-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
-    CONTAINER: ubuntu:xenial
+    CONTAINER: ubuntu:16.04-x86_64
 
-ubuntu-bionic-clang:
+ubuntu-18.04-x86_64-clang:
   extends: .clang-x86-64-build
   variables:
-    CONTAINER: ubuntu:bionic
+    CONTAINER: ubuntu:18.04-x86_64
 
-ubuntu-bionic-clang-debug:
+ubuntu-18.04-x86_64-clang-debug:
   extends: .clang-x86-64-build-debug
   variables:
-    CONTAINER: ubuntu:bionic
+    CONTAINER: ubuntu:18.04-x86_64
 
-ubuntu-bionic-gcc:
+ubuntu-18.04-x86_64-gcc:
   extends: .gcc-x86-64-build
   variables:
-    CONTAINER: ubuntu:bionic
+    CONTAINER: ubuntu:18.04-x86_64
 
-ubuntu-bionic-gcc-debug:
+ubuntu-18.04-x86_64-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
-    CONTAINER: ubuntu:bionic
+    CONTAINER: ubuntu:18.04-x86_64
 
-ubuntu-focal-gcc:
+ubuntu-20.04-x86_64-gcc:
   extends: .gcc-x86-64-build
   variables:
-    CONTAINER: ubuntu:focal
+    CONTAINER: ubuntu:20.04-x86_64
 
-ubuntu-focal-gcc-debug:
+ubuntu-20.04-x86_64-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
-    CONTAINER: ubuntu:focal
+    CONTAINER: ubuntu:20.04-x86_64
 
-ubuntu-focal-clang:
+ubuntu-20.04-x86_64-clang:
   extends: .clang-x86-64-build
   variables:
-    CONTAINER: ubuntu:focal
+    CONTAINER: ubuntu:20.04-x86_64
 
-ubuntu-focal-clang-debug:
+ubuntu-20.04-x86_64-clang-debug:
   extends: .clang-x86-64-build-debug
   variables:
-    CONTAINER: ubuntu:focal
+    CONTAINER: ubuntu:20.04-x86_64
+
+ubuntu-22.04-x86_64-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: ubuntu:22.04-x86_64
+
+ubuntu-22.04-x86_64-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: ubuntu:22.04-x86_64
+
+ubuntu-22.04-x86_64-clang:
+  extends: .clang-x86-64-build
+  variables:
+    CONTAINER: ubuntu:22.04-x86_64
+
+ubuntu-22.04-x86_64-clang-debug:
+  extends: .clang-x86-64-build-debug
+  variables:
+    CONTAINER: ubuntu:22.04-x86_64
+
+ubuntu-24.04-x86_64-gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: ubuntu:24.04-x86_64
+
+ubuntu-24.04-x86_64-gcc-debug:
+  extends: .gcc-x86-64-build-debug
+  variables:
+    CONTAINER: ubuntu:24.04-x86_64
+
+ubuntu-24.04-x86_64-clang:
+  extends: .clang-x86-64-build
+  variables:
+    CONTAINER: ubuntu:24.04-x86_64
+
+ubuntu-24.04-x86_64-clang-debug:
+  extends: .clang-x86-64-build-debug
+  variables:
+    CONTAINER: ubuntu:24.04-x86_64
 
 opensuse-leap-clang:
   extends: .clang-x86-64-build
   variables:
-    CONTAINER: suse:opensuse-leap
+    CONTAINER: opensuse:leap-15.6-x86_64
 
 opensuse-leap-clang-debug:
   extends: .clang-x86-64-build-debug
   variables:
-    CONTAINER: suse:opensuse-leap
+    CONTAINER: opensuse:leap-15.6-x86_64
 
 opensuse-leap-gcc:
   extends: .gcc-x86-64-build
   variables:
-    CONTAINER: suse:opensuse-leap
+    CONTAINER: opensuse:leap-15.6-x86_64
 
 opensuse-leap-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
-    CONTAINER: suse:opensuse-leap
+    CONTAINER: opensuse:leap-15.6-x86_64
 
 opensuse-tumbleweed-clang:
   extends: .clang-x86-64-build
   variables:
-    CONTAINER: suse:opensuse-tumbleweed
+    CONTAINER: opensuse:tumbleweed-x86_64
   allow_failure: true
 
 opensuse-tumbleweed-clang-debug:
   extends: .clang-x86-64-build-debug
   variables:
-    CONTAINER: suse:opensuse-tumbleweed
+    CONTAINER: opensuse:tumbleweed-x86_64
   allow_failure: true
 
 opensuse-tumbleweed-gcc:
   extends: .gcc-x86-64-build
   variables:
-    CONTAINER: suse:opensuse-tumbleweed
+    CONTAINER: opensuse:tumbleweed-x86_64
   allow_failure: true
 
 opensuse-tumbleweed-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
-    CONTAINER: suse:opensuse-tumbleweed
+    CONTAINER: opensuse:tumbleweed-x86_64
   allow_failure: true
 
 alpine-3.12-gcc:
