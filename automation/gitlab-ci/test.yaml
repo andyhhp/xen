@@ -6,6 +6,7 @@
     - smoke
     - /^coverity-tested\/.*/
     - /^stable-.*/
+  when: manual
 
 # Test jobs
 build-each-commit-gcc:
