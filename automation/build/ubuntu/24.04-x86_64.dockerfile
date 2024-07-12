@@ -27,7 +27,7 @@ RUN <<EOF
         git-core
         gzip
         patch
-        perl
+        perl-base
         pkg-config
         wget
         # libxenguest dombuilder
