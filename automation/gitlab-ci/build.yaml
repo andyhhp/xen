@@ -338,6 +338,22 @@ alpine-3.18-gcc:
   variables:
     CONTAINER: alpine:3.18
 
+alpine-3.18-gcc+qemu:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: alpine:3.18
+    QEMU: y
+  tags:
+    - qubes-ambrosia
+
+alpine-3.18-gcc<qemu:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: alpine:3.18
+    QEMU: n
+  tags:
+    - qubes-ambrosia
+
 alpine-3.18-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
@@ -531,6 +547,24 @@ archlinux-gcc:
     CONTAINER: archlinux:current
   allow_failure: true
 
+archlinux-gcc+gcc:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: archlinux:current
+    QEMU: y
+  allow_failure: true
+  tags:
+    - qubes-ambrosia
+
+archlinux-gcc<qemu:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: archlinux:current
+    QEMU: n
+  allow_failure: true
+  tags:
+    - qubes-ambrosia
+
 archlinux-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
@@ -564,6 +598,22 @@ debian-bookworm-gcc:
   extends: .gcc-x86-64-build
   variables:
     CONTAINER: debian:bookworm
+
+debian-bookworm-gcc+qemu:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: debian:bookworm
+    QEMU: y
+  tags:
+    - qubes-ambrosia
+
+debian-bookworm-gcc<qemu:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: debian:bookworm
+    QEMU: n
+  tags:
+    - qubes-ambrosia
 
 debian-bookworm-gcc-randconfig:
   extends: .gcc-x86-64-build
@@ -641,6 +691,22 @@ ubuntu-24.04-x86_64-gcc:
   variables:
     CONTAINER: ubuntu:24.04-x86_64
 
+ubuntu-24.04-x86_64-gcc+qemu:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: ubuntu:24.04-x86_64
+    QEMU: y
+  tags:
+    - qubes-ambrosia
+
+ubuntu-24.04-x86_64-gcc<qemu:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: ubuntu:24.04-x86_64
+    QEMU: n
+  tags:
+    - qubes-ambrosia
+
 ubuntu-24.04-x86_64-gcc-debug:
   extends: .gcc-x86-64-build-debug
   variables:
@@ -683,6 +749,24 @@ opensuse-tumbleweed-gcc:
   variables:
     CONTAINER: opensuse:tumbleweed-x86_64
   allow_failure: true
+
+opensuse-tumbleweed-gcc<qemu:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: opensuse:tumbleweed-x86_64
+    QEMU: n
+  allow_failure: true
+  tags:
+    - qubes-ambrosia
+
+opensuse-tumbleweed-gcc+qemu:
+  extends: .gcc-x86-64-build
+  variables:
+    CONTAINER: opensuse:tumbleweed-x86_64
+    QEMU: y
+  allow_failure: true
+  tags:
+    - qubes-ambrosia
 
 opensuse-tumbleweed-gcc-debug:
   extends: .gcc-x86-64-build-debug
