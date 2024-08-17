@@ -454,11 +454,11 @@ static uint64_t __init mtrr_top_of_ram(void)
     ASSERT(paddr_bits);
     addr_mask = ((1ull << paddr_bits) - 1) & PAGE_MASK;
 
-    rdmsrl(MSR_MTRRcap, mtrr_cap);
-    rdmsrl(MSR_MTRRdefType, mtrr_def);
-
     if ( slaunch_active && boot_cpu_data.x86_vendor == X86_VENDOR_INTEL )
         txt_restore_mtrrs(e820_verbose);
+
+    rdmsrl(MSR_MTRRcap, mtrr_cap);
+    rdmsrl(MSR_MTRRdefType, mtrr_def);
 
     if ( e820_verbose )
         printk(" MTRR cap: %"PRIx64" type: %"PRIx64"\n", mtrr_cap, mtrr_def);
