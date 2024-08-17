@@ -4,8 +4,12 @@
 #include <asm/e820.h>
 #include <xen/string.h>
 #include <asm/page.h>
+#include <asm/mtrr.h>
+#include <asm/invpcid.h>
+#include <asm/processor.h>
 #include <asm/intel_txt.h>
 #include <asm/slaunch.h>
+#include <asm/system.h>
 #include <asm/tpm.h>
 #include <xen/init.h>
 #include <xen/mm.h>
@@ -57,6 +61,63 @@ void __init protect_txt_mem_regions(void)
                  E820_RAM, E820_UNUSABLE);
 }
 
+static DEFINE_SPINLOCK(set_atomicity_lock);
+
+static uint64_t deftype = 0;
+
+static bool disable_mtrrs(void)
+{
+    unsigned long cr4;
+
+    /*  Note that this is not ideal, since the cache is only flushed/disabled
+       for this CPU while the MTRRs are changed, but changing this requires
+       more invasive changes to the way the kernel boots  */
+
+    spin_lock(&set_atomicity_lock);
+
+    /*  Enter the no-fill (CD=1, NW=0) cache mode and flush caches. */
+    write_cr0(read_cr0() | X86_CR0_CD);
+
+    /* Flush the caches */
+    wbinvd();
+
+    cr4 = read_cr4();
+    if (cr4 & X86_CR4_PGE)
+        write_cr4(cr4 & ~X86_CR4_PGE);
+    else if (use_invpcid)
+        invpcid_flush_all();
+    else
+        write_cr3(read_cr3());
+
+    /*  Disable MTRRs, and set the default type to uncached  */
+    rdmsrl(MSR_MTRRdefType, deftype);
+    wrmsrl(MSR_MTRRdefType, deftype & ~0xcff);
+
+    /* Again, flush caches */
+    wbinvd();
+
+    return cr4 & X86_CR4_PGE;
+}
+
+static void enable_mtrrs(bool pge)
+{
+    /* Intel (P6) standard MTRRs */
+    wrmsrl(MSR_MTRRdefType, deftype);
+
+    /*  Enable caches  */
+    write_cr0(read_cr0() & ~X86_CR0_CD);
+
+    /*  Reenable CR4.PGE (also flushes the TLB) */
+    if (pge)
+        write_cr4(read_cr4() | X86_CR4_PGE);
+    else if (use_invpcid)
+        invpcid_flush_all();
+    else
+        write_cr3(read_cr3());
+
+    spin_unlock(&set_atomicity_lock);
+}
+
 void __init txt_restore_mtrrs(bool e820_verbose)
 {
     struct txt_os_mle_data *os_mle;
@@ -65,6 +126,7 @@ void __init txt_restore_mtrrs(bool e820_verbose)
     int os_mle_size;
     uint64_t mtrr_cap, mtrr_def, base, mask;
     unsigned int i;
+    bool pge;
 
     os_mle_size = txt_os_mle_data_size(__va(txt_heap_base));
     os_mle = txt_os_mle_data_start(__va(txt_heap_base));
@@ -101,8 +163,7 @@ void __init txt_restore_mtrrs(bool e820_verbose)
                    intel_info->saved_bsp_mtrrs.mtrr_vcnt : mtrr_cap;
     }
 
-    /* Restore MTRRs saved by bootloader. */
-    wrmsrl(MSR_MTRRdefType, intel_info->saved_bsp_mtrrs.default_mem_type);
+    pge = disable_mtrrs();
 
     for ( i = 0; i < (uint8_t)mtrr_cap; i++ )
     {
@@ -112,6 +173,23 @@ void __init txt_restore_mtrrs(bool e820_verbose)
         wrmsrl(MSR_IA32_MTRR_PHYSMASK(i), mask);
     }
 
+    deftype = intel_info->saved_bsp_mtrrs.default_mem_type;
+    enable_mtrrs(pge);
+
     if ( e820_verbose )
+    {
         printk("Restored MTRRs:\n"); /* Printed by caller, mtrr_top_of_ram(). */
+
+        /* If MTRRs are not enabled or WB is not a default type, MTRRs won't be printed */
+        if ( !test_bit(11, &deftype) || ((uint8_t)deftype == X86_MT_WB) )
+        {
+            for ( i = 0; i < (uint8_t)mtrr_cap; i++ )
+            {
+                rdmsrl(MSR_IA32_MTRR_PHYSBASE(i), base);
+                rdmsrl(MSR_IA32_MTRR_PHYSMASK(i), mask);
+                printk(" MTRR[%d]: base %"PRIx64" mask %"PRIx64"\n",
+                       i, base, mask);
+            }
+        }
+    }
 }
