@@ -349,8 +349,7 @@ static int cf_check hpet_write(
     unsigned int tn, i;
 
     /* Acculumate a bit mask of timers whos state is changed by this write. */
-    unsigned long start_timers = 0;
-    unsigned long stop_timers  = 0;
+    unsigned int start_timers = 0, stop_timers = 0;
 #define set_stop_timer(n)    (__set_bit((n), &stop_timers))
 #define set_start_timer(n)   (__set_bit((n), &start_timers))
 #define set_restart_timer(n) (set_stop_timer(n),set_start_timer(n))
@@ -405,16 +404,12 @@ static int cf_check hpet_write(
 
     case HPET_STATUS:
         /* write 1 to clear. */
-        while ( new_val )
+        for ( i = 0; i < HPET_TIMER_NUM; i++ )
         {
-            bool active;
+            if ( !(new_val & (1U << i)) )
+                continue;
 
-            i = ffsl(new_val) - 1;
-            if ( i >= HPET_TIMER_NUM )
-                break;
-            __clear_bit(i, &new_val);
-            active = __test_and_clear_bit(i, &h->hpet.isr);
-            if ( active )
+            if ( __test_and_clear_bit(i, &h->hpet.isr) )
             {
                 hvm_ioapic_deassert(v->domain, timer_int_route(h, i));
                 if ( hpet_enabled(h) && timer_enabled(h, i) &&
@@ -533,19 +528,11 @@ static int cf_check hpet_write(
     }
 
     /* stop/start timers whos state was changed by this write. */
-    while (stop_timers)
-    {
-        i = ffsl(stop_timers) - 1;
-        __clear_bit(i, &stop_timers);
+    for_each_set_bit ( i, stop_timers )
         hpet_stop_timer(h, i, guest_time);
-    }
 
-    while (start_timers)
-    {
-        i = ffsl(start_timers) - 1;
-        __clear_bit(i, &start_timers);
+    for_each_set_bit ( i, start_timers )
         hpet_set_timer(h, i, guest_time);
-    }
 
 #undef set_stop_timer
 #undef set_start_timer
