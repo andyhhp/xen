@@ -9,8 +9,10 @@
 
 #pragma GCC visibility push(hidden)
 extern char _start[], _end[];
-extern uint64_t l2_xenmap[512], l3_bootmap[512], l2_directmap[512], l2_bootmap[512];
+extern uint64_t l2_xenmap[512], l2_directmap[512],
+	l3_bootmap[512], l2_bootmap[512], l1_bootmap[512];
 extern unsigned long xen_phys_start;
+extern unsigned long trampoline_phys;
 #pragma GCC visibility pop
 
 #define _PAGE_PRESENT 0x001
@@ -19,12 +21,11 @@ extern unsigned long xen_phys_start;
 #define _PAGE_DIRTY 0x040
 #define _PAGE_PSE 0x080
 #define _PAGE_GLOBAL 0x100
+#define _PAGE_NX (1LLU << 63)
 
 #define PAGE_HYPERVISOR       PAGE_HYPERVISOR_RW
 #define PAGE_HYPERVISOR_RW    (__PAGE_HYPERVISOR_RW | _PAGE_GLOBAL)
 #define __PAGE_HYPERVISOR_RW  (__PAGE_HYPERVISOR_RO | _PAGE_DIRTY | _PAGE_RW)
-// TODO
-#define _PAGE_NX 0
 #define __PAGE_HYPERVISOR_RO  (_PAGE_PRESENT | _PAGE_ACCESSED | _PAGE_NX)
 #define PAGE_HYPERVISOR_RWX   (__PAGE_HYPERVISOR | _PAGE_GLOBAL)
 #define __PAGE_HYPERVISOR     (__PAGE_HYPERVISOR_RX | _PAGE_DIRTY | _PAGE_RW)
@@ -33,14 +34,16 @@ extern unsigned long xen_phys_start;
 #define L2_PAGETABLE_SHIFT 21
 #define L2_PAGETABLE_ENTRIES 512
 #define PAGE_SIZE 4096
+#define PAGE_SHIFT 12
 #define l2_table_offset(a) (((a) >> L2_PAGETABLE_SHIFT) & (L2_PAGETABLE_ENTRIES - 1))
-#define l2e_from_paddr(a,f) ((a) | put_pte_flags(f))
-#define l3e_from_paddr(a,f) ((a) | put_pte_flags(f))
+#define l1e_from_paddr(a, flags) ((a) | put_pte_flags(flags))
+#define l2e_from_paddr(a, flags) ((a) | put_pte_flags(flags))
+#define l3e_from_paddr(a, flags) ((a) | put_pte_flags(flags))
 #define l2e_add_flags(x, flags)    (x |= put_pte_flags(flags))
 typedef uint64_t l2_pgentry_t;
-static inline int64_t put_pte_flags(unsigned int x)
+static inline uint64_t put_pte_flags(uint64_t x)
 {
-    return (((int64_t)x & ~0xfff) << 40) | (x & 0xfff);
+    return x;
 }
 
 void setup_pages32(void)
@@ -102,4 +105,12 @@ void setup_pages64(void)
         l2_directmap[i] = pte;
     }
 #undef l2_4G_offset
+
+    /* Map l1_bootmap[] into l2_bootmap[0]. */
+    l2_bootmap[0] = l2e_from_paddr((unsigned long)l1_bootmap,
+                                   __PAGE_HYPERVISOR);
+
+    /* Map the permanent trampoline page into l1_bootmap[]. */
+    l1_bootmap[(unsigned long)trampoline_phys >> PAGE_SHIFT] =
+        l1e_from_paddr((unsigned long)trampoline_phys, __PAGE_HYPERVISOR_RX);
 }

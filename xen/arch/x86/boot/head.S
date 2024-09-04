@@ -765,16 +765,6 @@ trampoline_setup:
 
         call    setup_pages32
 
-        /* Map l1_bootmap[] into l2_bootmap[0]. */
-        lea     __PAGE_HYPERVISOR + sym_esi(l1_bootmap), %eax
-        mov     %eax, sym_esi(l2_bootmap)
-
-        /* Map the permanent trampoline page into l1_bootmap[]. */
-        mov     sym_esi(trampoline_phys), %ecx
-        lea     __PAGE_HYPERVISOR_RX(%ecx), %edx /* %edx = PTE to write  */
-        shr     $PAGE_SHIFT, %ecx                /* %ecx = Slot to write */
-        mov     %edx, sym_offs(l1_bootmap)(%esi, %ecx, 8)
-
         /* Apply relocations to bootstrap trampoline. */
         mov     sym_esi(trampoline_phys), %eax
         call    reloc_trampoline32

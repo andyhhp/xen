@@ -286,7 +286,8 @@ extern l2_pgentry_t l2_xenmap[L2_PAGETABLE_ENTRIES],
     l2_bootmap[4*L2_PAGETABLE_ENTRIES];
 extern l3_pgentry_t l3_bootmap[L3_PAGETABLE_ENTRIES];
 extern l2_pgentry_t l2_directmap[4*L2_PAGETABLE_ENTRIES];
-extern l1_pgentry_t l1_fixmap[L1_PAGETABLE_ENTRIES];
+extern l1_pgentry_t l1_fixmap[L1_PAGETABLE_ENTRIES],
+    l1_bootmap[L1_PAGETABLE_ENTRIES];
 void paging_init(void);
 void efi_update_l4_pgtable(unsigned int l4idx, l4_pgentry_t l4e);
 #endif /* !defined(__ASSEMBLY__) */

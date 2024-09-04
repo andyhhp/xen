@@ -195,7 +195,7 @@ GLOBAL(__page_tables_end)
         .section .init.data, "aw", @progbits
         .align PAGE_SIZE, 0
 
-l1_bootmap:
+GLOBAL(l1_bootmap)
         .fill L1_PAGETABLE_ENTRIES, 8, 0
         .size l1_bootmap, . - l1_bootmap
 
