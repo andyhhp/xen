@@ -763,48 +763,7 @@ trampoline_setup:
         test    $(1 << L2_PAGETABLE_SHIFT) - 1, %eax
         jnz     .Lnot_aligned
 
-        /* Map Xen into the higher mappings using 2M superpages. */
-        lea     _PAGE_PSE + PAGE_HYPERVISOR_RWX + sym_esi(_start), %eax
-        mov     $sym_offs(_start),   %ecx   /* %eax = PTE to write ^      */
-        mov     $sym_offs(_end - 1), %edx
-        shr     $L2_PAGETABLE_SHIFT, %ecx   /* %ecx = First slot to write */
-        shr     $L2_PAGETABLE_SHIFT, %edx   /* %edx = Final slot to write */
-
-1:      mov     %eax, sym_offs(l2_xenmap)(%esi, %ecx, 8)
-        add     $1, %ecx
-        add     $1 << L2_PAGETABLE_SHIFT, %eax
-
-        cmp     %edx, %ecx
-        jbe     1b
-
-        /*
-         * Map Xen into the directmap (needed for early-boot pagetable
-         * handling/walking), and identity map Xen into bootmap (needed for
-         * the transition into long mode), using 2M superpages.
-         */
-        lea     sym_esi(_start), %ecx
-        lea     -1 + sym_esi(_end), %edx
-        lea     _PAGE_PSE + PAGE_HYPERVISOR_RWX(%ecx), %eax /* PTE to write. */
-        shr     $L2_PAGETABLE_SHIFT, %ecx                   /* First slot to write. */
-        shr     $L2_PAGETABLE_SHIFT, %edx                   /* Final slot to write. */
-
-1:      mov     %eax, sym_offs(l2_bootmap)  (%esi, %ecx, 8)
-        mov     %eax, sym_offs(l2_directmap)(%esi, %ecx, 8)
-        add     $1, %ecx
-        add     $1 << L2_PAGETABLE_SHIFT, %eax
-
-        cmp     %edx, %ecx
-        jbe     1b
-
-        /* Map 4x l2_bootmap[] into l3_bootmap[0...3] */
-        lea     __PAGE_HYPERVISOR + sym_esi(l2_bootmap), %eax
-        mov     %eax, 0  + sym_esi(l3_bootmap)
-        add     $PAGE_SIZE, %eax
-        mov     %eax, 8  + sym_esi(l3_bootmap)
-        add     $PAGE_SIZE, %eax
-        mov     %eax, 16 + sym_esi(l3_bootmap)
-        add     $PAGE_SIZE, %eax
-        mov     %eax, 24 + sym_esi(l3_bootmap)
+        call    setup_pages32
 
         /* Map l1_bootmap[] into l2_bootmap[0]. */
         lea     __PAGE_HYPERVISOR + sym_esi(l1_bootmap), %eax

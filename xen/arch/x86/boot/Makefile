@@ -1,6 +1,6 @@
-obj-bin-y += head.o cbundle.o reloc-trampoline64.o
+obj-bin-y += head.o cbundle.o reloc-trampoline64.o setup-pages64.o
 
-head-bin-objs := cmdline.o reloc.o reloc-trampoline.o
+head-bin-objs := cmdline.o reloc.o reloc-trampoline.o setup-pages.o
 
 nocov-y   += $(head-bin-objs)
 noubsan-y += $(head-bin-objs)
@@ -43,7 +43,7 @@ $(obj)/cbundle.o: $(head-bin-objs) $(obj)/build32.other.lds $(obj)/build32.final
 	$(PYTHON) $(srctree)/tools/make_output \
 		--script $(obj)/build32.final.lds \
 		--bin1 $@.1.bin --bin2 $@.2.bin \
-		--map $(obj)/cbundle.map --exports cmdline_parse_early,reloc,reloc_trampoline32 \
+		--map $(obj)/cbundle.map --exports cmdline_parse_early,reloc,reloc_trampoline32,setup_pages32 \
 		--section-header '.section .init.text, "ax", @progbits' \
 		--output $(obj)/cbundle.s
 	$(CC) -c $(obj)/cbundle.s -o $@.tmp
