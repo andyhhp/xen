@@ -23,13 +23,6 @@
  *   - %eax      = &cmdline,
  *   - %edx      = &early_boot_opts.
  */
-asm (
-    "    .text                         \n"
-    "    .globl _start                 \n"
-    "_start:                           \n"
-    "    jmp  cmdline_parse_early      \n"
-    );
-
 #include <xen/compiler.h>
 #include <xen/kconfig.h>
 #include <xen/macros.h>

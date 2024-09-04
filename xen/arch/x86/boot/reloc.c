@@ -19,13 +19,6 @@
  *   - %ecx       = TOPMOST_LOW_MEMORY_STACK_ADDRESS.
  *   - 0x04(%esp) = BOOT_VIDEO_INFO_ADDRESS.
  */
-asm (
-    "    .text                         \n"
-    "    .globl _start                 \n"
-    "_start:                           \n"
-    "    jmp  reloc                    \n"
-    );
-
 #include <xen/compiler.h>
 #include <xen/macros.h>
 #include <xen/types.h>
