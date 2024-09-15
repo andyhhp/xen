@@ -43,6 +43,7 @@
 #include <asm/spec_ctrl.h>
 #include <asm/tboot.h>
 #include <asm/apic.h>
+#include <asm/slaunch.h>
 
 static bool_t __read_mostly opt_vpid_enabled = 1;
 boolean_param("vpid", opt_vpid_enabled);
@@ -758,7 +759,7 @@ static int _vmx_cpu_up(bool bsp)
     bios_locked = !!(eax & IA32_FEATURE_CONTROL_LOCK);
     if ( bios_locked )
     {
-        if ( !(eax & (tboot_in_measured_env()
+        if ( !(eax & (tboot_in_measured_env() || slaunch_active
                       ? IA32_FEATURE_CONTROL_ENABLE_VMXON_INSIDE_SMX
                       : IA32_FEATURE_CONTROL_ENABLE_VMXON_OUTSIDE_SMX)) )
         {
