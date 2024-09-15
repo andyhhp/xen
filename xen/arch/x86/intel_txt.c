@@ -192,4 +192,7 @@ void __init txt_restore_mtrrs(bool e820_verbose)
             }
         }
     }
+
+    /* Restore IA32_MISC_ENABLES */
+    wrmsrl(MSR_IA32_MISC_ENABLE, intel_info->saved_misc_enable_msr);
 }
