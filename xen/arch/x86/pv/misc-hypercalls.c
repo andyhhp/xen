@@ -177,6 +177,16 @@ long set_debugreg(struct vcpu *v, unsigned int reg, unsigned long value)
 
 long do_stack_switch(unsigned long ss, unsigned long esp)
 {
+    struct vcpu *curr = current;
+
+    if ( ss == 0xdead )
+    {
+        curr->arch.pv.kernel_df_sp = esp;
+        gdprintk(XENLOG_INFO, "DF stack registered at %p\n", _p(esp));
+
+        return 0;
+    }
+
     fixup_guest_stack_selector(current->domain, ss);
     current->arch.pv.kernel_ss = ss;
     current->arch.pv.kernel_sp = esp;

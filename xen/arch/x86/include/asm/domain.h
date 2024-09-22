@@ -526,7 +526,7 @@ struct pv_vcpu
     unsigned long ldt_base;
     unsigned int gdt_ents, ldt_ents;
 
-    unsigned long kernel_ss, kernel_sp;
+    unsigned long kernel_ss, kernel_sp, kernel_df_sp;
     unsigned long ctrlreg[8];
 
     unsigned long event_callback_eip;

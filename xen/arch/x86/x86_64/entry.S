@@ -605,9 +605,21 @@ domain_crash_page_fault_2x8:
 domain_crash_page_fault_1x8:
         addq  $8,%rsi
 domain_crash_page_fault_0x8:
+        push  %rdx
+
         ALTERNATIVE "", clac, X86_FEATURE_XEN_SMAP
         movq  %rsi,%rdi
         call  show_page_walk
+
+        call  maybe_df
+        test  %al, %al
+        jz    1f
+
+        /* maybe_df fixed up */
+        pop   %rdx
+        ret
+1:
+
 ENTRY(dom_crash_sync_extable)
         ALTERNATIVE "", clac, X86_FEATURE_XEN_SMAP
         # Get out of the guest-save area of the stack.

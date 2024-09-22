@@ -2346,6 +2346,30 @@ void activate_debugregs(const struct vcpu *curr)
     }
 }
 
+bool /*fixed*/ maybe_df(void)
+{
+    struct vcpu *curr = current;
+
+    if ( curr->arch.pv.kernel_df_sp == 0 )
+    {
+        gdprintk(XENLOG_WARNING, "DF stack not regstered\n");
+        return false;
+    }
+
+    if ( (curr->arch.pv.kernel_sp >> 12) ==
+         (curr->arch.pv.kernel_df_sp >> 12) )
+    {
+        gdprintk(XENLOG_WARNING, "Already on DF stack, not changing\n");
+        return false;
+    }
+
+    curr->arch.pv.kernel_sp = curr->arch.pv.kernel_df_sp;
+    pv_inject_hw_exception(X86_EXC_DF, 0);
+    gdprintk(XENLOG_WARNING, "Switching to DF stack\n");
+
+    return true;
+}
+
 void asm_domain_crash_synchronous(unsigned long addr)
 {
     /*
