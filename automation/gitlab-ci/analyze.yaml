@@ -41,13 +41,6 @@ eclair-x86_64:
     VARIANT: "X86_64"
     RULESET: "monitored"
 
-eclair-ARM64:
-  extends: .eclair-analysis:triggered
-  variables:
-    LOGFILE: "eclair-ARM64.log"
-    VARIANT: "ARM64"
-    RULESET: "monitored"
-
 .eclair-analysis:on-schedule:
   extends: .eclair-analysis
   rules:
@@ -59,15 +52,6 @@ eclair-x86_64:on-schedule:
   extends: .eclair-analysis:on-schedule
   variables:
     VARIANT: "X86_64"
-    RULESET: "accepted"
-    ANALYSIS_KIND: "${RULESET}-scheduled"
-    LOGFILE: "eclair-${VARIANT}-${RULESET}.log"
-  allow_failure: true
-
-eclair-ARM64:on-schedule:
-  extends: .eclair-analysis:on-schedule
-  variables:
-    VARIANT: "ARM64"
     RULESET: "accepted"
     ANALYSIS_KIND: "${RULESET}-scheduled"
     LOGFILE: "eclair-${VARIANT}-${RULESET}.log"
