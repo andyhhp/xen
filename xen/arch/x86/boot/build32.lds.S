@@ -15,22 +15,52 @@
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-ENTRY(_start)
+#ifdef FINAL
+# define GAP 0
+# define MULT 0
+# define TEXT_START
+#else
+# define GAP 0x010200
+# define MULT 1
+# define TEXT_START 0x408020
+#endif
+# define DECLARE_IMPORT(name) name = . + (__LINE__ * MULT)
+
+ENTRY(dummy_start)
 
 SECTIONS
 {
-  /* Merge code and data into one section. */
-  .text : {
+  /* Merge code and read-only data into one section. */
+  .text TEXT_START : {
+        /* Silence linker warning, we are not going to use it */
+        dummy_start = .;
+
+        /* Declare below any symbol name needed.
+         * Each symbol should be on its own line.
+         * It looks like a tedious work but we make sure the things we use.
+         * Potentially they should be all variables. */
+        DECLARE_IMPORT(__base_relocs_start);
+        DECLARE_IMPORT(__base_relocs_end);
+        . = . + GAP;
         *(.text)
         *(.text.*)
-        *(.data)
-        *(.data.*)
         *(.rodata)
         *(.rodata.*)
+  }
+
+  /* Writeable data sections. Check empty.
+   * We collapse all into code section and we don't want it to be writeable. */
+  .data : {
+        *(.data)
+        *(.data.*)
         *(.bss)
         *(.bss.*)
   }
-
+  /DISCARD/ : {
+       *(.comment)
+       *(.comment.*)
+       *(.note.*)
+  }
   /* Dynamic linkage sections.  Collected simply so we can check they're empty. */
   .got : {
         *(.got)
@@ -64,3 +94,4 @@ ASSERT(SIZEOF(.igot.plt) == 0,    ".igot.plt non-empty")
 ASSERT(SIZEOF(.iplt) == 0,        ".iplt non-empty")
 ASSERT(SIZEOF(.plt) == 0,         ".plt non-empty")
 ASSERT(SIZEOF(.rel) == 0,         "leftover relocations")
+ASSERT(SIZEOF(.data) == 0,        "we don't want data")
