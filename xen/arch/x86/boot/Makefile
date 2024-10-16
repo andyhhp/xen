@@ -1,11 +1,15 @@
 obj-bin-y += head.o
 obj-bin-y += built-in-32.o
+obj-bin-y += $(obj64)
 
 obj32 := cmdline.32.o
 obj32 += reloc.32.o
+obj32 += reloc-trampoline.32.o
 
-nocov-y   += $(obj32)
-noubsan-y += $(obj32)
+obj64 := reloc-trampoline.o
+
+nocov-y   += $(obj32) $(obj64)
+noubsan-y += $(obj32) $(obj64)
 targets   += $(obj32)
 
 obj32 := $(addprefix $(obj)/,$(obj32))
@@ -57,7 +61,7 @@ $(obj)/built-in-32.S: $(obj)/built-in-32.other.bin $(obj)/built-in-32.final.bin 
 		--bin1 $(obj)/built-in-32.other.bin \
 		--bin2 $(obj)/built-in-32.final.bin \
 		--map $(obj)/built-in-32.final.map \
-		--exports cmdline_parse_early,reloc \
+		--exports cmdline_parse_early,reloc,reloc_trampoline32 \
 		--output $@
 
 clean-files := built-in-32.*.bin built-in-32.*.map build32.*.lds
