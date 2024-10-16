@@ -51,14 +51,7 @@ static const char delim_chars_comma[] = ", \n\r\t";
 
 #define delim_chars	(delim_chars_comma + 1)
 
-static size_t strlen(const char *s)
-{
-    const char *sc;
-
-    for ( sc = s; *sc != '\0'; ++sc )
-        /* nothing */;
-    return sc - s;
-}
+size_t strlen(const char *s);
 
 static int strncmp(const char *cs, const char *ct, size_t count)
 {

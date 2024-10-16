@@ -6,26 +6,32 @@ obj32 := cmdline.32.o
 obj32 += reloc.32.o
 obj32 += reloc-trampoline.32.o
 
+lib32 := strlen.32.o
+
 obj64 := reloc-trampoline.o
 
-nocov-y   += $(obj32) $(obj64)
-noubsan-y += $(obj32) $(obj64)
-targets   += $(obj32)
+nocov-y   += $(obj32) $(lib32) $(obj64)
+noubsan-y += $(obj32) $(lib32) $(obj64)
+targets   += $(obj32) $(lib32)
 
 obj32 := $(addprefix $(obj)/,$(obj32))
+lib32 := $(addprefix $(obj)/,$(lib32))
 
 CFLAGS_x86_32 := $(subst -m64,-m32 -march=i686,$(XEN_TREEWIDE_CFLAGS))
 $(call cc-options-add,CFLAGS_x86_32,CC,$(EMBEDDED_EXTRA_CFLAGS))
 CFLAGS_x86_32 += -Werror -fno-builtin -g0 -msoft-float -mregparm=3
 CFLAGS_x86_32 += -nostdinc -include $(filter %/include/xen/config.h,$(XEN_CFLAGS))
-CFLAGS_x86_32 += $(filter -I% -O%,$(XEN_CFLAGS)) -D__XEN__
+CFLAGS_x86_32 += $(filter -I% -O% -f%-sections,$(XEN_CFLAGS)) -D__XEN__
 
 # override for 32bit binaries
-$(obj32): CFLAGS_stack_boundary :=
-$(obj32): XEN_CFLAGS := $(CFLAGS_x86_32) -fpic
+$(obj32) $(lib32): CFLAGS_stack_boundary :=
+$(obj32) $(lib32): XEN_CFLAGS := $(CFLAGS_x86_32) -fpic
 
 $(obj)/%.32.o: $(src)/%.c FORCE
 	$(call if_changed_rule,cc_o_c)
+
+$(obj)/lib.32.a: $(lib32) FORCE
+	$(call if_changed,ar)
 
 orphan-handling-$(call ld-option,--orphan-handling=error) := --orphan-handling=error
 LDFLAGS_DIRECT-$(call ld-option,--warn-rwx-segments) := --no-warn-rwx-segments
@@ -43,7 +49,7 @@ $(obj)/build32.other.lds $(obj)/build32.final.lds: $(src)/build32.lds.S FORCE
 targets += build32.final.lds build32.other.lds
 
 # link all 32bit objects together
-$(obj)/built-in-32.tmp.o: $(obj32)
+$(obj)/built-in-32.tmp.o: $(obj32) $(obj)/lib.32.a
 	$(LD32) -r -o $@ $^
 
 # link bundle with a given layout and extract a binary from it
