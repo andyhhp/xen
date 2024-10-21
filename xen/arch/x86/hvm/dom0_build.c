@@ -1300,9 +1300,8 @@ static void __hwdom_init pvh_setup_mmcfg(struct domain *d)
     }
 }
 
-int __init dom0_construct_pvh(struct domain *d, const module_t *image,
-                              unsigned long image_headroom,
-                              module_t *initrd,
+int __init dom0_construct_pvh(struct domain *d, const struct boot_module *image,
+                              struct boot_module *initrd,
                               const char *cmdline)
 {
     paddr_t entry, start_info;
@@ -1347,8 +1346,8 @@ int __init dom0_construct_pvh(struct domain *d, const module_t *image,
         return rc;
     }
 
-    rc = pvh_load_kernel(d, image, image_headroom, initrd, bootstrap_map(image),
-                         cmdline, &entry, &start_info);
+    rc = pvh_load_kernel(d, image->mod, image->headroom, initrd->mod,
+                         bootstrap_map_bm(image), cmdline, &entry, &start_info);
     if ( rc )
     {
         printk("Failed to load Dom0 kernel\n");

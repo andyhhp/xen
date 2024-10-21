@@ -610,8 +610,7 @@ int __init construct_dom0(struct domain *d, const struct boot_module *image,
     process_pending_softirqs();
 
     if ( is_hvm_domain(d) )
-        rc = dom0_construct_pvh(d, image->mod, image->headroom, initrd->mod,
-                                cmdline);
+        rc = dom0_construct_pvh(d, image, initrd, cmdline);
     else if ( is_pv_domain(d) )
         rc = dom0_construct_pv(d, image, initrd, cmdline);
     else

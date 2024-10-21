@@ -17,9 +17,8 @@ int dom0_construct_pv(struct domain *d, const struct boot_module *image,
                       struct boot_module *initrd,
                       const char *cmdline);
 
-int dom0_construct_pvh(struct domain *d, const module_t *image,
-                       unsigned long image_headroom,
-                       module_t *initrd,
+int dom0_construct_pvh(struct domain *d, const struct boot_module *image,
+                       struct boot_module *initrd,
                        const char *cmdline);
 
 unsigned long dom0_paging_pages(const struct domain *d,
