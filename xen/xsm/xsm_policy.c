@@ -33,22 +33,19 @@
 int __init xsm_multiboot_policy_init(
     struct boot_info *bi, void **policy_buffer, size_t *policy_size)
 {
-    int i;
     int rc = 0;
     u32 *_policy_start;
     unsigned long _policy_len;
+    struct boot_module *bm;
 
     /*
      * Try all modules and see whichever could be the binary policy.
      * Adjust module_map for the module that is the binary policy.
      */
-    for ( i = bi->nr_modules - 1; i >= 1; i-- )
+    for_each_boot_module(bi, bm, BOOTMOD_UNKNOWN)
     {
-        if ( !test_bit(i, bi->module_map) )
-            continue;
-
-        _policy_start = bootstrap_map(bi->mods[i].mod);
-        _policy_len   = bi->mods[i].mod->mod_end;
+        _policy_start = bootstrap_map_bm(bm);
+        _policy_len   = bm->size;
 
         if ( (xsm_magic_t)(*_policy_start) == XSM_MAGIC )
         {
@@ -58,7 +55,8 @@ int __init xsm_multiboot_policy_init(
             printk("Policy len %#lx, start at %p.\n",
                    _policy_len,_policy_start);
 
-            __clear_bit(i, bi->module_map);
+            __clear_bit(boot_module_index(bi, bm), module_map);
+            bm->type = BOOTMOD_XSM_POLICY;
             break;
 
         }

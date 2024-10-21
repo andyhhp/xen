@@ -160,6 +160,14 @@ int __init xsm_multiboot_init(struct boot_info *bi)
     }
 
     ret = xsm_core_init(policy_buffer, policy_size);
+    if ( ret == 0 )
+    {
+        int idx = first_boot_module_index(bi, BOOTMOD_XSM_POLICY);
+
+        /* If the policy was loaded from a boot module, mark it consumed */
+        if ( idx >= 0 )
+            bi->mods[idx].consumed = true;
+    }
     bootstrap_unmap();
 
     return 0;

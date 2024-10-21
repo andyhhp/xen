@@ -21,6 +21,7 @@ enum bootmod_type {
     BOOTMOD_KERNEL,
     BOOTMOD_RAMDISK,
     BOOTMOD_MICROCODE,
+    BOOTMOD_XSM_POLICY,
 };
 
 struct boot_module {
@@ -94,6 +95,34 @@ static inline struct boot_module *__init next_boot_module_by_type(
 
 #define boot_module_index(bi, bm)                   \
     (unsigned int)(bm - &bi->mods[0])
+
+/*
+ * next_boot_module_index:
+ *     Finds the next boot module of type t, starting at array index start.
+ *
+ * Returns:
+ *      Success - index in boot_module array
+ *      Failure - a value greater than MAX_NR_BOOTMODS
+ */
+static inline unsigned int __init next_boot_module_index(
+    const struct boot_info *bi, enum bootmod_type t, unsigned int start)
+{
+    unsigned int i;
+
+    if ( t == BOOTMOD_XEN )
+        return bi->nr_modules;
+
+    for ( i = start; i < bi->nr_modules; i++ )
+    {
+        if ( bi->mods[i].type == t )
+            return i;
+    }
+
+    return MAX_NR_BOOTMODS + 1;
+}
+
+#define first_boot_module_index(bi, t)              \
+    next_boot_module_index(bi, t, 0)
 
 #endif /* X86_BOOTINFO_H */
 
