@@ -46,6 +46,9 @@ struct boot_module {
      *   relocated: indicates module has been relocated in memory.
      */
     bool relocated:1;
+
+    paddr_t start;
+    size_t size;
 };
 
 /*

@@ -312,10 +312,25 @@ static struct boot_info *__init multiboot_fill_boot_info(
      * reserved for Xen.
      */
     for ( i = 0; i < MAX_NR_BOOTMODS && i < bi->nr_modules; i++ )
+    {
         bi->mods[i].mod = &mods[i];
+
+        if ( !efi_enabled(EFI_LOADER) )
+        {
+            bi->mods[i].start = mods[i].mod_start;
+            bi->mods[i].size = mods[i].mod_end - mods[i].mod_start;
+        }
+        else
+        {
+            bi->mods[i].start = pfn_to_paddr(mods[i].mod_start);
+            bi->mods[i].size = mods[i].mod_end;
+        }
+    }
 
     /* Variable 'i' should be one entry past the last module. */
     bi->mods[i].mod = &mods[bi->nr_modules];
+    bi->mods[i].start = mods[i].mod_start;
+    bi->mods[i].size = mods[i].mod_end - mods[i].mod_start;
     bi->mods[i].type = BOOTMOD_XEN;
 
     return bi;
@@ -478,7 +493,7 @@ void *__init bootstrap_map(const module_t *mod)
 
 void *__init bootstrap_map_bm(const struct boot_module *bm)
 {
-    return bootstrap_map(bm->mod);
+    return bootstrap_map_addr(bm->start, bm->start + bm->size);
 }
 
 void __init bootstrap_unmap(void)
