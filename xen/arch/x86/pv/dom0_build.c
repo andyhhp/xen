@@ -355,8 +355,7 @@ static struct page_info * __init alloc_chunk(struct domain *d,
 }
 
 static int __init dom0_construct(struct domain *d,
-                                 const module_t *image,
-                                 unsigned long image_headroom,
+                                 const struct boot_module *image,
                                  module_t *initrd,
                                  const char *cmdline)
 {
@@ -374,9 +373,9 @@ static int __init dom0_construct(struct domain *d,
     unsigned int flush_flags = 0;
     start_info_t *si;
     struct vcpu *v = d->vcpu[0];
-    void *image_base = bootstrap_map(image);
-    unsigned long image_len = image->mod_end;
-    void *image_start = image_base + image_headroom;
+    void *image_base = bootstrap_map_bm(image);
+    unsigned long image_len = image->size;
+    void *image_start = image_base + image->headroom;
     unsigned long initrd_len = initrd ? initrd->mod_end : 0;
     l4_pgentry_t *l4tab = NULL, *l4start = NULL;
     l3_pgentry_t *l3tab = NULL, *l3start = NULL;
@@ -1052,8 +1051,7 @@ out:
 }
 
 int __init dom0_construct_pv(struct domain *d,
-                             const module_t *image,
-                             unsigned long image_headroom,
+                             const struct boot_module *image,
                              module_t *initrd,
                              const char *cmdline)
 {
@@ -1073,7 +1071,7 @@ int __init dom0_construct_pv(struct domain *d,
         write_cr4(cr4 & ~X86_CR4_SMAP);
     }
 
-    rc = dom0_construct(d, image, image_headroom, initrd, cmdline);
+    rc = dom0_construct(d, image, initrd, cmdline);
 
     if ( cr4 & X86_CR4_SMAP )
     {
