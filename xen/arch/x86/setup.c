@@ -315,6 +315,8 @@ static struct boot_info *__init multiboot_fill_boot_info(
     {
         bi->mods[i].mod = &mods[i];
 
+        bi->mods[i].cmdline = (paddr_t)mods[i].string;
+
         if ( !efi_enabled(EFI_LOADER) )
         {
             bi->mods[i].start = mods[i].mod_start;
@@ -1008,10 +1010,11 @@ static struct domain *__init create_dom0(struct boot_info *bi)
         panic("Error creating d%uv0\n", domid);
 
     /* Grab the DOM0 command line. */
-    if ( image->mod->string || bi->kextra )
+    if ( image->cmdline || bi->kextra )
     {
-        if ( image->mod->string )
-            safe_strcpy(cmdline, cmdline_cook(__va(image->mod->string),
+        if ( image->cmdline )
+            safe_strcpy(cmdline,
+                        cmdline_cook(__va(image->cmdline),
                         bi->loader));
 
         if ( bi->kextra )

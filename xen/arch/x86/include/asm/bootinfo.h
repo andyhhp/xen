@@ -52,6 +52,8 @@ struct boot_module {
     bool relocated:1;
     bool consumed:1;
 
+    paddr_t cmdline;
+
     paddr_t start;
     size_t size;
 };
