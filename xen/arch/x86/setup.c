@@ -954,10 +954,8 @@ static unsigned int __init copy_bios_e820(struct e820entry *map, unsigned int li
     return n;
 }
 
-static struct domain *__init create_dom0(const module_t *image,
-                                         unsigned long headroom,
-                                         module_t *initrd, const char *kextra,
-                                         const char *loader)
+static struct domain *__init create_dom0(const struct boot_info *bi,
+                                         const char *kextra)
 {
     static char __initdata cmdline[MAX_GUEST_CMDLINE];
 
@@ -972,8 +970,21 @@ static struct domain *__init create_dom0(const module_t *image,
             .misc_flags = opt_dom0_msr_relaxed ? XEN_X86_MSR_RELAXED : 0,
         },
     };
+    unsigned long headroom;
+    unsigned int mod_idx = first_boot_module_index(bi, BOOTMOD_RAMDISK);
+    module_t *image, *initrd;
     struct domain *d;
     domid_t domid;
+
+    /* Map boot_module to mb1 module for dom0 */
+    image = bi->mods[0].mod;
+    headroom = bi->mods[0].headroom;
+
+    /* Map boot_module to mb1 module for initrd */
+    if ( mod_idx < 0 )
+        initrd = NULL;
+    else
+        initrd = bi->mods[mod_idx].mod;
 
     if ( opt_dom0_pvh )
     {
@@ -1003,7 +1014,7 @@ static struct domain *__init create_dom0(const module_t *image,
     if ( image->string || kextra )
     {
         if ( image->string )
-            safe_strcpy(cmdline, cmdline_cook(__va(image->string), loader));
+            safe_strcpy(cmdline, cmdline_cook(__va(image->string), bi->loader));
 
         if ( kextra )
             /* kextra always includes exactly one leading space. */
@@ -2121,10 +2132,7 @@ void asmlinkage __init noreturn __start_xen(void)
      * We're going to setup domain0 using the module(s) that we stashed safely
      * above our heap. The second module, if present, is an initrd ramdisk.
      */
-    dom0 = create_dom0(bi->mods[0].mod, bi->mods[0].headroom,
-                       initrdidx < bi->nr_modules ? bi->mods[initrdidx].mod
-                                                  : NULL,
-                       kextra, bi->loader);
+    dom0 = create_dom0(bi, kextra);
     if ( !dom0 )
         panic("Could not set up DOM0 guest OS\n");
 
