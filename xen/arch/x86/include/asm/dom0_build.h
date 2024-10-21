@@ -4,6 +4,7 @@
 #include <xen/libelf.h>
 #include <xen/sched.h>
 
+#include <asm/bootinfo.h>
 #include <asm/setup.h>
 
 extern unsigned int dom0_memflags;
@@ -13,9 +14,7 @@ unsigned long dom0_compute_nr_pages(struct domain *d,
                                     unsigned long initrd_len);
 int dom0_setup_permissions(struct domain *d);
 
-int dom0_construct_pv(struct domain *d, const struct boot_module *image,
-                      struct boot_module *initrd,
-                      const char *cmdline);
+int dom0_construct_pv(struct boot_domain *bd);
 
 int dom0_construct_pvh(struct domain *d, const struct boot_module *image,
                        struct boot_module *initrd,

@@ -354,10 +354,7 @@ static struct page_info * __init alloc_chunk(struct domain *d,
     return page;
 }
 
-static int __init dom0_construct(struct domain *d,
-                                 const struct boot_module *image,
-                                 struct boot_module *initrd,
-                                 const char *cmdline)
+static int __init dom0_construct(struct boot_domain *bd)
 {
     int i, rc, order, machine;
     bool compatible, compat;
@@ -373,11 +370,12 @@ static int __init dom0_construct(struct domain *d,
     struct page_info *page = NULL;
     unsigned int flush_flags = 0;
     start_info_t *si;
+    struct domain *d = bd->d;
     struct vcpu *v = d->vcpu[0];
-    void *image_base = bootstrap_map_bm(image);
-    unsigned long image_len = image->size;
-    void *image_start = image_base + image->headroom;
-    unsigned long initrd_len = initrd ? initrd->size : 0;
+    void *image_base = bootstrap_map_bm(bd->kernel);
+    unsigned long image_len = bd->kernel->size;
+    void *image_start = image_base + bd->kernel->headroom;
+    unsigned long initrd_len = bd->ramdisk ? bd->ramdisk->size : 0;
     l4_pgentry_t *l4tab = NULL, *l4start = NULL;
     l3_pgentry_t *l3tab = NULL, *l3start = NULL;
     l2_pgentry_t *l2tab = NULL, *l2start = NULL;
@@ -613,7 +611,7 @@ static int __init dom0_construct(struct domain *d,
         initrd_pfn = vinitrd_start ?
                      (vinitrd_start - v_start) >> PAGE_SHIFT :
                      domain_tot_pages(d);
-        initrd_mfn = maddr_to_mfn(initrd->start);
+        initrd_mfn = maddr_to_mfn(bd->ramdisk->start);
         mfn = mfn_x(initrd_mfn);
         count = PFN_UP(initrd_len);
         if ( d->arch.physaddr_bitsize &&
@@ -629,13 +627,13 @@ static int __init dom0_construct(struct domain *d,
                     free_domheap_pages(page, order);
                     page += 1UL << order;
                 }
-            memcpy(page_to_virt(page), maddr_to_virt(initrd->start),
+            memcpy(page_to_virt(page), maddr_to_virt(bd->ramdisk->start),
                    initrd_len);
-            mpt_alloc = initrd->start;
+            mpt_alloc = bd->ramdisk->start;
             init_domheap_pages(mpt_alloc,
                                mpt_alloc + PAGE_ALIGN(initrd_len));
             initrd_mfn = page_to_mfn(page);
-            initrd->start = mfn_to_maddr(initrd_mfn);
+            bd->ramdisk->start = mfn_to_maddr(initrd_mfn);
         }
         else
         {
@@ -643,7 +641,7 @@ static int __init dom0_construct(struct domain *d,
                 if ( assign_pages(mfn_to_page(_mfn(mfn++)), 1, d, 0) )
                     BUG();
         }
-        initrd->size = 0;
+        bd->ramdisk->size = 0;
 
         iommu_memory_setup(d, "initrd", mfn_to_page(initrd_mfn),
                            PFN_UP(initrd_len), &flush_flags);
@@ -655,9 +653,9 @@ static int __init dom0_construct(struct domain *d,
     if ( domain_tot_pages(d) < nr_pages )
         printk(" (%lu pages to be allocated)",
                nr_pages - domain_tot_pages(d));
-    if ( initrd )
+    if ( bd->ramdisk )
     {
-        mpt_alloc = initrd->start;
+        mpt_alloc = bd->ramdisk->start;
         printk("\n Init. ramdisk: %"PRIpaddr"->%"PRIpaddr,
                mpt_alloc, mpt_alloc + initrd_len);
     }
@@ -885,7 +883,7 @@ static int __init dom0_construct(struct domain *d,
         if ( pfn >= initrd_pfn )
         {
             if ( pfn < initrd_pfn + PFN_UP(initrd_len) )
-                mfn = paddr_to_pfn(initrd->start) + (pfn - initrd_pfn);
+                mfn = paddr_to_pfn(bd->ramdisk->start) + (pfn - initrd_pfn);
             else
                 mfn -= PFN_UP(initrd_len);
         }
@@ -955,8 +953,8 @@ static int __init dom0_construct(struct domain *d,
     }
 
     memset(si->cmd_line, 0, sizeof(si->cmd_line));
-    if ( cmdline != NULL )
-        strlcpy((char *)si->cmd_line, cmdline, sizeof(si->cmd_line));
+    if ( bd->cmdline[0] != '\0' )
+        strlcpy((char *)si->cmd_line, bd->cmdline, sizeof(si->cmd_line));
 
 #ifdef CONFIG_VIDEO
     if ( !pv_shim && fill_console_start_info((void *)(si + 1)) )
@@ -1053,10 +1051,7 @@ out:
     return rc;
 }
 
-int __init dom0_construct_pv(struct domain *d,
-                             const struct boot_module *image,
-                             struct boot_module *initrd,
-                             const char *cmdline)
+int __init dom0_construct_pv(struct boot_domain *bd)
 {
     unsigned long cr4 = read_cr4();
     int rc;
@@ -1074,7 +1069,7 @@ int __init dom0_construct_pv(struct domain *d,
         write_cr4(cr4 & ~X86_CR4_SMAP);
     }
 
-    rc = dom0_construct(d, image, initrd, cmdline);
+    rc = dom0_construct(bd);
 
     if ( cr4 & X86_CR4_SMAP )
     {
