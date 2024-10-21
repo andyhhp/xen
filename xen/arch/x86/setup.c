@@ -1043,7 +1043,7 @@ void asmlinkage __init noreturn __start_xen(void)
     struct cpu_info *info = get_cpu_info(), *bsp_info;
     unsigned int initrdidx, num_parked = 0;
     struct boot_info *bi;
-    unsigned long nr_pages, raw_max_page, module_map[1];
+    unsigned long nr_pages, raw_max_page;
     int i, j, e820_warn = 0, bytes = 0;
     unsigned long eb_start, eb_end;
     bool acpi_boot_table_init_done = false, relocated = false;
@@ -1105,8 +1105,6 @@ void asmlinkage __init noreturn __start_xen(void)
          */
         ASSERT(multiboot_ptr < MB(1) || xen_phys_start);
     }
-
-    bi->module_map = module_map; /* Temporary */
 
     /* Parse the command-line options. */
     if ( (kextra = strstr(bi->cmdline, " -- ")) != NULL )
@@ -1225,8 +1223,7 @@ void asmlinkage __init noreturn __start_xen(void)
                bi->nr_modules);
     }
 
-    bitmap_fill(module_map, bi->nr_modules);
-    __clear_bit(0, module_map); /* Dom0 kernel is always first */
+    /* Dom0 kernel is always first */
     bi->mods[0].type = BOOTMOD_KERNEL;
     bi->mods[0].consumed = true;
 
