@@ -1422,8 +1422,11 @@ void asmlinkage __init noreturn __start_xen(void)
          * respective reserve_e820_ram() invocation below. No need to
          * query efi_boot_mem_unused() here, though.
          */
-        xen->mod->mod_start = virt_to_mfn(_stext);
-        xen->mod->mod_end   = __2M_rwdata_end - _stext;
+        xen->start = virt_to_maddr(_stext);
+        xen->size  = __2M_rwdata_end - _stext;
+
+        xen->mod->mod_start = paddr_to_pfn(xen->start);
+        xen->mod->mod_end   = xen->size;
     }
 
     bi->mods[0].headroom =
