@@ -40,6 +40,12 @@ struct boot_module {
      */
     unsigned long headroom;
     enum bootmod_type type;
+
+    /*
+     * Module State Flags:
+     *   relocated: indicates module has been relocated in memory.
+     */
+    bool relocated:1;
 };
 
 /*
