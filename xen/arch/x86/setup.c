@@ -1023,10 +1023,12 @@ static struct domain *__init create_dom0(struct boot_info *bi)
         }
     }
 
+    bd->d = d;
+
     if ( construct_dom0(d, bd->kernel, bd->ramdisk, bd->cmdline) != 0 )
         panic("Could not construct domain 0\n");
 
-    return d;
+    return bd->d;
 }
 
 /* How much of the directmap is prebuilt at compile time. */

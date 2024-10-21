@@ -10,6 +10,7 @@
 
 #include <public/xen.h>
 
+struct domain;
 struct boot_module;
 
 struct boot_domain {
@@ -19,6 +20,8 @@ struct boot_domain {
 
     struct boot_module *kernel;
     struct boot_module *ramdisk;
+
+    struct domain *d;
 };
 
 #endif
