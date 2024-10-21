@@ -967,19 +967,9 @@ static struct domain *__init create_dom0(struct boot_info *bi)
             .misc_flags = opt_dom0_msr_relaxed ? XEN_X86_MSR_RELAXED : 0,
         },
     };
-    unsigned int mod_idx = first_boot_module_index(bi, BOOTMOD_RAMDISK);
-    struct boot_module *image, *initrd;
+    struct boot_domain *bd = &bi->domains[0];
     struct domain *d;
     domid_t domid;
-
-    /* Map boot_module to mb1 module for dom0 */
-    image = &bi->mods[0];
-
-    /* Map boot_module to mb1 module for initrd */
-    if ( mod_idx < 0 )
-        initrd = NULL;
-    else
-        initrd = &bi->mods[mod_idx];
 
     if ( opt_dom0_pvh )
     {
@@ -1006,11 +996,10 @@ static struct domain *__init create_dom0(struct boot_info *bi)
         panic("Error creating d%uv0\n", domid);
 
     /* Grab the DOM0 command line. */
-    if ( image->cmdline || bi->kextra )
+    if ( bd->kernel->cmdline || bi->kextra )
     {
-        if ( image->cmdline )
-            safe_strcpy(cmdline,
-                        cmdline_cook(__va(image->cmdline),
+        if ( bd->kernel->cmdline )
+            safe_strcpy(cmdline, cmdline_cook(__va(bd->kernel->cmdline),
                         bi->loader));
 
         if ( bi->kextra )
@@ -1034,7 +1023,7 @@ static struct domain *__init create_dom0(struct boot_info *bi)
         }
     }
 
-    if ( construct_dom0(d, image, initrd, cmdline) != 0 )
+    if ( construct_dom0(d, bd->kernel, bd->ramdisk, cmdline) != 0 )
         panic("Could not construct domain 0\n");
 
     return d;
@@ -1235,6 +1224,7 @@ void asmlinkage __init noreturn __start_xen(void)
     /* Dom0 kernel is always first */
     bi->mods[0].type = BOOTMOD_KERNEL;
     bi->mods[0].consumed = true;
+    bi->domains[0].kernel = &bi->mods[0];
 
     if ( pvh_boot )
     {
@@ -2113,6 +2103,7 @@ void asmlinkage __init noreturn __start_xen(void)
     {
         bi->mods[initrdidx].type = BOOTMOD_RAMDISK;
         bi->mods[initrdidx].consumed = true;
+        bi->domains[0].ramdisk = &bi->mods[initrdidx];
         if ( first_boot_module_index(bi, BOOTMOD_UNKNOWN) < MAX_NR_BOOTMODS )
             printk(XENLOG_WARNING
                    "Multiple initrd candidates, picking module #%u\n",

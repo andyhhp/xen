@@ -9,9 +9,13 @@
 #define X86_BOOTINFO_H
 
 #include <xen/types.h>
+#include <asm/bootdomain.h>
 
 /* Max number of boot modules a bootloader can provide in addition to Xen */
 #define MAX_NR_BOOTMODS 63
+
+/* Max number of boot domains that Xen can construct */
+#define MAX_NR_BOOTDOMS 1
 
 /* Boot module binary type / purpose */
 enum bootmod_type {
@@ -68,6 +72,7 @@ struct boot_info {
 
     unsigned int nr_modules;
     struct boot_module mods[MAX_NR_BOOTMODS + 1];
+    struct boot_domain domains[MAX_NR_BOOTDOMS];
 };
 
 static inline struct boot_module *__init next_boot_module_by_type(
