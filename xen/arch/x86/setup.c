@@ -1512,7 +1512,7 @@ void asmlinkage __init noreturn __start_xen(void)
         for ( j = bi->nr_modules - 1; j >= 0; j-- )
         {
             struct boot_module *bm = &bi->mods[j];
-            unsigned long size = PAGE_ALIGN(bm->headroom + bm->mod->mod_end);
+            unsigned long size = PAGE_ALIGN(bm->headroom + bm->size);
 
             if ( bm->relocated )
                 continue;
@@ -1524,14 +1524,13 @@ void asmlinkage __init noreturn __start_xen(void)
             if ( highmem_start && end > highmem_start )
                 continue;
 
-            if ( s < end &&
-                 (bm->headroom ||
-                  ((end - size) >> PAGE_SHIFT) > bm->mod->mod_start) )
+            if ( s < end && (bm->headroom || (end - size) > bm->start) )
             {
-                move_memory(end - size + bm->headroom,
-                            pfn_to_paddr(bm->mod->mod_start), bm->mod->mod_end);
-                bm->mod->mod_start = (end - size) >> PAGE_SHIFT;
-                bm->mod->mod_end += bm->headroom;
+                move_memory(end - size + bm->headroom, bm->start, bm->size);
+                bm->start = (end - size);
+                bm->mod->mod_start = paddr_to_pfn(bm->start);
+                bm->size += bm->headroom;
+                bm->mod->mod_end = bm->size;
                 bm->relocated = true;
             }
         }
@@ -1563,9 +1562,9 @@ void asmlinkage __init noreturn __start_xen(void)
     for ( i = 0; i < bi->nr_modules; ++i )
     {
         const struct boot_module *bm = &bi->mods[i];
-        uint64_t s = pfn_to_paddr(bm->mod->mod_start);
+        uint64_t s = bm->start;
 
-        reserve_e820_ram(&boot_e820, s, s + PAGE_ALIGN(bm->mod->mod_end));
+        reserve_e820_ram(&boot_e820, s, s + PAGE_ALIGN(bm->size));
     }
 
     if ( !xen_phys_start )
@@ -1643,8 +1642,7 @@ void asmlinkage __init noreturn __start_xen(void)
                 map_e = boot_e820.map[j].addr + boot_e820.map[j].size;
                 for ( j = 0; j < bi->nr_modules; ++j )
                 {
-                    uint64_t end = pfn_to_paddr(bi->mods[j].mod->mod_start) +
-                                   bi->mods[j].mod->mod_end;
+                    uint64_t end = bi->mods[j].start + bi->mods[j].size;
 
                     if ( map_e < end )
                         map_e = end;
@@ -1719,12 +1717,11 @@ void asmlinkage __init noreturn __start_xen(void)
     for ( i = 0; i < bi->nr_modules; ++i )
     {
         const struct boot_module *bm = &bi->mods[i];
+        unsigned long s = bm->start, l = bm->size;
 
-        set_pdx_range(bm->mod->mod_start,
-                      bm->mod->mod_start + PFN_UP(bm->mod->mod_end));
-        map_pages_to_xen((unsigned long)mfn_to_virt(bm->mod->mod_start),
-                         _mfn(bm->mod->mod_start),
-                         PFN_UP(bm->mod->mod_end), PAGE_HYPERVISOR);
+        set_pdx_range(paddr_to_pfn(s), paddr_to_pfn(s) + PFN_UP(l));
+        map_pages_to_xen((unsigned long)maddr_to_virt(s), maddr_to_mfn(s),
+                         PFN_UP(l), PAGE_HYPERVISOR);
     }
 
 #ifdef CONFIG_KEXEC
