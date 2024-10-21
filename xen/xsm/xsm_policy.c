@@ -55,7 +55,6 @@ int __init xsm_multiboot_policy_init(
             printk("Policy len %#lx, start at %p.\n",
                    _policy_len,_policy_start);
 
-            __clear_bit(boot_module_index(bi, bm), module_map);
             bm->type = BOOTMOD_XSM_POLICY;
             break;
 
