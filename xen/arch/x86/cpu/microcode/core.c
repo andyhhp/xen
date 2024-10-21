@@ -160,7 +160,7 @@ static void __init microcode_scan_module(struct boot_info *bi)
     struct cpio_data cd;
     long offset;
     const char *p = NULL;
-    int i;
+    struct boot_module *bm;
 
     ucode_blob.size = 0;
     if ( !ucode_scan )
@@ -176,17 +176,14 @@ static void __init microcode_scan_module(struct boot_info *bi)
     /*
      * Try all modules and see whichever could be the microcode blob.
      */
-    for ( i = 1 /* Ignore dom0 kernel */; i < bi->nr_modules; i++ )
+    for_each_boot_module(bi, bm, BOOTMOD_UNKNOWN)
     {
-        if ( !test_bit(i, bi->module_map) )
-            continue;
-
-        _blob_start = bootstrap_map(bi->mods[i].mod);
-        _blob_size = bi->mods[i].mod->mod_end;
+        _blob_start = bootstrap_map_bm(bm);
+        _blob_size = bm->size;
         if ( !_blob_start )
         {
-            printk("Could not map multiboot module #%d (size: %ld)\n",
-                   i, _blob_size);
+            printk("Could not map boot module #%d (size: %ld)\n",
+                   boot_module_index(bi, bm), _blob_size);
             continue;
         }
         cd.data = NULL;
@@ -209,6 +206,7 @@ static void __init microcode_grab_module(struct boot_info *bi)
     if ( ucode_mod_idx <= 0 || ucode_mod_idx >= bi->nr_modules ||
          !__test_and_clear_bit(ucode_mod_idx, bi->module_map) )
         goto scan;
+    bi->mods[ucode_mod_idx].type = BOOTMOD_MICROCODE;
     ucode_mod = *bi->mods[ucode_mod_idx].mod;
 scan:
     if ( ucode_scan )

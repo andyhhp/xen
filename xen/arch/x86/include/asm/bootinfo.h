@@ -20,6 +20,7 @@ enum bootmod_type {
     BOOTMOD_XEN,
     BOOTMOD_KERNEL,
     BOOTMOD_RAMDISK,
+    BOOTMOD_MICROCODE,
 };
 
 struct boot_module {
@@ -69,6 +70,30 @@ struct boot_info {
     unsigned long *module_map; /* Temporary */
     struct boot_module mods[MAX_NR_BOOTMODS + 1];
 };
+
+static inline struct boot_module *__init next_boot_module_by_type(
+    struct boot_info *bi, struct boot_module *bm, enum bootmod_type t)
+{
+    if ( bm == NULL )
+        bm = &bi->mods[0];
+    else
+        bm++;
+
+    for ( ; bm <= &bi->mods[bi->nr_modules]; bm++ )
+    {
+        if ( bm->type == t )
+            return bm;
+    }
+
+    return NULL;
+}
+
+#define for_each_boot_module(bi, bm, t)                                     \
+    for ( bm = &bi->mods[0]; bm != NULL && bm <= &bi->mods[bi->nr_modules]; \
+          bm = next_boot_module_by_type(bi, bm, t) )
+
+#define boot_module_index(bi, bm)                   \
+    (unsigned int)(bm - &bi->mods[0])
 
 #endif /* X86_BOOTINFO_H */
 
