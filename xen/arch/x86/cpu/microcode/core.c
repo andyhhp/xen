@@ -203,7 +203,7 @@ static void __init microcode_grab_module(struct boot_info *bi)
     if ( ucode_mod_idx < 0 )
         ucode_mod_idx += bi->nr_modules;
     if ( ucode_mod_idx <= 0 || ucode_mod_idx >= bi->nr_modules ||
-         !__test_and_clear_bit(ucode_mod_idx, bi->module_map) )
+         bi->mods[ucode_mod_idx].type != BOOTMOD_UNKNOWN )
         goto scan;
     bi->mods[ucode_mod_idx].type = BOOTMOD_MICROCODE;
     ucode_mod = &bi->mods[ucode_mod_idx];
