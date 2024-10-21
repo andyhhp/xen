@@ -510,26 +510,26 @@ yocto-qemux86-64:
 
 # Cppcheck analysis jobs
 
-debian-bookworm-gcc-cppcheck:
+debian-12-x86_64-gcc-cppcheck:
   extends: .gcc-x86-64-cross-build
   variables:
-    CONTAINER: debian:bookworm-cppcheck
+    CONTAINER: debian:12-arm64v8-cppcheck
     CROSS_COMPILE: /usr/bin/x86_64-linux-gnu-
     CPPCHECK: y
     HYPERVISOR_ONLY: y
 
-debian-bookworm-gcc-arm32-cppcheck:
+debian-12-arm32-gcc-cppcheck:
   extends: .gcc-arm32-cross-build
   variables:
-    CONTAINER: debian:bookworm-cppcheck
+    CONTAINER: debian:12-arm64v8-cppcheck
     CROSS_COMPILE: /usr/bin/arm-linux-gnueabihf-
     CPPCHECK: y
     HYPERVISOR_ONLY: y
 
-debian-bookworm-gcc-arm64-cppcheck:
+debian-12-arm64-gcc-cppcheck:
   extends: .gcc-arm64-build
   variables:
-    CONTAINER: debian:bookworm-cppcheck
+    CONTAINER: debian:12-arm64v8-cppcheck
     CPPCHECK: y
     HYPERVISOR_ONLY: y
 
