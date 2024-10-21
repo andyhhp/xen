@@ -313,8 +313,6 @@ static struct boot_info *__init multiboot_fill_boot_info(
      */
     for ( i = 0; i < MAX_NR_BOOTMODS && i < bi->nr_modules; i++ )
     {
-        bi->mods[i].mod = &mods[i];
-
         bi->mods[i].cmdline = (paddr_t)mods[i].string;
 
         if ( !efi_enabled(EFI_LOADER) )
@@ -330,7 +328,6 @@ static struct boot_info *__init multiboot_fill_boot_info(
     }
 
     /* Variable 'i' should be one entry past the last module. */
-    bi->mods[i].mod = &mods[bi->nr_modules];
     bi->mods[i].start = mods[i].mod_start;
     bi->mods[i].size = mods[i].mod_end - mods[i].mod_start;
     bi->mods[i].type = BOOTMOD_XEN;

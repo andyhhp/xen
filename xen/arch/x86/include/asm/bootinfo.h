@@ -8,7 +8,6 @@
 #ifndef X86_BOOTINFO_H
 #define X86_BOOTINFO_H
 
-#include <xen/multiboot.h>
 #include <xen/types.h>
 
 /* Max number of boot modules a bootloader can provide in addition to Xen */
@@ -25,9 +24,6 @@ enum bootmod_type {
 };
 
 struct boot_module {
-    /* Transitionary only */
-    module_t *mod;
-
     /*
      * A boot module may contain a compressed kernel that will require
      * additional space, before the module data, into which the kernel will be
