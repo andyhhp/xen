@@ -1299,10 +1299,9 @@ static void __hwdom_init pvh_setup_mmcfg(struct domain *d)
     }
 }
 
-int __init dom0_construct_pvh(struct domain *d, const struct boot_module *image,
-                              struct boot_module *initrd,
-                              const char *cmdline)
+int __init dom0_construct_pvh(const struct boot_domain *bd)
 {
+    struct domain *d = bd->d;
     paddr_t entry, start_info;
     int rc;
 
@@ -1345,7 +1344,8 @@ int __init dom0_construct_pvh(struct domain *d, const struct boot_module *image,
         return rc;
     }
 
-    rc = pvh_load_kernel(d, image, initrd, bootstrap_map_bm(image), cmdline,
+    rc = pvh_load_kernel(d, bd->kernel, bd->ramdisk,
+                         bootstrap_map_bm(bd->kernel), bd->cmdline,
                          &entry, &start_info);
     if ( rc )
     {
