@@ -366,10 +366,9 @@ void __init discard_initial_images(void)
 
     for ( i = 0; i < bi->nr_modules; ++i )
     {
-        uint64_t start = pfn_to_paddr(bi->mods[i].mod->mod_start);
+        uint64_t start = bi->mods[i].start;
 
-        init_domheap_pages(start,
-                           start + PAGE_ALIGN(bi->mods[i].mod->mod_end));
+        init_domheap_pages(start, start + PAGE_ALIGN(bi->mods[i].size));
     }
 
     bi->nr_modules = 0;
