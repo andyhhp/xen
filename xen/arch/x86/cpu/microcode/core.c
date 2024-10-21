@@ -58,7 +58,7 @@
  */
 #define MICROCODE_UPDATE_TIMEOUT_US 1000000
 
-static struct boot_module __initdata ucode_mod;
+static struct boot_module __initdata *ucode_mod;
 static signed int __initdata ucode_mod_idx;
 static bool __initdata ucode_mod_forced;
 static unsigned int nr_cores;
@@ -206,7 +206,7 @@ static void __init microcode_grab_module(struct boot_info *bi)
          !__test_and_clear_bit(ucode_mod_idx, bi->module_map) )
         goto scan;
     bi->mods[ucode_mod_idx].type = BOOTMOD_MICROCODE;
-    ucode_mod = bi->mods[ucode_mod_idx];
+    ucode_mod = &bi->mods[ucode_mod_idx];
 scan:
     if ( ucode_scan )
         microcode_scan_module(bi);
@@ -764,10 +764,10 @@ static int __init cf_check microcode_init(void)
         ucode_blob.size = 0;
         ucode_blob.data = NULL;
     }
-    else if ( ucode_mod.size )
+    else if ( ucode_mod && !ucode_mod->consumed )
     {
         bootstrap_unmap();
-        ucode_mod.size = 0;
+        ucode_mod->consumed = true;
     }
 
     return 0;
@@ -820,14 +820,14 @@ int __init microcode_init_cache(struct boot_info *bi)
     if ( !ucode_ops.apply_microcode )
         return -ENODEV;
 
-    if ( ucode_scan )
-        /* Need to rescan the modules because they might have been relocated */
+    /* Scan if microcode was not detected earlier */
+    if ( !ucode_mod )
         microcode_scan_module(bi);
 
-    if ( ucode_mod.size )
-        rc = early_update_cache(bootstrap_map_bm(&ucode_mod),
-                                ucode_mod.size);
-    else if ( ucode_blob.size )
+    if ( ucode_mod && !ucode_mod->consumed )
+        rc = early_update_cache(bootstrap_map_bm(ucode_mod),
+                                ucode_mod->size);
+    else if ( ucode_mod && ucode_blob.size )
         rc = early_update_cache(ucode_blob.data, ucode_blob.size);
 
     return rc;
@@ -845,10 +845,10 @@ static int __init early_microcode_update_cpu(void)
         len = ucode_blob.size;
         data = ucode_blob.data;
     }
-    else if ( ucode_mod.size )
+    else if ( ucode_mod && !ucode_mod->consumed )
     {
-        len = ucode_mod.size;
-        data = bootstrap_map_bm(&ucode_mod);
+        len = ucode_mod->size;
+        data = bootstrap_map_bm(ucode_mod);
     }
 
     if ( !data )
@@ -913,7 +913,7 @@ int __init early_microcode_init(struct boot_info *bi)
 
     microcode_grab_module(bi);
 
-    if ( ucode_mod.size || ucode_blob.size )
+    if ( ucode_mod || ucode_blob.size )
         rc = early_microcode_update_cpu();
 
     /*
