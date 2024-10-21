@@ -17,6 +17,20 @@
 struct boot_module {
     /* Transitionary only */
     module_t *mod;
+
+    /*
+     * A boot module may contain a compressed kernel that will require
+     * additional space, before the module data, into which the kernel will be
+     * decompressed.
+     *
+     * Memory layout at boot:
+     *     [ compressed kernel ]
+     * After boot module relocation:
+     *     [ estimated headroom + PAGE_SIZE rounding ][ compressed kernel ]
+     * After kernel decompression:
+     *     [ decompressed kernel ][ unused rounding ]
+     */
+    unsigned long headroom;
 };
 
 /*
