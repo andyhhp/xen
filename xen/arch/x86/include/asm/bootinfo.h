@@ -44,8 +44,11 @@ struct boot_module {
     /*
      * Module State Flags:
      *   relocated: indicates module has been relocated in memory.
+     *   consumed:  indicates that the subystem that claimed the module has
+     *              finished with it.
      */
     bool relocated:1;
+    bool consumed:1;
 
     paddr_t start;
     size_t size;

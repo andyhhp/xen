@@ -332,6 +332,7 @@ static struct boot_info *__init multiboot_fill_boot_info(
     bi->mods[i].start = mods[i].mod_start;
     bi->mods[i].size = mods[i].mod_end - mods[i].mod_start;
     bi->mods[i].type = BOOTMOD_XEN;
+    bi->mods[i].consumed = true;
 
     return bi;
 }
@@ -1227,6 +1228,7 @@ void asmlinkage __init noreturn __start_xen(void)
     bitmap_fill(module_map, bi->nr_modules);
     __clear_bit(0, module_map); /* Dom0 kernel is always first */
     bi->mods[0].type = BOOTMOD_KERNEL;
+    bi->mods[0].consumed = true;
 
     if ( pvh_boot )
     {
@@ -2102,7 +2104,10 @@ void asmlinkage __init noreturn __start_xen(void)
 
     initrdidx = find_first_bit(module_map, bi->nr_modules);
     if ( initrdidx < bi->nr_modules )
+    {
         bi->mods[initrdidx].type = BOOTMOD_RAMDISK;
+        bi->mods[initrdidx].consumed = true;
+    }
     if ( bitmap_weight(module_map, bi->nr_modules) > 1 )
         printk(XENLOG_WARNING
                "Multiple initrd candidates, picking module #%u\n",
