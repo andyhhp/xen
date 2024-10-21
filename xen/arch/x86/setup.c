@@ -349,8 +349,8 @@ unsigned long __init initial_images_nrpages(nodeid_t node)
 
     for ( nr = i = 0; i < bi->nr_modules; ++i )
     {
-        unsigned long start = bi->mods[i].mod->mod_start;
-        unsigned long end   = start + PFN_UP(bi->mods[i].mod->mod_end);
+        unsigned long start = bi->mods[i].start;
+        unsigned long end   = start + PFN_UP(bi->mods[i].size);
 
         if ( end > node_start && node_end > start )
             nr += min(node_end, end) - max(node_start, start);
@@ -487,7 +487,7 @@ static void *__init bootstrap_map_addr(paddr_t start, paddr_t end)
     return ret;
 }
 
-void *__init bootstrap_map(const module_t *mod)
+static void *__init bootstrap_map(const module_t *mod)
 {
     return bootstrap_map_addr(pfn_to_paddr(mod->mod_start),
                               pfn_to_paddr(mod->mod_start) + mod->mod_end);
@@ -673,8 +673,8 @@ static uint64_t __init consider_modules(
 
     for ( i = 0; i < nr_mods ; ++i )
     {
-        uint64_t start = pfn_to_paddr(mods[i].mod->mod_start);
-        uint64_t end = start + PAGE_ALIGN(mods[i].mod->mod_end);
+        uint64_t start = (uint64_t)mods[i].start;
+        uint64_t end = start + PAGE_ALIGN(mods[i].size);
 
         if ( i == this_mod )
             continue;
@@ -1408,12 +1408,10 @@ void asmlinkage __init noreturn __start_xen(void)
     set_kexec_crash_area_size((u64)nr_pages << PAGE_SHIFT);
     kexec_reserve_area();
 
-    for ( i = 0; !efi_enabled(EFI_LOADER) && i < bi->nr_modules; i++ )
+    for ( i = 0; i < bi->nr_modules; i++ )
     {
-        if ( bi->mods[i].mod->mod_start & (PAGE_SIZE - 1) )
+        if ( bi->mods[i].start & (PAGE_SIZE - 1) )
             panic("Bootloader didn't honor module alignment request\n");
-        bi->mods[i].mod->mod_end -= bi->mods[i].mod->mod_start;
-        bi->mods[i].mod->mod_start >>= PAGE_SHIFT;
     }
 
     /*
@@ -1435,14 +1433,11 @@ void asmlinkage __init noreturn __start_xen(void)
          */
         xen->start = virt_to_maddr(_stext);
         xen->size  = __2M_rwdata_end - _stext;
-
-        xen->mod->mod_start = paddr_to_pfn(xen->start);
-        xen->mod->mod_end   = xen->size;
     }
 
     bi->mods[0].headroom =
         bzimage_headroom(bootstrap_map_bm(&bi->mods[0]),
-                         bi->mods[0].mod->mod_end);
+                         bi->mods[0].size);
     bootstrap_unmap();
 
 #ifndef highmem_start
@@ -1539,9 +1534,7 @@ void asmlinkage __init noreturn __start_xen(void)
             {
                 move_memory(end - size + bm->headroom, bm->start, bm->size);
                 bm->start = (end - size);
-                bm->mod->mod_start = paddr_to_pfn(bm->start);
                 bm->size += bm->headroom;
-                bm->mod->mod_end = bm->size;
                 bm->relocated = true;
             }
         }
