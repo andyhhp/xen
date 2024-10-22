@@ -481,7 +481,7 @@ void *__init bootstrap_map(const module_t *mod)
                               pfn_to_paddr(mod->mod_start) + mod->mod_end);
 }
 
-static void __init move_memory(
+static void __init noinline move_memory(
     uint64_t dst, uint64_t src, unsigned int size)
 {
     unsigned int blksz = BOOTSTRAP_MAP_LIMIT - BOOTSTRAP_MAP_BASE;
