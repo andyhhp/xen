@@ -9,12 +9,17 @@ TREE=$1
 TAG=$2
 DIR=$3
 
+# In CI, do a shallow clone
+if test "$CI" = "true"; then
+    DEPTH="--depth 1 --shallow-submodules"
+fi
+
 set -e
 
 if test \! -d $DIR-remote; then
 	rm -rf $DIR-remote $DIR-remote.tmp
 	mkdir -p $DIR-remote.tmp; rmdir $DIR-remote.tmp
-	$GIT clone $TREE $DIR-remote.tmp
+	$GIT clone -b $TAG $DEPTH $TREE $DIR-remote.tmp
 	if test "$TAG" ; then
 		cd $DIR-remote.tmp
 		$GIT branch -D dummy >/dev/null 2>&1 ||:
