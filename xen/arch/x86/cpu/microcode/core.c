@@ -721,6 +721,7 @@ static int __initdata early_mod_idx = -1;
 static int __init cf_check microcode_init_cache(void)
 {
     struct boot_info *bi = &xen_boot_info;
+    struct boot_module *bm;
     struct microcode_patch *patch;
     void *data;
     size_t size;
@@ -730,8 +731,9 @@ static int __init cf_check microcode_init_cache(void)
         /* early_microcode_load() didn't leave us any work to do. */
         return 0;
 
-    size = bi->mods[early_mod_idx].mod->mod_end;
-    data = __mfn_to_virt(bi->mods[early_mod_idx].mod->mod_start);
+    bm = &bi->mods[early_mod_idx];
+    size = bm->mod->mod_end;
+    data = __mfn_to_virt(bm->mod->mod_start);
 
     /*
      * If opt_scan is set, we're looking for a CPIO archive rather than a raw
@@ -759,6 +761,10 @@ static int __init cf_check microcode_init_cache(void)
         printk(XENLOG_WARNING "Microcode: Parse error %d\n", rc);
         return rc;
     }
+
+    /* If raw module, we can free it now */
+    if ( bm->type == BOOTMOD_MICROCODE )
+        release_boot_module(bm);
 
     if ( !patch )
     {

@@ -162,6 +162,11 @@ int __init xsm_multiboot_init(struct boot_info *bi)
     ret = xsm_core_init(policy_buffer, policy_size);
     bootstrap_unmap();
 
+    /* If the policy was loaded from a boot module, release it's memory */
+    ret = first_boot_module_index(bi, BOOTMOD_XSM_POLICY);
+    if ( ret >= 0 && ret < bi->nr_modules )
+        release_boot_module(&bi->mods[ret], true);
+
     return 0;
 }
 #endif

@@ -705,6 +705,8 @@ static int __init pvh_load_kernel(
         return rc;
     }
 
+    release_module(image->mod, true);
+
     /*
      * Find a RAM region big enough (and that doesn't overlap with the loaded
      * kernel) in order to load the initrd and the metadata. Note it could be
@@ -752,6 +754,8 @@ static int __init pvh_load_kernel(
             last_addr += len;
         }
         last_addr = ROUNDUP(last_addr, PAGE_SIZE);
+
+        release_module(initrd->mod, true);
     }
 
     if ( cmdline != NULL )

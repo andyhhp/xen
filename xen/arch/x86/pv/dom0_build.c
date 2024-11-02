@@ -854,7 +854,9 @@ static int __init dom0_construct(struct boot_info *bi, struct domain *d)
         printk("Failed to load the kernel binary\n");
         goto out;
     }
+    /* All done with kernel, release the module pages */
     bootstrap_unmap();
+    release_module(image->mod, true);
 
     if ( UNSET_ADDR != parms.virt_hypercall )
     {

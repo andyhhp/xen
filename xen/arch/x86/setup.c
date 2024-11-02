@@ -345,24 +345,55 @@ unsigned long __init initial_images_nrpages(nodeid_t node)
     return nr;
 }
 
-static void __init free_boot_modules(void)
+void __init release_boot_module(struct boot_module *bm, bool free_mem)
+{
+    uint64_t start = pfn_to_paddr(bm->mod->mod_start);
+    uint64_t size  = bm->mod->mod_end;
+
+    if ( bm->released )
+    {
+        printk(XENLOG_WARNING "Attempt second release boot module of type %d\n",
+               bm->type);
+        return;
+    }
+
+    if ( free_mem )
+        init_domheap_pages(start, start + PAGE_ALIGN(size));
+
+    bm->released = true;
+}
+
+void __init release_module(const module_t *m, bool free_mem)
 {
     struct boot_info *bi = &xen_boot_info;
     unsigned int i;
 
-    for ( i = 0; i < bi->nr_modules; ++i )
+    for ( i = 0; i < bi->nr_modules; i++ )
     {
-        uint64_t start = pfn_to_paddr(bi->mods[i].mod->mod_start);
-        uint64_t size  = bi->mods[i].mod->mod_end;
+        if ( bi->mods[i].mod == m )
+            release_boot_module(&bi->mods[i], free_mem);
+    }
+}
 
-        if ( bi->mods[i].released )
+static void __init discard_unknown_boot_modules(void)
+{
+    struct boot_info *bi = &xen_boot_info;
+    unsigned int i, count = 0;
+
+    for_each_boot_module_by_type(i, bi, BOOTMOD_UNKNOWN)
+    {
+        struct boot_module *bm = &bi->mods[i];
+
+        if ( bm == NULL || bm->released )
             continue;
 
-        init_domheap_pages(start, start + PAGE_ALIGN(size));
-        bi->mods[i].released = true;
+        release_boot_module(bm, true);
+        count++;
     }
 
-    bi->nr_modules = 0;
+    if ( count )
+        printk(XENLOG_DEBUG "Releasing pages for uknown boot module %d\n",
+               count);
 }
 
 void __init release_boot_module(struct boot_module *bm)
@@ -2126,6 +2157,8 @@ void asmlinkage __init noreturn __start_xen(void)
                    initrdidx);
     }
 
+    discard_unknown_boot_modules();
+
     /*
      * We're going to setup domain0 using the module(s) that we stashed safely
      * above our heap. The second module, if present, is an initrd ramdisk.
@@ -2134,7 +2167,10 @@ void asmlinkage __init noreturn __start_xen(void)
     if ( !dom0 )
         panic("Could not set up DOM0 guest OS\n");
 
-    free_boot_modules();
+    /* Check and warn if any modules did not get released */
+    for ( i = 0; i < bi->nr_modules; i++ )
+        if ( !bi->mods[i].released )
+            printk(XENLOG_ERR "Boot module %d not released, memory leaked", i);
 
     heap_init_late();
 
