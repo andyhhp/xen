@@ -992,8 +992,6 @@ static unsigned int __init copy_bios_e820(struct e820entry *map, unsigned int li
 
 static struct domain *__init create_dom0(struct boot_info *bi)
 {
-    static char __initdata cmdline[MAX_GUEST_CMDLINE];
-
     struct xen_domctl_createdomain dom0_cfg = {
         .flags = IS_ENABLED(CONFIG_TBOOT) ? XEN_DOMCTL_CDF_s3_integrity : 0,
         .max_evtchn_port = -1,
@@ -1036,16 +1034,16 @@ static struct domain *__init create_dom0(struct boot_info *bi)
     if ( bd->kernel->cmdline_pa || bi->kextra )
     {
         if ( bd->kernel->cmdline_pa )
-            safe_strcpy(cmdline, cmdline_cook(__va(bd->kernel->cmdline_pa),
+            safe_strcpy(bd->cmdline, cmdline_cook(__va(bd->kernel->cmdline_pa),
                         bi->loader));
 
         if ( bi->kextra )
             /* kextra always includes exactly one leading space. */
-            safe_strcat(cmdline, bi->kextra);
+            safe_strcat(bd->cmdline, bi->kextra);
 
         /* Append any extra parameters. */
-        if ( skip_ioapic_setup && !strstr(cmdline, "noapic") )
-            safe_strcat(cmdline, " noapic");
+        if ( skip_ioapic_setup && !strstr(bd->cmdline, "noapic") )
+            safe_strcat(bd->cmdline, " noapic");
 
         if ( (strlen(acpi_param) == 0) && acpi_disabled )
         {
@@ -1053,13 +1051,13 @@ static struct domain *__init create_dom0(struct boot_info *bi)
             safe_strcpy(acpi_param, "off");
         }
 
-        if ( (strlen(acpi_param) != 0) && !strstr(cmdline, "acpi=") )
+        if ( (strlen(acpi_param) != 0) && !strstr(bd->cmdline, "acpi=") )
         {
-            safe_strcat(cmdline, " acpi=");
-            safe_strcat(cmdline, acpi_param);
+            safe_strcat(bd->cmdline, " acpi=");
+            safe_strcat(bd->cmdline, acpi_param);
         }
 
-        bd->kernel->cmdline_pa = __pa(cmdline);
+        bd->kernel->cmdline_pa = __pa(bd->cmdline);
     }
 
     bd->d = d;
