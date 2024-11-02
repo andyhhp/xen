@@ -649,8 +649,8 @@ static int __init pvh_load_kernel(
 {
     void *image_base = bootstrap_map_bm(image);
     void *image_start = image_base + image->headroom;
-    unsigned long image_len = image->mod->mod_end;
-    unsigned long initrd_len = initrd ? initrd->mod->mod_end : 0;
+    unsigned long image_len = image->size;
+    unsigned long initrd_len = initrd ? initrd->size : 0;
     const char *cmdline = __va(image->cmdline_pa);
     struct elf_binary elf;
     struct elf_dom_parms parms;
@@ -705,7 +705,7 @@ static int __init pvh_load_kernel(
         return rc;
     }
 
-    release_module(image->mod, true);
+    release_boot_module(image, true);
 
     /*
      * Find a RAM region big enough (and that doesn't overlap with the loaded
@@ -729,7 +729,7 @@ static int __init pvh_load_kernel(
     if ( initrd != NULL )
     {
         rc = hvm_copy_to_guest_phys(
-            last_addr, mfn_to_virt(initrd->mod->mod_start), initrd_len, v);
+            last_addr, __va(initrd->start), initrd_len, v);
         if ( rc )
         {
             printk("Unable to copy initrd to guest\n");
@@ -755,7 +755,7 @@ static int __init pvh_load_kernel(
         }
         last_addr = ROUNDUP(last_addr, PAGE_SIZE);
 
-        release_module(initrd->mod, true);
+        release_boot_module(initrd, true);
     }
 
     if ( cmdline != NULL )
