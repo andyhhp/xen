@@ -12,6 +12,8 @@ struct boot_module;
 struct domain;
 
 struct boot_domain {
+    domid_t domid;
+
     struct boot_module *kernel;
     struct boot_module *ramdisk;
 
