@@ -1179,6 +1179,9 @@ void asmlinkage __init noreturn __start_xen(void)
     xhci_dbc_uart_init();
     console_init_preirq();
 
+    /* Load microcode as the very first thing after setting the console up. */
+    early_microcode_init(bi);
+
     if ( pvh_boot )
         pvh_print_info();
 
@@ -1435,12 +1438,6 @@ void asmlinkage __init noreturn __start_xen(void)
     for ( i = 0; i < bi->nr_modules; i++ )
         if ( bi->mods[i].start & (PAGE_SIZE - 1) )
             panic("Bootloader didn't honor module alignment request\n");
-
-    /*
-     * TODO: load ucode earlier once multiboot modules become accessible
-     * at an earlier stage.
-     */
-    early_microcode_init(bi);
 
     if ( xen_phys_start )
     {
