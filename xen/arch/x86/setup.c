@@ -345,7 +345,7 @@ unsigned long __init initial_images_nrpages(nodeid_t node)
     return nr;
 }
 
-void __init discard_initial_images(void) /* a.k.a. Free boot modules */
+static void __init free_boot_modules(void)
 {
     struct boot_info *bi = &xen_boot_info;
     unsigned int i;
@@ -2133,6 +2133,8 @@ void asmlinkage __init noreturn __start_xen(void)
     dom0 = create_dom0(bi);
     if ( !dom0 )
         panic("Could not set up DOM0 guest OS\n");
+
+    free_boot_modules();
 
     heap_init_late();
 

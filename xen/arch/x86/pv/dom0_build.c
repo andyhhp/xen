@@ -649,7 +649,7 @@ static int __init dom0_construct(struct boot_info *bi, struct domain *d)
                 }
             memcpy(page_to_virt(page), mfn_to_virt(initrd->mod->mod_start),
                    initrd_len);
-            release_boot_module(initrd);
+            /* XXX */
             initrd_mfn = mfn_x(page_to_mfn(page));
             initrd->mod->mod_start = initrd_mfn;
         }
@@ -868,9 +868,6 @@ static int __init dom0_construct(struct boot_info *bi, struct domain *d)
         }
         init_hypercall_page(d, _p(parms.virt_hypercall));
     }
-
-    /* Free temporary buffers. */
-    discard_initial_images();
 
     /* Set up start info area. */
     si = (start_info_t *)vstartinfo_start;
