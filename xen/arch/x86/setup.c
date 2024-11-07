@@ -355,17 +355,26 @@ void __init discard_initial_images(void) /* a.k.a. Free boot modules */
         uint64_t start = pfn_to_paddr(bi->mods[i].mod->mod_start);
         uint64_t size  = bi->mods[i].mod->mod_end;
 
-        /*
-         * Sometimes the initrd is mapped, rather than copied, into dom0.
-         * Size being 0 is how we're instructed to leave the module alone.
-         */
-        if ( size == 0 )
+        if ( bi->mods[i].released )
             continue;
 
         init_domheap_pages(start, start + PAGE_ALIGN(size));
+        bi->mods[i].released = true;
     }
 
     bi->nr_modules = 0;
+}
+
+void __init release_boot_module(struct boot_module *bm)
+{
+    uint64_t start = pfn_to_paddr(bm->mod->mod_start);
+    uint64_t size  = bm->mod->mod_end;
+
+    ASSERT(!bm->released);
+
+    init_domheap_pages(start, start + PAGE_ALIGN(size));
+
+    bm->released = true;
 }
 
 static void __init init_idle_domain(void)
