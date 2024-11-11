@@ -175,6 +175,11 @@ paddr_t __ro_after_init mem_hotplug;
 static char __initdata opt_badpage[100] = "";
 string_param("badpage", opt_badpage);
 
+#ifdef CONFIG_HAS_ONDEMAND_DIRECTMAP
+bool __ro_after_init opt_directmap = true;
+boolean_param("directmap", opt_directmap);
+#endif
+
 /*
  * no-bootscrub -> Free pages are not zeroed during boot.
  */

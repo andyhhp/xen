@@ -71,6 +71,9 @@ config HAS_IOPORTS
 config HAS_KEXEC
 	bool
 
+config HAS_ONDEMAND_DIRECTMAP
+	bool
+
 config HAS_PIRQ
 	bool
 
@@ -414,6 +417,20 @@ source "common/sched/Kconfig"
 
 config CRYPTO
 	bool
+
+config ONDEMAND_DIRECTMAP
+    bool "On-Demand Directmap"
+    depends on HAS_ONDEMAND_DIRECTMAP
+    help
+		The directmap contains mapping for most of the RAM, making domain
+		memory easily accessible. While this can improve performance, it also
+		increases the vulnerability to speculation attacks.
+
+		Enabling this feature allows the user to control whether the memory
+		is always mapped at boot or mapped only on demand (see the command line
+		option "directmap").
+
+		If unsure, say N.
 
 config LIVEPATCH
 	bool "Live patching support"

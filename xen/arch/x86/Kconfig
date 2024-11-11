@@ -23,6 +23,7 @@ config X86
 	select HAS_IOPORTS
 	select HAS_KEXEC
 	select HAS_NS16550
+	select HAS_ONDEMAND_DIRECTMAP
 	select HAS_PASSTHROUGH
 	select HAS_PCI
 	select HAS_PCI_MSI

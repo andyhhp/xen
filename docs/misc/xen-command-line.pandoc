@@ -799,6 +799,18 @@ that enabling this option cannot guarantee anything beyond what underlying
 hardware guarantees (with, where available and known to Xen, respective
 tweaks applied).
 
+### directmap (x86)
+> `= <boolean>`
+
+> Default: `true`
+
+Enable or disable fully populating the directmap region in Xen.
+
+By default, Xen creates the directmap region which maps all physical memory
+in that region. Disabling this option will sparsely populate the directmap,
+blocking exploits that leak secrets via speculative memory access in the
+directmap.
+
 ### dma_bits
 > `= <integer>`
 

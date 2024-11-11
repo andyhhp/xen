@@ -620,10 +620,16 @@ void write_32bit_pse_identmap(uint32_t *l2);
 /*
  * x86 maps part of physical memory via the directmap region.
  * Return whether the range of MFN falls in the directmap region.
+ *
+ * When boot command line sets directmap=no, the directmap will mostly be empty
+ * so this will always return false.
  */
 static inline bool arch_mfns_in_directmap(unsigned long mfn, unsigned long nr)
 {
     unsigned long eva = min(DIRECTMAP_VIRT_END, HYPERVISOR_VIRT_END);
+
+    if ( !has_directmap() )
+        return false;
 
     return (mfn + nr) <= (virt_to_mfn(eva - 1) + 1);
 }

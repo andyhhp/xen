@@ -1583,6 +1583,8 @@ void asmlinkage __init noreturn __start_xen(void)
     if ( highmem_start )
         xenheap_max_mfn(PFN_DOWN(highmem_start - 1));
 
+    printk("Booting with directmap %s\n", has_directmap() ? "full" : "on demand");
+
     /*
      * Walk every RAM region and map it in its entirety (on x86/64, at least)
      * and notify it to the boot allocator.
