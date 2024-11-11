@@ -101,6 +101,31 @@ static inline unsigned long virt_to_fix(const unsigned long vaddr)
     return __virt_to_fix(vaddr);
 }
 
+static inline bool virt_is_fixmap(const unsigned long vaddr)
+{
+    return vaddr >= FIXADDR_START && vaddr < FIXADDR_TOP;
+}
+
+static inline bool virt_in_fixmap_range(
+    const unsigned long vaddr,
+    const unsigned int start_idx,
+    const unsigned int end_idx
+)
+{
+    unsigned long start_addr = (unsigned long)fix_to_virt(start_idx);
+    unsigned long end_addr = (unsigned long)fix_to_virt(end_idx);
+
+    /*
+     * The check ensures that the virtual address (vaddr) is within the
+     * fixmap range. The addresses are allocated backwards, meaning the
+     * start address is higher than the end address. As a result, the
+     * check ensures that the virtual address is greater than or equal to
+     * the end address, and less than or equal to the start address, which
+     * may appear counterintuitive due to the reverse allocation order.
+     */
+    return ((vaddr & PAGE_MASK) <= start_addr) && (vaddr >= end_addr);
+}
+
 enum fixed_addresses_x {
     /* Index 0 is reserved since fix_x_to_virt(0) == FIXADDR_X_TOP. */
     FIX_X_RESERVED,
