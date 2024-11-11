@@ -516,6 +516,13 @@ void make_cr3(struct vcpu *v, mfn_t mfn)
         v->arch.cr3 |= get_pcid_bits(v, false);
 }
 
+#define pv_root_pt_idx(v) \
+    ((v)->vcpu_id >> PAGETABLE_ORDER)
+
+#define pv_root_pt_pte(v) \
+    ((v)->domain->arch.pv.root_pt_l1tab[pv_root_pt_idx(v)] + \
+     ((v)->vcpu_id & (L1_PAGETABLE_ENTRIES - 1)))
+
 void write_ptbase(struct vcpu *v)
 {
     const struct domain *d = v->domain;
@@ -527,11 +534,16 @@ void write_ptbase(struct vcpu *v)
 
     if ( is_pv_domain(d) && d->arch.pv.xpti )
     {
+        mfn_t guest_root_pt = _mfn(MASK_EXTR(v->arch.cr3, X86_CR3_ADDR_MASK));
+        l1_pgentry_t *pte = pv_root_pt_pte(v);
+
         cpu_info->root_pgt_changed = true;
         cpu_info->pv_cr3 = __pa(this_cpu(root_pgt));
         if ( new_cr4 & X86_CR4_PCIDE )
             cpu_info->pv_cr3 |= get_pcid_bits(v, true);
         switch_cr3_cr4(v->arch.cr3, new_cr4);
+
+        l1e_write(pte, l1e_from_mfn(guest_root_pt, __PAGE_HYPERVISOR_RO));
     }
     else
     {

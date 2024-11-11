@@ -289,6 +289,21 @@ static void pv_destroy_gdt_ldt_l1tab(struct vcpu *v)
                               1U << GDT_LDT_VCPU_SHIFT);
 }
 
+static int pv_create_root_pt_l1tab(const struct vcpu *v)
+{
+    return create_perdomain_mapping(v->domain,
+                                    PV_ROOT_PT_MAPPING_VCPU_VIRT_START(v),
+                                    1, v->domain->arch.pv.root_pt_l1tab,
+                                    NULL);
+}
+
+static void pv_destroy_root_pt_l1tab(const struct vcpu *v)
+
+{
+    destroy_perdomain_mapping(v->domain,
+                              PV_ROOT_PT_MAPPING_VCPU_VIRT_START(v), 1);
+}
+
 void pv_vcpu_destroy(struct vcpu *v)
 {
     if ( is_pv_32bit_vcpu(v) )
@@ -298,6 +313,7 @@ void pv_vcpu_destroy(struct vcpu *v)
     }
 
     pv_destroy_gdt_ldt_l1tab(v);
+    pv_destroy_root_pt_l1tab(v);
     XFREE(v->arch.pv.trap_ctxt);
 }
 
@@ -311,6 +327,13 @@ int pv_vcpu_initialise(struct vcpu *v)
     rc = pv_create_gdt_ldt_l1tab(v);
     if ( rc )
         return rc;
+
+    if ( v->domain->arch.pv.xpti )
+    {
+        rc = pv_create_root_pt_l1tab(v);
+        if ( rc )
+            goto done;
+    }
 
     BUILD_BUG_ON(X86_NR_VECTORS * sizeof(*v->arch.pv.trap_ctxt) >
                  PAGE_SIZE);
@@ -347,10 +370,12 @@ void pv_domain_destroy(struct domain *d)
 
     destroy_perdomain_mapping(d, GDT_LDT_VIRT_START,
                               GDT_LDT_MBYTES << (20 - PAGE_SHIFT));
+    destroy_perdomain_mapping(d, PV_ROOT_PT_MAPPING_VIRT_START, d->max_vcpus);
 
     XFREE(d->arch.pv.cpuidmasks);
 
     FREE_XENHEAP_PAGE(d->arch.pv.gdt_ldt_l1tab);
+    FREE_XENHEAP_PAGE(d->arch.pv.root_pt_l1tab);
 }
 
 void noreturn cf_check continue_pv_domain(void);
@@ -382,7 +407,21 @@ int pv_domain_initialise(struct domain *d)
     if ( rc )
         goto fail;
 
+    rc = create_perdomain_mapping(d, PV_ROOT_PT_MAPPING_VIRT_START,
+                                  d->max_vcpus, NULL, NULL);
+    if ( rc )
+        goto fail;
+
     d->arch.ctxt_switch = &pv_csw;
+
+    if ( d->arch.pv.xpti )
+    {
+        d->arch.pv.root_pt_l1tab =
+            xzalloc_array(l1_pgentry_t *,
+                          DIV_ROUND_UP(d->max_vcpus, L1_PAGETABLE_ENTRIES));
+        if ( !d->arch.pv.root_pt_l1tab )
+            goto fail;
+    }
 
     if ( !is_pv_32bit_domain(d) && use_invpcid && cpu_has_pcid )
         switch ( ACCESS_ONCE(opt_pcid) )
@@ -457,7 +496,8 @@ static void _toggle_guest_pt(struct vcpu *v)
             guest_update = false;
         }
     }
-    write_cr3(cr3);
+
+    write_ptbase(v);
 
     if ( !pagetable_is_null(old_shadow) )
         shadow_put_top_level(v->domain, old_shadow);
@@ -497,9 +537,6 @@ void toggle_guest_mode(struct vcpu *v)
     {
         struct cpu_info *cpu_info = get_cpu_info();
 
-        cpu_info->root_pgt_changed = true;
-        cpu_info->pv_cr3 = __pa(this_cpu(root_pgt)) |
-                           (d->arch.pv.pcid ? get_pcid_bits(v, true) : 0);
         /*
          * As in _toggle_guest_pt() the XPTI CR3 write needs to be a TLB-
          * flushing one too for shadow mode guests.

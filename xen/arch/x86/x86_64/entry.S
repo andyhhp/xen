@@ -170,9 +170,16 @@ FUNC_LOCAL(restore_all_guest)
         movabs $PADDR_MASK & PAGE_MASK, %rsi
         movabs $DIRECTMAP_VIRT_START, %rcx
         and   %rsi, %rdi
-        and   %r9, %rsi
         add   %rcx, %rdi
+
+        /*
+         * The address in the vCPU cr3 is always mapped in the per-domain
+         * pv_root_pt virt area.
+         */
+        imul  $PAGE_SIZE, VCPU_id(%rbx), %esi
+        movabs $PV_ROOT_PT_MAPPING_VIRT_START, %rcx
         add   %rcx, %rsi
+
         mov   $ROOT_PAGETABLE_FIRST_XEN_SLOT, %ecx
         mov   root_table_offset(SH_LINEAR_PT_VIRT_START)*8(%rsi), %r8
         mov   %r8, root_table_offset(SH_LINEAR_PT_VIRT_START)*8(%rdi)

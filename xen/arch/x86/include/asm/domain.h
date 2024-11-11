@@ -272,6 +272,7 @@ struct time_scale {
 struct pv_domain
 {
     l1_pgentry_t **gdt_ldt_l1tab;
+    l1_pgentry_t **root_pt_l1tab;
 
     atomic_t nr_l4_pages;
 
