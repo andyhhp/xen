@@ -777,6 +777,10 @@ void __init arch_init_idle_domain(struct domain *d)
     };
 
     d->arch.ctxt_switch = &idle_csw;
+
+    /* Slot 260: Per-domain mappings. */
+    idle_pg_table[l4_table_offset(PERDOMAIN_VIRT_START)] =
+        l4e_from_page(d->arch.perdomain_l3_pg, __PAGE_HYPERVISOR_RW);
 }
 
 int arch_domain_create(struct domain *d,
@@ -870,9 +874,6 @@ int arch_domain_create(struct domain *d,
     }
     else if ( is_pv_domain(d) )
     {
-        if ( (rc = mapcache_domain_init(d)) != 0 )
-            goto fail;
-
         if ( (rc = pv_domain_initialise(d)) != 0 )
             goto fail;
     }
@@ -909,7 +910,6 @@ int arch_domain_create(struct domain *d,
     XFREE(d->arch.cpu_policy);
     if ( paging_initialised )
         paging_final_teardown(d);
-    free_perdomain_mappings(d);
 
     return rc;
 }

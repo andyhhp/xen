@@ -738,6 +738,11 @@ struct domain *domain_create(domid_t domid,
 
     rangeset_domain_initialise(d);
 
+#ifdef CONFIG_X86
+    if ( (err = mapcache_domain_init(d)) != 0)
+        goto fail;
+#endif
+
     if ( is_idle_domain(d) )
         arch_init_idle_domain(d);
 
@@ -819,6 +824,10 @@ struct domain *domain_create(domid_t domid,
  fail:
     ASSERT(err < 0);      /* Sanity check paths leading here. */
     err = err ?: -EILSEQ; /* Release build safety. */
+
+#ifdef CONFIG_X86
+    free_perdomain_mappings(d);
+#endif
 
     d->is_dying = DOMDYING_dead;
     if ( hardware_domain == d )
