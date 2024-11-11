@@ -30,17 +30,15 @@
  * PCPUs.
  */
 
-#ifdef CONFIG_ARM_64
-DEFINE_PAGE_TABLE(xen_pgtable);
-static DEFINE_PAGE_TABLE(xen_first);
-#define THIS_CPU_PGTABLE xen_pgtable
-#else
 /* Per-CPU pagetable pages */
 /* xen_pgtable == root of the trie (zeroeth level on 64-bit, first on 32-bit) */
 DEFINE_PER_CPU(lpae_t *, xen_pgtable);
 #define THIS_CPU_PGTABLE this_cpu(xen_pgtable)
 /* Root of the trie for cpu0, other CPU's PTs are dynamically allocated */
 static DEFINE_PAGE_TABLE(cpu0_pgtable);
+
+#ifdef CONFIG_ARM_64
+static DEFINE_PAGE_TABLE(xen_first);
 #endif
 
 /* Common pagetable leaves */
@@ -232,17 +230,20 @@ void __init setup_pagetables(void)
     lpae_t pte, *p;
     int i;
 
+    p = cpu0_pgtable;
+
+    /* arch_setup_page_tables() may need to access the root page-tables. */
+    per_cpu(xen_pgtable, 0) = cpu0_pgtable;
+
     arch_setup_page_tables();
 
 #ifdef CONFIG_ARM_64
     pte = pte_of_xenaddr((uintptr_t)xen_first);
     pte.pt.table = 1;
     pte.pt.xn = 0;
-    xen_pgtable[zeroeth_table_offset(XEN_VIRT_START)] = pte;
+    p[zeroeth_table_offset(XEN_VIRT_START)] = pte;
 
-    p = (void *) xen_first;
-#else
-    p = (void *) cpu0_pgtable;
+    p = xen_first;
 #endif
 
     /* Map xen second level page-table */
@@ -285,19 +286,12 @@ void __init setup_pagetables(void)
     pte.pt.table = 1;
     xen_second[second_table_offset(FIXMAP_ADDR(0))] = pte;
 
-#ifdef CONFIG_ARM_64
-    ttbr = virt_to_maddr(xen_pgtable);
-#else
     ttbr = virt_to_maddr(cpu0_pgtable);
-#endif
+
 
     switch_ttbr(ttbr);
 
     xen_pt_enforce_wnx();
-
-#ifdef CONFIG_ARM_32
-    per_cpu(xen_pgtable, 0) = cpu0_pgtable;
-#endif
 }
 
 void *__init arch_vmap_virt_end(void)

@@ -76,6 +76,7 @@ static void __init prepare_runtime_identity_mapping(void)
     paddr_t id_addr = virt_to_maddr(_start);
     lpae_t pte;
     DECLARE_OFFSETS(id_offsets, id_addr);
+    lpae_t *root = this_cpu(xen_pgtable);
 
     if ( id_offsets[0] >= IDENTITY_MAPPING_AREA_NR_L0 )
         panic("Cannot handle ID mapping above %uTB\n",
@@ -86,7 +87,7 @@ static void __init prepare_runtime_identity_mapping(void)
     pte.pt.table = 1;
     pte.pt.xn = 0;
 
-    write_pte(&xen_pgtable[id_offsets[0]], pte);
+    write_pte(&root[id_offsets[0]], pte);
 
     /* Link second ID table */
     pte = pte_of_xenaddr((vaddr_t)xen_second_id);

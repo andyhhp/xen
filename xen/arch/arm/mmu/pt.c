@@ -607,9 +607,9 @@ static int xen_pt_update(unsigned long virt,
     unsigned long left = nr_mfns;
 
     /*
-     * For arm32, page-tables are different on each CPUs. Yet, they share
-     * some common mappings. It is assumed that only common mappings
-     * will be modified with this function.
+     * Page-tables are different on each CPU. Yet, they share some common
+     * mappings. It is assumed that only common mappings will be modified
+     * with this function.
      *
      * XXX: Add a check.
      */

@@ -7,6 +7,7 @@
 
 #include <xen/domain_page.h>
 
+#include <asm/domain_page.h>
 #include <asm/setup.h>
 
 /* Override macros from asm/page.h to make them work with mfn_t */
@@ -93,20 +94,6 @@ static void set_init_ttbr(lpae_t *root)
     unmap_domain_page(ptr);
 }
 
-#ifdef CONFIG_ARM_64
-int prepare_secondary_mm(int cpu)
-{
-    clear_boot_pagetables();
-
-    /*
-     * Set init_ttbr for this CPU coming up. All CPUs share a single setof
-     * pagetables, but rewrite it each time for consistency with 32 bit.
-     */
-    set_init_ttbr(xen_pgtable);
-
-    return 0;
-}
-#else
 int prepare_secondary_mm(int cpu)
 {
     lpae_t *root = alloc_xenheap_page();
@@ -136,7 +123,6 @@ int prepare_secondary_mm(int cpu)
 
     return 0;
 }
-#endif
 
 /*
  * Local variables:
