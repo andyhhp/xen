@@ -328,6 +328,7 @@ void asmlinkage __init start_xen(unsigned long fdt_paddr)
     cmdline_parse(cmdline);
 
     setup_mm();
+    printk("Booting with directmap %s\n", has_directmap() ? "on" : "off");
 
     vm_init();
 
