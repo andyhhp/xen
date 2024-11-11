@@ -421,6 +421,7 @@ config CRYPTO
 config ONDEMAND_DIRECTMAP
     bool "On-Demand Directmap"
     depends on HAS_ONDEMAND_DIRECTMAP
+    select HAS_PMAP
     help
 		The directmap contains mapping for most of the RAM, making domain
 		memory easily accessible. While this can improve performance, it also
