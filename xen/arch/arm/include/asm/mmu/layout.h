@@ -35,8 +35,12 @@
  *
  *  32G -  64G   Frametable: 56 bytes per page for 2TB of RAM
  *
- * 0x00000a8000000000 - 0x00007fffffffffff (512GB+117TB, L0 slots [21..255])
+ * 0x00000a8000000000 - 0x00007f7fffffffff (117TB, L0 slots [21..254])
  *  Unused
+ *
+ * 0x00007f8000000000 - 0x00007fffffffffff (512GB, L0 slot [255])
+ *  (Relative offsets)
+ *  0  -    2G    Domheap: on-demand-mapped
  *
  * 0x0000800000000000 - 0x000084ffffffffff (5TB, L0 slots [256..265])
  *  1:1 mapping of RAM
@@ -129,6 +133,13 @@
 #define FRAMETABLE_VIRT_START  (XEN_VM_MAPPING + GB(32))
 #define FRAMETABLE_SIZE        GB(32)
 #define FRAMETABLE_NR          (FRAMETABLE_SIZE / sizeof(*frame_table))
+
+#define DOMHEAP_VIRT_START     SLOT0(255)
+#define DOMHEAP_VIRT_SIZE      GB(2)
+
+#define DOMHEAP_ENTRIES        1024 /* 1024 2MB mapping slots */
+/* Number of domheap pagetable pages required at the second level (2MB mappings) */
+#define DOMHEAP_SECOND_PAGES (DOMHEAP_VIRT_SIZE >> FIRST_SHIFT)
 
 #define DIRECTMAP_VIRT_START   SLOT0(256)
 #define DIRECTMAP_SIZE         (SLOT0_ENTRY_SIZE * (266 - 256))
