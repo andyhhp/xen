@@ -26,6 +26,12 @@ extern bool opt_hvm_fep;
 #define opt_hvm_fep 0
 #endif
 
+#define X86_MODE_REAL  0
+#define X86_MODE_VM86  1
+#define X86_MODE_16BIT 2
+#define X86_MODE_32BIT 4
+#define X86_MODE_64BIT 8
+
 /* Interrupt acknowledgement sources. */
 enum hvm_intsrc {
     hvm_intsrc_none,

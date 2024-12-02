@@ -11,6 +11,7 @@
 #include <xen/ioreq.h>
 #include <xen/nospec.h>
 
+#include <asm/hvm/hvm.h>
 #include <asm/hvm/emulate.h>
 #include <asm/hvm/support.h>
 #include <asm/hvm/viridian.h>
@@ -112,23 +113,23 @@ int hvm_hypercall(struct cpu_user_regs *regs)
 
     switch ( mode )
     {
-    case 8:
+    case X86_MODE_64BIT:
         eax = regs->rax;
         fallthrough;
-    case 4:
-    case 2:
+    case X86_MODE_32BIT:
+    case X86_MODE_16BIT:
         if ( currd->arch.monitor.guest_request_userspace_enabled &&
             eax == __HYPERVISOR_hvm_op &&
-            (mode == 8 ? regs->rdi : regs->ebx) == HVMOP_guest_request_vm_event )
+            (mode == X86_MODE_64BIT ? regs->rdi : regs->ebx) == HVMOP_guest_request_vm_event )
             break;
 
         if ( likely(!hvm_get_cpl(curr)) )
             break;
         fallthrough;
-    default:
+    case X86_MODE_VM86:
         regs->rax = -EPERM;
         return HVM_HCALL_completed;
-    case 0:
+    case X86_MODE_REAL:
         break;
     }
 
