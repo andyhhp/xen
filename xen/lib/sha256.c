@@ -149,14 +149,31 @@ static void sha256_init(struct sha256_state *s)
     };
 }
 
-static void sha256_once(struct sha256_state *s, const void *msg, size_t len)
+static void sha256_update(struct sha256_state *s, const void *msg, size_t len)
 {
-    s->count = len;
+    unsigned int partial = s->count & 0x3f;
 
-    for ( ; len >= 64; msg += 64, len -= 64 )
-        sha256_transform(s->state, msg);
+    s->count += len;
 
-    memcpy(s->buf, msg, len);
+    if ( (partial + len) >= 64 )
+    {
+        if ( partial )
+        {
+            unsigned int rem = SHA256_BLOCK_SIZE - partial;
+
+            memcpy(s->buf + partial, msg, rem);
+            msg += rem;
+            len -= rem;
+
+            sha256_transform(s->state, s->buf);
+            partial = 0;
+        }
+
+        for ( ; len >= 64; msg += 64, len -= 64 )
+            sha256_transform(s->state, msg);
+    }
+
+    memcpy(s->buf + partial, msg, len);
 }
 
 static void sha256_final(struct sha256_state *s, void *_dst)
@@ -192,7 +209,7 @@ void sha256_digest(uint8_t digest[SHA256_DIGEST_SIZE],
     struct sha256_state s;
 
     sha256_init(&s);
-    sha256_once(&s, msg, len);
+    sha256_update(&s, msg, len);
     sha256_final(&s, digest);
 }
 
