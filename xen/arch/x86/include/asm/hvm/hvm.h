@@ -26,12 +26,6 @@ extern bool opt_hvm_fep;
 #define opt_hvm_fep 0
 #endif
 
-#define X86_MODE_REAL  0
-#define X86_MODE_VM86  1
-#define X86_MODE_16BIT 2
-#define X86_MODE_32BIT 4
-#define X86_MODE_64BIT 8
-
 /* Interrupt acknowledgement sources. */
 enum hvm_intsrc {
     hvm_intsrc_none,
@@ -430,8 +424,16 @@ static inline void hvm_domain_creation_finished(struct domain *d)
         alternative_vcall(hvm_funcs.domain_creation_finished, d);
 }
 
-static inline int
-hvm_guest_x86_mode(struct vcpu *v)
+/*
+ * TODO: Rework this helper to avoid implying mixing the architectural
+ * concepts of mode and operand size.
+ */
+#define X86_MODE_REAL  0
+#define X86_MODE_VM86  1
+#define X86_MODE_16BIT 2
+#define X86_MODE_32BIT 4
+#define X86_MODE_64BIT 8
+static inline int hvm_guest_x86_mode(struct vcpu *v)
 {
     ASSERT(v == current);
     return alternative_call(hvm_funcs.guest_x86_mode, v);
