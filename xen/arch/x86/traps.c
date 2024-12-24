@@ -1897,6 +1897,114 @@ void asmlinkage check_ist_exit(const struct cpu_user_regs *regs, bool ist_exit)
 }
 #endif
 
+void fred_dump(struct cpu_user_regs *regs)
+{
+    printk("Fred stack:\n");
+    printk("  edata: %016lx\n", regs->edata);
+    printk("  ss:    %016lx\n"
+           "         { l %u, n %u, lm %u, ty %u, v %u, n %u, sw %u, s %u }\n",
+           regs->ssx, regs->fred_ss.insnlen, regs->fred_ss.nested, regs->fred_ss.lm, /* regs->fred_ss.enclave, */
+           regs->fred_ss.type, regs->fred_ss.vector, regs->fred_ss.nmi, regs->fred_ss.swevent, regs->fred_ss.sti);
+    printk("  rsp:   %016lx\n", regs->rsp);
+    printk("  flags: %016lx\n", regs->rflags);
+    printk("  cs:    %016lx { wfe %u, sl %u, cs %04x }\n",
+           regs->csx, regs->fred_cs.wfe, regs->fred_cs.sl, regs->fred_cs.cs);
+    printk("  rip:   %016lx %ps\n", regs->rip, _p(regs->rip));
+    printk("         { %16ph }\n", _p(regs->rip));
+    printk("  ec:    %016lx\n", *(unsigned long *)&regs->error_code);
+}
+
+void entry_from_guest(struct cpu_user_regs *regs)
+{
+    regs->entry_vector = regs->fred_ss.vector;
+
+    switch ( regs->fred_ss.type )
+    {
+    case X86_ET_EXT_INTR:
+        do_IRQ(regs);
+        break;
+
+    case X86_ET_NMI:
+        do_nmi(regs);
+        break;
+
+    case X86_ET_HW_EXC:
+    case X86_ET_SW_INT:
+    case X86_ET_PRIV_SW_EXC:
+    case X86_ET_SW_EXC:
+        switch ( regs->fred_ss.vector )
+        {
+        default:
+            goto fatal;
+        }
+        break;
+
+    default:
+        goto fatal;
+    }
+
+    return;
+
+ fatal:
+    fred_dump(regs);
+    panic("entry_from_guest()\n");
+}
+
+void entry_from_xen(struct cpu_user_regs *regs)
+{
+    regs->entry_vector = regs->fred_ss.vector;
+
+    switch ( regs->fred_ss.type )
+    {
+    case X86_ET_EXT_INTR:
+        do_IRQ(regs);
+        break;
+
+    case X86_ET_NMI:
+        do_nmi(regs);
+        break;
+
+    case X86_ET_HW_EXC:
+    case X86_ET_SW_INT:
+    case X86_ET_PRIV_SW_EXC:
+    case X86_ET_SW_EXC:
+        switch ( regs->fred_ss.vector )
+        {
+        case X86_EXC_PF:  do_page_fault(regs); break;
+        case X86_EXC_GP:  do_general_protection(regs); break;
+        case X86_EXC_UD:  do_invalid_op(regs); break;
+        case X86_EXC_NM:  do_device_not_available(regs); break;
+        case X86_EXC_BP:  do_int3(regs); break;
+
+        case X86_EXC_DE:
+        case X86_EXC_OF:
+        case X86_EXC_BR:
+        case X86_EXC_NP:
+        case X86_EXC_SS:
+        case X86_EXC_MF:
+        case X86_EXC_AC:
+        case X86_EXC_XM:
+            do_trap(regs);
+            break;
+
+        case X86_EXC_CP:  do_entry_CP(regs); break;
+
+        default:
+            goto fatal;
+        }
+        break;
+
+    default:
+        goto fatal;
+    }
+
+    return;
+
+ fatal:
+    fred_dump(regs);
+    panic("entry_from_xen()\n");
+}
+
 /*
  * Local variables:
  * mode: C

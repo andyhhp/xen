@@ -21,6 +21,7 @@ int8_t __ro_after_init opt_fred = true;
 boolean_param("fred", opt_fred);
 
 void nocall entry_PF(void);
+void nocall entry_FRED_CPL3(void);
 
 static void __init init_ler(void)
 {
@@ -56,6 +57,28 @@ static void __init init_ler(void)
 
     ler_msr = msr;
     setup_force_cpu_cap(X86_FEATURE_XEN_LBR);
+}
+
+/*
+ * Set up all FRED MSRs.
+ */
+void init_fred(void)
+{
+    wrmsrns(MSR_FRED_RSP_SL0, 0);
+    wrmsrns(MSR_FRED_RSP_SL1, 0);
+    wrmsrns(MSR_FRED_RSP_SL2, 0);
+    wrmsrns(MSR_FRED_RSP_SL3, 0);
+    wrmsrns(MSR_FRED_STK_LVLS, 3UL << (X86_EXC_DF * 2));
+
+    if ( cpu_has_xen_shstk )
+    {
+        wrmsrns(MSR_FRED_SSP_SL0, 0);
+        wrmsrns(MSR_FRED_SSP_SL1, 0);
+        wrmsrns(MSR_FRED_SSP_SL2, 0);
+        wrmsrns(MSR_FRED_SSP_SL3, 0);
+    }
+
+    wrmsrns(MSR_FRED_CONFIG, (unsigned long)entry_FRED_CPL3);
 }
 
 /*
@@ -102,6 +125,12 @@ void __init traps_init(void)
     if ( opt_fred == -1 && pv_shim )
         opt_fred = false;
 
+    if ( opt_fred )
+    {
+        init_fred();
+        set_in_cr4(X86_CR4_FRED);
+    }
+
     this_cpu(idt) = bsp_idt;
     this_cpu(gdt) = boot_gdt;
     if ( IS_ENABLED(CONFIG_PV32) )
@@ -131,4 +160,6 @@ void percpu_traps_init(void)
 
     if ( cpu_has_xen_lbr )
         wrmsrl(MSR_IA32_DEBUGCTLMSR, IA32_DEBUGCTLMSR_LBR);
+
+    init_fred();
 }

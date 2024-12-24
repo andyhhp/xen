@@ -50,6 +50,11 @@ static inline void wrmsr_ns(uint32_t msr, uint32_t lo, uint32_t hi)
                       "c" (msr), "a" (lo), "d" (hi));
 }
 
+static inline void wrmsrns(uint32_t msr, uint64_t val)
+{
+    wrmsr_ns(msr, val, val >> 32);
+}
+
 /* rdmsr with exception handling */
 #define rdmsr_safe(msr,val) ({\
     int rc_; \

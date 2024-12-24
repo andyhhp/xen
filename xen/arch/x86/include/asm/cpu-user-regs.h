@@ -54,12 +54,41 @@ struct cpu_user_regs
     uint32_t entry_vector;
 
     DECL_REG_LO16(ip);
-    uint16_t cs, _pad0[1];
-    uint8_t  saved_upcall_mask;
-    uint8_t  _pad1[3];
+
+    union {
+        struct {
+            uint16_t cs, :16;
+            uint8_t  saved_upcall_mask;
+        };
+        unsigned long csx;
+        struct {
+            uint16_t cs;
+            unsigned int sl:2; /* Stack level at event time */
+            bool wfe:1; /* Wait-for-ENDBRANCH state */
+        } fred_cs;
+    };
+
     DECL_REG_LO16(flags); /* rflags.IF == !saved_upcall_mask */
     DECL_REG_LO8(sp);
-    uint16_t ss, _pad2[3];
+
+    union {
+        uint16_t ss;
+        unsigned long ssx;
+        struct {
+            uint16_t ss;
+            bool sti:1;
+            bool swevent:1;
+            bool nmi:1;
+            unsigned long :13;
+            uint8_t vector;
+            unsigned long :8;
+            unsigned int type:4, :4;
+            bool enclave:1;
+            bool lm:1;
+            bool nested:1, :1;
+            unsigned int insnlen:4;
+        } fred_ss;
+    };
 
     uint64_t edata, _rsvd;
 };
