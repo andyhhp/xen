@@ -231,6 +231,9 @@ extern u32 vmx_pin_based_exec_control;
 #define VM_EXIT_CLEAR_BNDCFGS           0x00800000
 extern u32 vmx_vmexit_control;
 
+#define _2VM_EXIT_SAVE_GUEST_FRED       0x00000001
+#define _2VM_EXIT_LOAD_HOST_FRED        0x00000002
+
 #define VM_ENTRY_IA32E_MODE             0x00000200
 #define VM_ENTRY_SMM                    0x00000400
 #define VM_ENTRY_DEACT_DUAL_MONITOR     0x00000800
@@ -238,6 +241,7 @@ extern u32 vmx_vmexit_control;
 #define VM_ENTRY_LOAD_GUEST_PAT         0x00004000
 #define VM_ENTRY_LOAD_GUEST_EFER        0x00008000
 #define VM_ENTRY_LOAD_BNDCFGS           0x00010000
+#define VM_ENTRY_LOAD_GUEST_FRED        0x00800000
 extern u32 vmx_vmentry_control;
 
 #define SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES 0x00000001U
@@ -471,7 +475,9 @@ enum vmcs_field {
     TERTIARY_VM_EXEC_CONTROL        = 0x00002034,
     SPEC_CTRL_MASK                  = 0x0000204a,
     SPEC_CTRL_SHADOW                = 0x0000204c,
+    INJECTED_EVENT                  = 0x00002052,
     GUEST_PHYSICAL_ADDRESS          = 0x00002400,
+    ORIGINAL_EVENT                  = 0x00002404,
     VMCS_LINK_POINTER               = 0x00002800,
     GUEST_IA32_DEBUGCTL             = 0x00002802,
     GUEST_PAT                       = 0x00002804,
@@ -480,9 +486,25 @@ enum vmcs_field {
     GUEST_PDPTE0                    = 0x0000280a,
 #define GUEST_PDPTE(n) (GUEST_PDPTE0 + (n) * 2) /* n = 0...3 */
     GUEST_BNDCFGS                   = 0x00002812,
+    GUEST_FRED_CONFIG               = 0x0000281a,
+    GUEST_FRED_RSP_SL1              = 0x0000281c,
+    GUEST_FRED_RSP_SL2              = 0x0000281e,
+    GUEST_FRED_RSP_SL3              = 0x00002820,
+    GUEST_FRED_STK_LVLS             = 0x00002822,
+    GUEST_FRED_SSP_SL1              = 0x00002824,
+    GUEST_FRED_SSP_SL2              = 0x00002826,
+    GUEST_FRED_SSP_SL3              = 0x00002828,
     HOST_PAT                        = 0x00002c00,
     HOST_EFER                       = 0x00002c02,
     HOST_PERF_GLOBAL_CTRL           = 0x00002c04,
+    HOST_FRED_CONFIG                = 0x00002c08,
+    HOST_FRED_RSP_SL1               = 0x00002c0a,
+    HOST_FRED_RSP_SL2               = 0x00002c0c,
+    HOST_FRED_RSP_SL3               = 0x00002c0e,
+    HOST_FRED_STK_LVLS              = 0x00002c10,
+    HOST_FRED_SSP_SL1               = 0x00002c12,
+    HOST_FRED_SSP_SL2               = 0x00002c14,
+    HOST_FRED_SSP_SL3               = 0x00002c16,
     PIN_BASED_VM_EXEC_CONTROL       = 0x00004000,
     CPU_BASED_VM_EXEC_CONTROL       = 0x00004002,
     EXCEPTION_BITMAP                = 0x00004004,
