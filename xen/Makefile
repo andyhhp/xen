@@ -648,6 +648,16 @@ cscope:
 	$(all_sources) > cscope.files
 	cscope -k -b -q
 
+hd.img: xen.cfg FORCE
+	strip $(TARGET).efi
+	dd if=/dev/zero of=$@.tmp bs=1M count=16
+	/sbin/mkfs.vfat $@.tmp -F 16
+	mmd -i $@.tmp ::EFI ::EFI/BOOT
+	mcopy -i $@.tmp $(TARGET).efi ::EFI/BOOT/BOOTX64.EFI
+	mcopy -i $@.tmp xen.cfg ::EFI/BOOT/BOOTX64.CFG
+	mcopy -i $@.tmp /local/xen-test-framework.git/tests/cpuid/test-pv64-cpuid ::EFI/BOOT/DOM0
+	mv $@.tmp $@
+
 .PHONY: _MAP
 _MAP: $(TARGET)
 	$(NM) -n $(TARGET)-syms | grep -v '\(compiled\)\|\(\.o$$\)\|\( [aUw] \)\|\(\.\.ng$$\)\|\(LASH[RL]DI\)' > System.map
