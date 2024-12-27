@@ -1046,6 +1046,8 @@ static int cpu_smpboot_alloc(unsigned int cpu)
     unsigned long stub_page;
     int rc = -ENOMEM;
 
+    printk("*** CPU %u, %s(%u)\n", smp_processor_id(), __func__, cpu);
+
     if ( node != NUMA_NO_NODE )
         memflags = MEMF_node(node);
 
@@ -1150,6 +1152,8 @@ static struct notifier_block cpu_smpboot_nfb = {
 
 void __init smp_prepare_cpus(void)
 {
+    printk("*** CPU %u, %s()\n", smp_processor_id(), __func__);
+
     register_cpu_notifier(&cpu_smpboot_nfb);
 
     mtrr_aps_sync_begin();

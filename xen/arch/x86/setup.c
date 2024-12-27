@@ -1181,6 +1181,44 @@ void asmlinkage __init noreturn __start_xen(void)
     early_cpu_init(true);
     early_microcode_init(bi);
 
+    printk("*** FRED: %u, LKGS: %u, NMI_SRC %u, opt_fred %d\n",
+           boot_cpu_has(X86_FEATURE_FRED),
+           boot_cpu_has(X86_FEATURE_LKGS),
+           boot_cpu_has(X86_FEATURE_NMI_SRC),
+           opt_fred);
+
+    /* printk("*** cr4 %p\n", _p(read_cr4())); */
+
+    /* printk("int3\n"); */
+    /* asm volatile ("int3"); */
+
+    /* printk("rex64 int3\n"); */
+    /* asm volatile ("rex64 int3"); */
+
+    /* printk("int1\n"); */
+    /* asm volatile ("data16 addr32 int1"); */
+
+    /* printk("syscall\n"); */
+    /* asm volatile ("syscall"); */
+
+    /* printk("sysenter\n"); */
+    /* asm volatile ("sysenter"); */
+
+    /* printk("Good CET-IBT\n"); */
+    /* asm volatile ("lea 1f(%%rip), %%rax\n\t" */
+    /*               "jmp *%%rax\n\t" */
+    /*               "1: endbr64; cmc" */
+    /*               ::: "rax"); */
+
+    /* printk("Bad CET-IBT\n"); */
+    /* asm volatile ("lea 1f(%%rip), %%rax\n\t" */
+    /*               "jmp *%%rax\n\t" */
+    /*               "1: cmc" */
+    /*               ::: "rax"); */
+
+    /* panic("done\n"); */
+
+
     if ( pvh_boot )
         pvh_print_info();
 
