@@ -2,6 +2,8 @@
 /*
  * Configuration of event handling for all CPUs.
  */
+#include <xen/init.h>
+
 #include <asm/idt.h>
 #include <asm/msr.h>
 #include <asm/page.h>
@@ -10,6 +12,28 @@
 
 DEFINE_PER_CPU_READ_MOSTLY(idt_entry_t *, idt);
 
+/*
+ * Configure basic exception handling.  This is prior to parsing the command
+ * line or configuring a console, and needs to be as simple as possible.
+ */
+void __init early_traps_init(void)
+{
+    init_idt_traps();
+    load_system_tables();
+}
+
+/*
+ * Configure complete exception, interrupt and syscall handling.
+ */
+void __init traps_init(void)
+{
+    trap_init();
+}
+
+/*
+ * Set up per-CPU linkage registers for exception, interrupt and syscall
+ * handling.
+ */
 void percpu_traps_init(void)
 {
     subarch_percpu_traps_init();

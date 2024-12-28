@@ -1093,8 +1093,7 @@ void asmlinkage __init noreturn __start_xen(void)
 
     percpu_init_areas();
 
-    init_idt_traps();
-    load_system_tables();
+    early_traps_init();
 
     smp_prepare_boot_cpu();
     sort_exception_tables();
@@ -2016,7 +2015,7 @@ void asmlinkage __init noreturn __start_xen(void)
                                            &this_cpu(stubs).mfn);
     BUG_ON(!this_cpu(stubs.addr));
 
-    trap_init();
+    traps_init(); /* Needs stubs allocated. */
 
     cpu_init();
 
