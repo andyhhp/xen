@@ -7,6 +7,10 @@
 #ifndef ASM_TRAP_H
 #define ASM_TRAP_H
 
+#include <xen/types.h>
+
+extern int8_t opt_fred;
+
 void early_traps_init(void);
 void traps_init(void);
 void percpu_traps_init(void);

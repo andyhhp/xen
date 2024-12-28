@@ -4,6 +4,7 @@
  */
 #include <xen/init.h>
 #include <xen/param.h>
+#include <xen/types.h>
 
 #include <asm/idt.h>
 #include <asm/msr.h>
@@ -15,6 +16,9 @@ DEFINE_PER_CPU_READ_MOSTLY(idt_entry_t *, idt);
 
 static bool __initdata opt_ler;
 boolean_param("ler", opt_ler);
+
+int8_t __ro_after_init opt_fred = true;
+boolean_param("fred", opt_fred);
 
 void nocall entry_PF(void);
 
@@ -86,6 +90,17 @@ void __init traps_init(void)
 {
     /* Replace early pagefault with real pagefault handler. */
     _update_gate_addr_lower(&bsp_idt[X86_EXC_PF], entry_PF);
+
+    if ( !boot_cpu_has(X86_FEATURE_FRED) ||
+         !boot_cpu_has(X86_FEATURE_LKGS) )
+    {
+        if ( opt_fred )
+            printk(XENLOG_WARNING "FRED not available, ignoring\n");
+        opt_fred = false;
+    }
+
+    if ( opt_fred == -1 && pv_shim )
+        opt_fred = false;
 
     this_cpu(idt) = bsp_idt;
     this_cpu(gdt) = boot_gdt;
