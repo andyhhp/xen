@@ -43,6 +43,13 @@ Glossary
      Sapphire Rapids (Server, 2023) CPUs.  AMD support only CET-SS, starting
      with Zen3 (Both client and server, 2020) CPUs.
 
+   FRED
+     Flexible Return and Event Delivery is a facility in x86 CPUs which
+     overhauls how system calls, interrupt and exception handling works.
+
+     Intel support for FRED is slated for Panther Lake (Client) and Diamond
+     Rapids (Server).
+
    guest
      The term 'guest' has two different meanings, depending on context, and
      should not be confused with :term:`domain`.
