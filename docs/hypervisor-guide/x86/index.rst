@@ -7,3 +7,4 @@ x86
    :maxdepth: 2
 
    how-xen-boots
+   fred

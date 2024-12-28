@@ -46,6 +46,13 @@ Glossary
    event channel
      A paravirtual facility for guests to send and receive interrupts.
 
+   FRED
+     Flexible Return and Event Delivery is a facility in x86 CPUs which
+     overhauls how system calls, interrupt and exception handling works.
+
+     Intel support for FRED is slated for Panther Lake (Client) and Diamond
+     Rapids (Server).
+
    guest
      The term 'guest' has two different meanings, depending on context, and
      should not be confused with :term:`domain`.
