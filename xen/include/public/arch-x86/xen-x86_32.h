@@ -114,7 +114,7 @@
 #define __DECL_REG_LO16(name) uint32_t e ## name
 #endif
 
-struct cpu_user_regs {
+struct guest_user_regs {
     __DECL_REG_LO8(b);
     __DECL_REG_LO8(c);
     __DECL_REG_LO8(d);
@@ -136,8 +136,8 @@ struct cpu_user_regs {
     uint16_t fs, _pad4;
     uint16_t gs, _pad5;
 };
-typedef struct cpu_user_regs cpu_user_regs_t;
-DEFINE_XEN_GUEST_HANDLE(cpu_user_regs_t);
+typedef struct guest_user_regs guest_user_regs_t;
+DEFINE_XEN_GUEST_HANDLE(guest_user_regs_t);
 
 #undef __DECL_REG_LO8
 #undef __DECL_REG_LO16

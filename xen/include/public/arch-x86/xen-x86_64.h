@@ -159,7 +159,7 @@ struct iret_context {
 #define __DECL_REG_HI(num)    uint64_t r ## num
 #endif
 
-struct cpu_user_regs {
+struct guest_user_regs {
     __DECL_REG_HI(15);
     __DECL_REG_HI(14);
     __DECL_REG_HI(13);
@@ -189,8 +189,8 @@ struct cpu_user_regs {
     uint16_t fs, _pad5[3];
     uint16_t gs, _pad6[3];
 };
-typedef struct cpu_user_regs cpu_user_regs_t;
-DEFINE_XEN_GUEST_HANDLE(cpu_user_regs_t);
+typedef struct guest_user_regs guest_user_regs_t;
+DEFINE_XEN_GUEST_HANDLE(guest_user_regs_t);
 
 #undef __DECL_REG
 #undef __DECL_REG_LOHI

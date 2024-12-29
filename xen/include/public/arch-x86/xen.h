@@ -173,7 +173,7 @@ struct vcpu_guest_context {
 #define _VGCF_online                   5
 #define VGCF_online                    (1<<_VGCF_online)
     unsigned long flags;                    /* VGCF_* flags                 */
-    struct cpu_user_regs user_regs;         /* User-level CPU registers     */
+    struct guest_user_regs user_regs;       /* User-level CPU registers     */
     struct trap_info trap_ctxt[256];        /* Virtual IDT                  */
     unsigned long ldt_base, ldt_ents;       /* LDT (linear address, # ents) */
     unsigned long gdt_frames[16], gdt_ents; /* GDT (machine frames, # ents) */
