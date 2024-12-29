@@ -924,6 +924,9 @@ exception_with_ints_disabled:
         call  search_pre_exception_table
         testq %rax,%rax                 # no fixup code for faulting EIP?
         jz    .Ldispatch_exceptions
+
+/* Exception recovery from the pre exception table (fault on IRET instruction). */
+
         movq  %rax,UREGS_rip(%rsp)      # fixup regular stack
 
 #ifdef CONFIG_XEN_SHSTK
@@ -941,7 +944,7 @@ exception_with_ints_disabled:
         subq  $8,%rsp
         movq  %rsp,%rdi
         movq  $UREGS_kernel_sizeof/8,%rcx
-        rep;  movsq                     # make room for ec/ev
+        rep movsq                       # make room for ec/ev
 1:      movq  UREGS_error_code(%rsp),%rax # ec/ev
         movq  %rax,UREGS_kernel_sizeof(%rsp)
         mov   %r15, STACK_CPUINFO_FIELD(xen_cr3)(%r14)
