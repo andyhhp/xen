@@ -60,18 +60,12 @@ config DEBUG_LOCKS
 	  checks will be performed when acquiring and releasing locks.
 
 config PERF_COUNTERS
-	bool "Performance Counters"
-	help
-	  Enables software performance counters that allows you to analyze
-	  bottlenecks in the system.  To access this data you can use serial
-	  console to print (and reset) using 'p' and 'P' respectively, or
-	  the 'xenperf' tool.
+	bool
+	default y
 
 config PERF_ARRAYS
-	bool "Performance Counter Array Histograms"
-	depends on PERF_COUNTERS
-	help
-	  Enables software performance counter array histograms.
+	bool
+	default y
 
 
 config VERBOSE_DEBUG
