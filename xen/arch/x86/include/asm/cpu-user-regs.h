@@ -55,10 +55,6 @@ struct cpu_user_regs
     DECL_REG_LO16(flags); /* rflags.IF == !saved_upcall_mask */
     DECL_REG_LO8(sp);
     uint16_t ss, _pad2[3];
-    uint16_t es, _pad3[3];
-    uint16_t ds, _pad4[3];
-    uint16_t fs, _pad5[3];
-    uint16_t gs, _pad6[3];
 };
 
 #undef DECL_REG_HI
