@@ -916,7 +916,13 @@ void load_system_tables(void)
 	 */
 	BUILD_BUG_ON((sizeof(struct cpu_info) -
 		      sizeof(struct cpu_user_regs)) & 0xf);
-	BUG_ON(system_state != SYS_STATE_early_boot && (stack_bottom & 0xf));
+        BUILD_BUG_ON((sizeof(struct cpu_info) -
+                      endof_field(struct cpu_info, _blah)) & 63);
+        if ( system_state != SYS_STATE_early_boot )
+        {
+            BUG_ON(stack_bottom & 0xf);
+            BUG_ON(stack_bottom & 63);
+        }
 }
 
 static void skinit_enable_intr(void)

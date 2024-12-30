@@ -102,6 +102,8 @@
  */
 #define sizeof_field(type, member) sizeof(((type *)NULL)->member)
 
+#define endof_field(type, member) (offsetof(type, member) + sizeof_field(type, member))
+
 /* Cast an arbitrary integer to a pointer. */
 #define _p(x) ((void *)(unsigned long)(x))
 

@@ -2164,7 +2164,7 @@ void asmlinkage __init noreturn __start_xen(void)
     *bsp_info = *info;
 
     asm volatile ("mov %[stk], %%rsp; jmp %c[fn]" ::
-                  [stk] "g" (&bsp_info->guest_cpu_user_regs),
+                  [stk] "g" (&bsp_info->_blah),
                   [fn] "i" (reinit_bsp_stack) : "memory");
     unreachable();
 }

@@ -45,8 +45,14 @@ struct cpu_user_regs
     DECL_REG_LOHI(d);
     DECL_REG_LO8(si);
     DECL_REG_LO8(di);
+
+    /*
+     *
+     */
+
     uint32_t error_code;
     uint32_t entry_vector;
+
     DECL_REG_LO16(ip);
     uint16_t cs, _pad0[1];
     uint8_t  saved_upcall_mask;
@@ -54,6 +60,8 @@ struct cpu_user_regs
     DECL_REG_LO16(flags); /* rflags.IF == !saved_upcall_mask */
     DECL_REG_LO8(sp);
     uint16_t ss, _pad2[3];
+
+    uint64_t edata, _rsvd;
 };
 
 #undef DECL_REG_HI

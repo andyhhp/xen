@@ -37,7 +37,7 @@ static inline unsigned int get_stack_page(unsigned long sp)
 struct vcpu;
 
 struct cpu_info {
-    struct cpu_user_regs guest_cpu_user_regs;
+    struct cpu_user_regs _blah;
     unsigned int processor_id;
     unsigned int verw_sel;
     struct vcpu *current_vcpu;
@@ -101,7 +101,7 @@ static inline struct cpu_info *get_cpu_info(void)
 #define current               (get_current())
 
 #define smp_processor_id()    (get_cpu_info()->processor_id)
-#define guest_cpu_user_regs() (&get_cpu_info()->guest_cpu_user_regs)
+#define guest_cpu_user_regs() (&get_cpu_info()->_blah)
 
 #define get_per_cpu_offset()  (get_cpu_info()->per_cpu_offset)
 
@@ -111,7 +111,7 @@ static inline struct cpu_info *get_cpu_info(void)
  * corresponds to a CPU trap frame.
  */
 #define get_stack_bottom()                      \
-    ((unsigned long)(&get_cpu_info()->guest_cpu_user_regs + 1))
+    ((unsigned long)(&get_cpu_info()->_blah + 1))
 
 /*
  * Get the reasonable stack bounds for stack traces and stack dumps.  Stack

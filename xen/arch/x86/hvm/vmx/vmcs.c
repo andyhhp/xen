@@ -927,7 +927,7 @@ static void vmx_set_host_env(struct vcpu *v)
      * all get saved into the VMCS instead.
      */
     __vmwrite(HOST_RSP,
-              (unsigned long)&get_cpu_info()->guest_cpu_user_regs.error_code);
+              (unsigned long)&get_cpu_info()->_blah.error_code);
 }
 
 void vmx_clear_msr_intercept(struct vcpu *v, unsigned int msr,

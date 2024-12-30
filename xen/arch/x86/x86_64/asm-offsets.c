@@ -146,9 +146,9 @@ void __dummy__(void)
     BLANK();
 #endif
 
-    OFFSET(CPUINFO_guest_cpu_user_regs, struct cpu_info, guest_cpu_user_regs);
-    OFFSET(CPUINFO_error_code, struct cpu_info, guest_cpu_user_regs.error_code);
-    OFFSET(CPUINFO_rip, struct cpu_info, guest_cpu_user_regs.rip);
+    OFFSET(CPUINFO_guest_cpu_user_regs, struct cpu_info, _blah);
+    OFFSET(CPUINFO_error_code, struct cpu_info, _blah.error_code);
+    OFFSET(CPUINFO_rip, struct cpu_info, _blah.rip);
     OFFSET(CPUINFO_processor_id, struct cpu_info, processor_id);
     OFFSET(CPUINFO_verw_sel, struct cpu_info, verw_sel);
     OFFSET(CPUINFO_current_vcpu, struct cpu_info, current_vcpu);
