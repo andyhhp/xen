@@ -450,19 +450,10 @@ static void put_fpu(
             if ( ops->read_segment &&
                  ops->read_segment(state->ea.mem.seg, &sreg,
                                    ctxt) == X86EMUL_OKAY )
+            {
                 aux.ds = sreg.sel;
-            else
-                switch ( state->ea.mem.seg )
-                {
-                case x86_seg_cs: aux.ds = ctxt->regs->cs; break;
-                case x86_seg_ds: aux.ds = ctxt->regs->ds; break;
-                case x86_seg_es: aux.ds = ctxt->regs->es; break;
-                case x86_seg_fs: aux.ds = ctxt->regs->fs; break;
-                case x86_seg_gs: aux.ds = ctxt->regs->gs; break;
-                case x86_seg_ss: aux.ds = ctxt->regs->ss; break;
-                default:         ASSERT_UNREACHABLE();    break;
-                }
-            aux.dval = true;
+                aux.dval = true;
+            }
         }
         ops->put_fpu(ctxt, X86EMUL_FPU_none, &aux);
     }
