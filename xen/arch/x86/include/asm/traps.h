@@ -13,6 +13,8 @@ void percpu_traps_init(void);
 
 const char *vector_name(unsigned int vec);
 
+void load_system_tables(void);
+
 #endif /* ASM_TRAP_H */
 
 /*
