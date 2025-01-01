@@ -18,6 +18,7 @@
 #include <asm/apic.h>
 #include <asm/cpufeature.h>
 #include <asm/current.h>
+#include <asm/idt.h>
 #include <asm/flushtlb.h>
 #include <asm/hvm/hvm.h>
 #include <asm/hvm/io.h>
