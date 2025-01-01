@@ -5,9 +5,9 @@
  * Mark functions and data as being only used at initialization
  * or exit time.
  */
-#define __init            __text_section(".init.text")
-#define __exit            __text_section(".exit.text")
-#define __cold            __text_section(".text.cold")
+#define __init            __section(".init.text")
+#define __exit            __section(".exit.text")
+#define __cold            __section(".text.cold")
 #define __initdata        __section(".init.data")
 #define __initconst       __section(".init.rodata")
 #define __initconstrel    __section(".init.rodata.rel")
