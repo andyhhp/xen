@@ -74,22 +74,6 @@ static inline void _write_gate_lower(volatile idt_entry_t *gate,
     gate->a = new->a;
 }
 
-#define _set_gate(gate_addr,type,dpl,addr)               \
-do {                                                     \
-    (gate_addr)->a = 0;                                  \
-    smp_wmb(); /* disable gate /then/ rewrite */         \
-    (gate_addr)->b =                                     \
-        ((unsigned long)(addr) >> 32);                   \
-    smp_wmb(); /* rewrite /then/ enable gate */          \
-    (gate_addr)->a =                                     \
-        (((unsigned long)(addr) & 0xFFFF0000UL) << 32) | \
-        ((unsigned long)(dpl) << 45) |                   \
-        ((unsigned long)(type) << 40) |                  \
-        ((unsigned long)(addr) & 0xFFFFUL) |             \
-        ((unsigned long)__HYPERVISOR_CS << 16) |         \
-        (1UL << 47);                                     \
-} while (0)
-
 static inline void _set_gate_lower(idt_entry_t *gate, unsigned long type,
                                    unsigned long dpl, void *addr)
 {
