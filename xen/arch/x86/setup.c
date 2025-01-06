@@ -2017,6 +2017,8 @@ void asmlinkage __init noreturn __start_xen(void)
 
     trap_init();
 
+    cpu_init();
+
     rcu_init();
 
     early_time_init();
