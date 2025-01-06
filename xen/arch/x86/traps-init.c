@@ -57,20 +57,26 @@ static void __init init_ler(void)
 /*
  * Configure basic exception handling.  This is prior to parsing the command
  * line or configuring a console, and needs to be as simple as possible.
+ *
+ * boot_gdt is already loaded, and bsp_idt[] is constructed at build time
+ * without IST settings, so we don't need a TSS configured yet.
+ *
+ * Load bsp_idt[], and invalidate the TSS and LDT.
  */
 void __init early_traps_init(void)
 {
-    /* Specify dedicated interrupt stacks for NMI, #DF, and #MC. */
-    enable_each_ist(bsp_idt);
+    const struct desc_ptr idtr = {
+        .base = (unsigned long)bsp_idt,
+        .limit = sizeof(bsp_idt) - 1,
+    };
 
-    /* CPU0 uses the master IDT. */
-    this_cpu(idt) = bsp_idt;
+    lidt(&idtr);
 
-    this_cpu(gdt) = boot_gdt;
-    if ( IS_ENABLED(CONFIG_PV32) )
-        this_cpu(compat_gdt) = boot_compat_gdt;
+    _set_tssldt_desc(boot_gdt + TSS_ENTRY - FIRST_RESERVED_GDT_ENTRY,
+                     0, 0, SYS_DESC_tss_avail);
 
-    load_system_tables();
+    ltr(TSS_SELECTOR);
+    lldt(0);
 }
 
 /*
@@ -80,6 +86,13 @@ void __init traps_init(void)
 {
     /* Replace early pagefault with real pagefault handler. */
     _update_gate_addr_lower(&bsp_idt[X86_EXC_PF], entry_PF);
+
+    this_cpu(idt) = bsp_idt;
+    this_cpu(gdt) = boot_gdt;
+    if ( IS_ENABLED(CONFIG_PV32) )
+        this_cpu(compat_gdt) = boot_compat_gdt;
+
+    load_system_tables();
 
     init_ler();
 
