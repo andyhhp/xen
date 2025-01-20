@@ -10,6 +10,9 @@
 #include <xen/elf.h>
 #include <xen/version.h>
 
+void sha256_digest(uint8_t[], const void *, size_t);
+void *ptr = sha256_digest;
+
 const char *xen_compile_date(void)
 {
     return XEN_COMPILE_DATE;

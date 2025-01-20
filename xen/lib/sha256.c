@@ -242,5 +242,7 @@ static void __init __constructor test_sha256(void)
               "       got %" STR(SHA256_DIGEST_SIZE) "phN\n",
               __func__, t->msg, t->digest, res);
     }
+
+    printk("%s() done\n", __func__);
 }
 #endif /* CONFIG_SELF_TESTS */
