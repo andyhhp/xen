@@ -577,8 +577,6 @@ void panic_PAR(uint64_t par);
 void show_registers(const struct cpu_user_regs *regs);
 void show_stack(const struct cpu_user_regs *regs);
 
-#define dump_execution_state() run_in_exception_handler(show_execution_state)
-
 #define cpu_relax() barrier() /* Could yield? */
 
 /* All a bit UP for the moment */

@@ -11,7 +11,6 @@
  */
 
 #include <xen/bitops.h>
-#include <xen/kernel.h>
 #include <xen/lib.h>
 #include <xen/percpu.h>
 #include <xen/spinlock.h>

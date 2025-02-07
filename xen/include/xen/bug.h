@@ -155,6 +155,9 @@ int do_bug_frame(const struct cpu_user_regs *regs, unsigned long pc);
 
 #endif /* CONFIG_GENERIC_BUG_FRAME */
 
+void cf_check show_execution_state(const struct cpu_user_regs *regs);
+#define dump_execution_state() run_in_exception_handler(show_execution_state)
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __XEN_BUG_H__ */
