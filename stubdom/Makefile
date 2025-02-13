@@ -14,6 +14,8 @@ export debug=y
 # Moved from config/StdGNU.mk
 CFLAGS += -O1 -fno-omit-frame-pointer
 
+CFLAGS += -fno-stack-protector
+
 ifeq (,$(findstring clean,$(MAKECMDGOALS)))
   ifeq ($(wildcard $(MINI_OS)/Config.mk),)
     $(error Please run 'make mini-os-dir' in top-level directory)
