@@ -958,7 +958,28 @@ cpu_add_to_runqueue(const struct scheduler *ops, unsigned int cpu)
     write_lock_irqsave(&prv->lock, flags);
 
     rqd_ins = &prv->rql;
+
+#if 1
     list_for_each_entry ( rqd, &prv->rql, rql )
+#else
+    for ( (rqd) = ({
+                typeof(((typeof(*(rqd)) *)((void*)0))->rql) *__mptr =
+                    ((&prv->rql)->next);
+                (typeof(*(rqd)) *)
+                    ((char *)__mptr -
+                     __builtin_offsetof(typeof(*(rqd)),rql) );
+            });
+          &(rqd)->rql !=
+              (&prv->rql);
+          (rqd) = ({
+                  typeof(((typeof(*(rqd)) *)((void*)0))->rql) *__mptr =
+                      ((rqd)->rql.next);
+                  (typeof(*(rqd)) *)
+                      ((char *)__mptr -
+                       __builtin_offsetof(typeof(*(rqd)),rql) );
+              })
+        )
+#endif
     {
         /* Remember first unused queue index. */
         if ( !rqi_unused && rqd->id > rqi )

@@ -17,8 +17,8 @@
  *
  */
 #define container_of(ptr, type, member) ({                      \
-        typeof_field(type, member) *__mptr = (ptr);             \
-        (type *)( (char *)__mptr - offsetof(type,member) );})
+        void *__mptr = (void *)(ptr);                           \
+        (type *)(__mptr - offsetof(type , member)); })
 
 /**
  * __struct_group() - Create a mirrored named and anonyomous struct
