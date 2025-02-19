@@ -29,9 +29,6 @@
   rules:
     - if: $CI_PIPELINE_SOURCE == "schedule"
       when: never
-    - if: $WTOKEN && $CI_PROJECT_PATH =~ /^xen-project\/people\/.*$/
-      when: manual
-      allow_failure: true
     - !reference [.eclair-analysis, rules]
 
 eclair-x86_64:
