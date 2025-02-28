@@ -240,6 +240,15 @@ static const struct test {
             0xf6, 0xec, 0xed, 0xd4, 0x19, 0xdb, 0x06, 0xc1,
         },
     },
+    {
+        .msg = "                                                                      ", /* 70 */
+        .digest = {
+            0xf5, 0xd8, 0x85, 0x15, 0x97, 0x2d, 0x5d, 0x9b,
+            0xdf, 0x69, 0xf1, 0x7f, 0x5c, 0xfd, 0xe6, 0xd0,
+            0x33, 0x35, 0x7f, 0x35, 0x9c, 0x15, 0x5e, 0xfb,
+            0xdf, 0x18, 0xca, 0x64, 0xa6, 0xdd, 0x63, 0x35,
+        },
+    },
 };
 
 static void __init __constructor test_sha256(void)
@@ -259,6 +268,24 @@ static void __init __constructor test_sha256(void)
               "       got %" STR(SHA256_DIGEST_SIZE) "phN\n",
               __func__, t->msg, t->digest, res);
     }
+
+    {
+        const struct test *t = &tests[ARRAY_SIZE(tests) - 1];
+        uint8_t res[SHA256_DIGEST_SIZE] = {};
+        struct sha256_state s;
+
+        sha256_init(&s);
+        sha256_update(&s, t->msg, 40);
+        sha256_update(&s, t->msg + 40, strlen(t->msg) - 40);
+        sha256_final(&s, res);
+
+        if ( memcmp(res, t->digest, sizeof(t->digest)) )
+            panic("%s() msg '%s' failed\n"
+                  "  expected %" STR(SHA256_DIGEST_SIZE) "phN\n"
+                  "       got %" STR(SHA256_DIGEST_SIZE) "phN\n",
+                  __func__, t->msg, t->digest, res);
+    }
+
 
     printk("%s() done\n", __func__);
 }
