@@ -113,6 +113,11 @@ trampoline_protmode_entry:
 start64:
         /* Jump to high mappings. */
         movabs  $__high_start, %rdi
+
+        /* Hijack movabs's imm64 for hooking the AMD entrysign fix */
+        .globl trampoline_ap_fn
+        .set trampoline_ap_fn, . - 8
+
         jmpq    *%rdi
 
 #include "video.h"

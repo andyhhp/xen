@@ -15,12 +15,15 @@
  */
 
 #include <xen/bsearch.h>
+#include <xen/console.h>
 #include <xen/err.h>
 #include <xen/init.h>
 #include <xen/mm.h> /* TODO: Fix asm/tlbflush.h breakage */
 #include <xen/sha2.h>
 
+#include <asm/apic.h>
 #include <asm/msr.h>
+#include <asm/trampoline.h>
 
 #include "private.h"
 
@@ -604,6 +607,270 @@ static void __init __constructor test_digests_sorted(void)
 #endif /* CONFIG_SELF_TESTS */
 
 /*
+ * Probe for the mode of the LAPIC.  If the LAPIC is disabled, or the MMIO
+ * window is in a non-standard place, fix it up.  Set up the fixmap entry.
+ * Returns true for x2apic mode, false for xapic.
+ */
+static bool __init probe_lapic(void)
+{
+    uint64_t val;
+
+    rdmsrl(MSR_APIC_BASE, val);
+
+    if ( val & APIC_BASE_EXTD )
+        return true;
+
+    if ( !(val & APIC_BASE_ENABLE) ||
+         (val & APIC_BASE_ADDR_MASK) != APIC_DEFAULT_PHYS_BASE )
+    {
+        printk(XENLOG_WARNING
+               "  Unexpected LAPIC configuration 0x%08lx, fixing\n", val);
+        wrmsrl(MSR_APIC_BASE,
+               APIC_DEFAULT_PHYS_BASE | APIC_BASE_ENABLE | APIC_BASE_BSP);
+    }
+
+    set_fixmap_nocache(FIX_APIC_BASE, APIC_DEFAULT_PHYS_BASE);
+
+    return false;
+}
+
+/*
+ * Local simplification apic_icr_write().  Because we always use destination
+ * shorthands, we do not need to write to APIC_ICR2 in xAPIC mode.
+ */
+static void __init icr_write(bool x2apic, uint32_t val)
+{
+    if ( x2apic )
+        return apic_wrmsr(APIC_ICR, val);
+
+    while ( apic_mem_read(APIC_ICR) & APIC_ICR_BUSY )
+        cpu_relax();
+    apic_mem_write(APIC_ICR, val);
+}
+
+/*
+ * Send an ALL_BUT_SELF INIT or INIT-SIPI sequence.  As we're dealing with
+ * modern platforms, we don't need INIT assert/deassrt cycles, or the second
+ * SIPI.
+ */
+static void __init send_init(bool x2apic, bool sipi)
+{
+    unsigned long sipi_vec;
+
+    icr_write(x2apic, APIC_DEST_ALLBUT | APIC_DM_INIT);
+
+    if ( !sipi )
+        return;
+
+    sipi_vec = bootsym_phys(entry_SIPI16) >> 12;
+
+    icr_write(x2apic, APIC_DEST_ALLBUT | APIC_DM_STARTUP | sipi_vec);
+}
+
+/*
+ * We're far too early to calibrate time.  Assume a 5GHz processor (the upper
+ * end of the Fam19h range), which causes us to be wrong in the safe direction
+ * on slower systems.
+ */
+static void __init wait(unsigned int usecs)
+{
+    unsigned long ticks = usecs * (5UL*1000*1000 /* cpu_khz */ / 1000);
+    unsigned long s, e;
+
+    s = rdtsc_ordered();
+    do
+    {
+        cpu_relax();
+        e = rdtsc_ordered();
+    } while ( (e - s) < ticks );
+}
+
+/*
+ * Control variables between the BSP running logic in this file, and the APs
+ * running amd_parallel_ucode_loader().
+ *
+ * APs do a LOCK INC on callin_*, then spin on ptr/wait.  The BSP waits for
+ * the callin_* count to match the number of APs, then sets ptr/wait.  The BSP
+ * is also responsible for resetting this state at relevant positions of the
+ * cycle.
+ */
+volatile unsigned int trampoline_ucode_callin_ready;
+volatile unsigned int trampoline_ucode_callin_done;
+volatile unsigned long trampoline_ucode_ptr;
+volatile bool trampoline_ucode_wait;
+
+/*
+ * Wait for the APs to be ready.  Returns the number of APs.  Will return 0 on
+ * timeout, including if the platform is down-cored to just the BSP.
+ */
+static unsigned int __init wait_for_aps(void)
+{
+    volatile uint8_t *started = &bootsym(trampoline_cpu_started);
+    unsigned int i, old_nr, nr;
+
+    /*
+     * Wait up to 100us to see the AP sign-of-life.  This is issued
+     * immediately after the AP starts executing code, while still in 16bit
+     * mode.
+     *
+     * If the platform is down-cored to just the BSP, we'll time out here.
+     */
+    for ( i = 0; *started == 0; ++i )
+    {
+        if ( i == 100 )
+        {
+            printk(XENLOG_WARNING
+                   "  Timeout waiting for APs to start, or in single core configuration\n");
+            return 0;
+        }
+        wait(1 /* us */);
+    }
+    pr_debug(XENLOG_DEBUG "  AP(s) started after %uus\n", i);
+
+    /*
+     * We don't know how many APs there are supposed to be, but we've seen
+     * signs of life and they're all running in parallel.  Wait for the count
+     * in trampoline_ucode_callin_ready to stabilise (i.e. not changed in
+     * 10us).
+     */
+    old_nr = 0;
+    do {
+        for ( i = 0; (nr = trampoline_ucode_callin_ready) == old_nr; ++i )
+        {
+            if ( i == 10 )
+                goto done;
+            wait(1 /* us */);
+        }
+        old_nr = nr;
+    } while ( true );
+
+ done:
+    pr_debug(XENLOG_DEBUG "  AP count stabilised at %u\n", nr);
+
+    /* Reset AP signs-of-life */
+    *started = 0;
+
+    return nr;
+}
+
+static bool __init orchestrate_load(unsigned int nr_aps, const struct microcode_patch *blob)
+{
+    unsigned long addr = (unsigned long)blob;
+    unsigned int rev;
+    bool err;
+
+    err = wrmsr_safe(MSR_AMD_PATCHLOADER, addr);
+    if ( err )
+    {
+        printk(XENLOG_ERR "  Failed to load %#x, aborting\n", blob->patch_id);
+        return false;
+    }
+
+    rdmsrl(MSR_AMD_PATCHLEVEL, rev);
+    this_cpu(cpu_sig).rev = rev;
+
+    if ( rev != blob->patch_id )
+    {
+        printk(XENLOG_ERR "  Patch %#x not accepted; CPU rev %#x, aborting\n",
+               blob->patch_id, rev);
+        return false;
+    }
+
+    if ( nr_aps == 0 ) /* If there are no APs, we're done. */
+        return true;
+
+    /* Wait for callin_ready.  APs will then spin on ptr == 0. */
+    while ( trampoline_ucode_callin_ready < nr_aps )
+        cpu_relax();
+    printk(XENLOG_INFO "  Loading patch %#x\n", blob->patch_id);
+
+    /* Reset state */
+    trampoline_ucode_callin_ready = 0;
+    trampoline_ucode_wait = true;
+
+    /* Kick APs to start loading. */
+    trampoline_ucode_ptr = addr;
+
+    /* Wait for callin_done.  APs will then spin on wait == true. */
+    while ( trampoline_ucode_callin_done < nr_aps )
+        cpu_relax();
+
+    /* Reset state */
+    trampoline_ucode_callin_done = 0;
+    trampoline_ucode_ptr = 0;
+
+    /* Kick APs to restart the waiting loop. */
+    trampoline_ucode_wait = false;
+
+    return true;
+}
+
+extern unsigned long trampoline_ap_fn;
+void nocall amd_parallel_ucode_loader(void);
+void nocall __high_start(void);
+
+static void __init parallel_load(const struct microcode_patch *p1,
+                                 const struct microcode_patch *p2)
+{
+    unsigned long *tramp_fn;
+    unsigned int nr_aps;
+    bool x2apic;
+
+    printk(XENLOG_INFO "microcode: Attempting parallel load of Entrysign fixes\n");
+
+    tramp_fn = &bootsym(trampoline_ap_fn);
+    if ( *tramp_fn != (unsigned long)__high_start )
+    {
+        printk(XENLOG_ERR "  Unexpected trampoline function %ps, aborting\n",
+               _p(*tramp_fn));
+        return;
+    }
+
+    console_start_sync();
+
+    x2apic = probe_lapic();
+
+    *tramp_fn = (unsigned long)amd_parallel_ucode_loader;
+
+    send_init(x2apic, true);
+
+    nr_aps = wait_for_aps();
+    printk(XENLOG_INFO "  Found %u APs\n", nr_aps);
+
+    if ( p1 && p1->patch_id > this_cpu(cpu_sig).rev &&
+         !orchestrate_load(nr_aps, p1) )
+        goto out;
+
+    if ( p2 && p2->patch_id > this_cpu(cpu_sig).rev &&
+         !orchestrate_load(nr_aps, p2) )
+        goto out;
+
+    /*
+     * Bending the truth at little, but the signature fix is in place, so Xen
+     * can drop the digest check and accept newer blobs.
+     */
+    entrysign_mitigiated_in_firmware = true;
+
+    printk(XENLOG_INFO "  Parallel load complete\n");
+
+ out:
+    send_init(x2apic, false);
+
+    console_end_sync();
+
+    *tramp_fn = (unsigned long)__high_start;
+}
+
+extern const struct microcode_patch
+    patch_0a0011d8[], patch_0a0011d9[], /* GN-B1, Milan */
+    patch_0a001241[], patch_0a001242[], /* GN-B2, MilanX */
+    patch_0a101152[], patch_0a101153[], /* RS-B1, Genoa */
+    patch_0a10124d[], patch_0a10124e[], /* RS-B2, GenoaX */
+    patch_0aa00217[], patch_0aa00218[], /* RSDN-A2, Bergamo */
+    patch_0b002140[], /* BRH-C1,  Turin */
+    patch_0b101040[]; /* BRHD-B0, Turin Dense */
+
+/*
  * The Entrysign vulnerability affects all Zen1 thru Zen5 CPUs.  Firmware
  * fixes were produced from Nov 2024.  Zen3 thru Zen5 can continue to take
  * OS-loadable microcode updates using a new signature scheme, as long as
@@ -611,6 +878,7 @@ static void __init __constructor test_digests_sorted(void)
  */
 void __init amd_check_entrysign(void)
 {
+    const struct microcode_patch *p1 = NULL, *p2 = NULL;
     unsigned int curr_rev;
     uint8_t fixed_rev;
 
@@ -683,4 +951,25 @@ void __init amd_check_entrysign(void)
     printk(XENLOG_WARNING
            "WARNING: Platform vulnerable to Entrysign (SB-7033, CVE-2024-36347) - firmware update required\n");
     add_taint(TAINT_CPU_OUT_OF_SPEC);
+
+    if ( !opt_es_boot_load )
+        return;
+
+    /*
+     * If we have the OS-loadable Entrysign mitigation, try applying it.
+     */
+    switch ( curr_rev >> 8 )
+    {
+    case 0x0a0011: p1 = patch_0a0011d8; p2 = patch_0a0011d9; break;
+    case 0x0a0012: p1 = patch_0a001241; p2 = patch_0a001242; break;
+    case 0x0a1011: p1 = patch_0a101152; p2 = patch_0a101153; break;
+    case 0x0a1012: p1 = patch_0a10124d; p2 = patch_0a10124e; break;
+    case 0x0aa002: p1 = patch_0aa00217; p2 = patch_0aa00218; break;
+    case 0x0b0021: p1 = patch_0b002140; break;
+    case 0x0b1010: p1 = patch_0b101040; break;
+    default:
+        return;
+    }
+
+    parallel_load(p1, p2);
 }

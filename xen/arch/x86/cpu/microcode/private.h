@@ -68,6 +68,7 @@ struct microcode_ops {
 };
 
 extern bool opt_digest_check;
+extern bool opt_es_boot_load;
 
 /*
  * Microcode loading falls into one of 3 states.
