@@ -1,5 +1,5 @@
 variables:
-  XEN_REGISTRY: registry.gitlab.com/xen-project/xen
+  XEN_REGISTRY: registry.gitlab.com/xen-project/people/andrewcoop/xen
   SELECTED_JOBS_ONLY:
     description: "Regex to select only some jobs, must be enclosed with /. For example /job1|job2/"
   XEN_CI_REBUILD_CONTAINERS:

@@ -3,8 +3,6 @@
   image: docker:stable
   tags:
     - container-builder
-  rules:
-    - if: $XEN_CI_REBUILD_CONTAINERS
   services:
     - docker:dind
   before_script:
@@ -16,14 +14,36 @@
   after_script:
     - docker logout
 
-container-archlinux-current:
+.container-schedule-tmpl:
   extends:
     - .container-build-tmpl
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "schedule"
+      when: always
+    - when: manual
+
+container-archlinux-current:
+  extends:
+    - .container-schedule-tmpl
   variables:
     CONTAINER: "archlinux:current"
 
 container-opensuse-tumbleweed-x86_64:
   extends:
-    - .container-build-tmpl
+    - .container-schedule-tmpl
   variables:
     CONTAINER: "opensuse:tumbleweed-x86_64"
+
+container-single:
+  extends:
+    - .container-build-tmpl
+  when:
+    manual
+
+container-all:
+  extends:
+    - .container-build-tmpl
+  when:
+    manual
+  variables:
+    CONTAINER: "all"
