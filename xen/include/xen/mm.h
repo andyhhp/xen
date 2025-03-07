@@ -63,11 +63,11 @@
 
 #include <xen/bug.h>
 #include <xen/compiler.h>
-#include <xen/mm-frame.h>
-#include <xen/types.h>
 #include <xen/list.h>
-#include <xen/spinlock.h>
+#include <xen/mm-frame.h>
 #include <xen/perfc.h>
+#include <xen/spinlock.h>
+
 #include <public/memory.h>
 
 struct page_info;
