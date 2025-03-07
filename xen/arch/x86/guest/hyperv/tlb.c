@@ -11,6 +11,7 @@
 #include <xen/cpumask.h>
 #include <xen/errno.h>
 
+#include <asm/flushtlb.h>
 #include <asm/guest/hyperv.h>
 #include <asm/guest/hyperv-hcall.h>
 #include <asm/guest/hyperv-tlfs.h>

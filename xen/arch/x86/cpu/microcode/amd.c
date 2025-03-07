@@ -17,9 +17,9 @@
 #include <xen/bsearch.h>
 #include <xen/err.h>
 #include <xen/init.h>
-#include <xen/mm.h> /* TODO: Fix asm/tlbflush.h breakage */
 #include <xen/sha2.h>
 
+#include <asm/flushtlb.h>
 #include <asm/msr.h>
 
 #include "private.h"

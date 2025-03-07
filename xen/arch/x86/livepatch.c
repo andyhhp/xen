@@ -16,6 +16,7 @@
 
 #include <asm/endbr.h>
 #include <asm/fixmap.h>
+#include <asm/flushtlb.h>
 #include <asm/nmi.h>
 #include <asm/setup.h>
 

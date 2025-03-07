@@ -10,6 +10,7 @@
 #include <asm/alternative.h>
 #include <asm/apic.h>
 #include <asm/endbr.h>
+#include <asm/flushtlb.h>
 #include <asm/nmi.h>
 #include <asm/nops.h>
 #include <asm/processor.h>
