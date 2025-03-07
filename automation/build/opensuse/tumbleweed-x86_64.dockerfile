@@ -23,7 +23,7 @@ RUN <<EOF
         findutils
         flex
         gawk
-        gcc
+        gcc15
         make
         python3
 
