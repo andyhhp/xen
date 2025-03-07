@@ -404,6 +404,9 @@ $(call cc-option-add,CFLAGS,CC,-Winit-self)
 CFLAGS += -pipe -D__XEN__ -include $(srctree)/include/xen/config.h
 CFLAGS-$(CONFIG_DEBUG_INFO) += -g
 
+$(call cc-option-add,CFLAGS,CC,-Wtrailing-whitespace=any)
+$(call cc-option-add,CFLAGS,CC,-Wheader-guard)
+
 ifneq ($(CONFIG_CC_IS_CLANG),y)
 # Clang doesn't understand this command line argument, and doesn't appear to
 # have a suitable alternative.  The resulting compiled binary does function,
