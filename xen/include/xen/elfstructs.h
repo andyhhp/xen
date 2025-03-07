@@ -26,6 +26,11 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/* Outside of Xen, the includer must provide stdint.h or equivalent. */
+#ifdef __XEN__
+#include <xen/types.h>
+#endif
+
 typedef uint32_t	Elf32_Addr;	/* Unsigned program address */
 typedef uint32_t	Elf32_Off;	/* Unsigned file offset */
 typedef uint16_t	Elf32_Half;	/* Unsigned medium integer */
@@ -45,7 +50,7 @@ typedef uint64_t	Elf64_Xword;
 
 /*
  * e_ident[] identification indexes
- * See http://www.caldera.com/developers/gabi/2000-07-17/ch4.eheader.html 
+ * See http://www.caldera.com/developers/gabi/2000-07-17/ch4.eheader.html
  */
 #define EI_MAG0		0		/* file ID */
 #define EI_MAG1		1		/* file ID */
