@@ -1,6 +1,8 @@
 #ifndef __ASM_ARM_ARM32_FLUSHTLB_H__
 #define __ASM_ARM_ARM32_FLUSHTLB_H__
 
+#include <asm/arm32/sysregs.h>
+
 /*
  * Every invalidation operation use the following patterns:
  *

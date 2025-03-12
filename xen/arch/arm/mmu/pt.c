@@ -13,6 +13,7 @@
 
 #include <asm/current.h>
 #include <asm/fixmap.h>
+#include <asm/flushtlb.h>
 
 #ifdef NDEBUG
 static inline void

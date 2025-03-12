@@ -22,6 +22,8 @@
 
 #ifndef __ASSEMBLY__
 
+#include <asm/lpae.h>
+
 /*
  * Direct access to xen_fixmap[] should only happen when {set,
  * clear}_fixmap() is unusable (e.g. where we would end up to

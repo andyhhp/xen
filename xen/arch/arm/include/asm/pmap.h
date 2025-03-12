@@ -4,6 +4,7 @@
 #include <xen/mm.h>
 
 #include <asm/fixmap.h>
+#include <asm/flushtlb.h>
 
 static inline void arch_pmap_map(unsigned int slot, mfn_t mfn)
 {

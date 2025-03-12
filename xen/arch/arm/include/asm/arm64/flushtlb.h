@@ -1,6 +1,8 @@
 #ifndef __ASM_ARM_ARM64_FLUSHTLB_H__
 #define __ASM_ARM_ARM64_FLUSHTLB_H__
 
+#include <asm/alternative.h>
+
 /*
  * Every invalidation operation use the following patterns:
  *

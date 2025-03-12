@@ -34,6 +34,7 @@
 #include <asm/cpuerrata.h>
 #include <asm/cpufeature.h>
 #include <asm/event.h>
+#include <asm/flushtlb.h>
 #include <asm/hsr.h>
 #include <asm/mem_access.h>
 #include <asm/mmio.h>

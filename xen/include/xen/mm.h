@@ -587,7 +587,7 @@ void destroy_ring_for_helper(void **_va, struct page_info *page);
 /* Return the upper bound of MFNs, including hotplug memory. */
 unsigned long get_upper_mfn_bound(void);
 
-#if defined(CONFIG_X86) || defined(CONFIG_ARM)
+#if defined(CONFIG_X86)
 #include <asm/flushtlb.h>
 #endif
 
