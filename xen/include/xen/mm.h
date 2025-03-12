@@ -61,6 +61,7 @@
 #ifndef __XEN_MM_H__
 #define __XEN_MM_H__
 
+#include <xen/bitops.h>
 #include <xen/bug.h>
 #include <xen/compiler.h>
 #include <xen/list.h>
@@ -586,7 +587,9 @@ void destroy_ring_for_helper(void **_va, struct page_info *page);
 /* Return the upper bound of MFNs, including hotplug memory. */
 unsigned long get_upper_mfn_bound(void);
 
+#if defined(CONFIG_X86) || defined(CONFIG_ARM)
 #include <asm/flushtlb.h>
+#endif
 
 enum XENSHARE_flags {
     SHARE_rw,
