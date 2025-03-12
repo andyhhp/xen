@@ -20,20 +20,6 @@ static inline void flush_tlb_range_va(vaddr_t va, size_t size)
     sbi_remote_sfence_vma(NULL, va, size);
 }
 
-/*
- * Filter the given set of CPUs, removing those that definitely flushed their
- * TLB since @page_timestamp.
- */
-/* XXX lazy implementation just doesn't clear anything.... */
-static inline void tlbflush_filter(cpumask_t *mask, uint32_t page_timestamp) {}
-
-#define tlbflush_current_time() (0)
-
-static inline void page_set_tlbflush_timestamp(struct page_info *page)
-{
-    BUG_ON("unimplemented");
-}
-
 /* Flush specified CPUs' TLBs */
 void arch_flush_tlb_mask(const cpumask_t *mask);
 

@@ -44,6 +44,7 @@ static inline void accumulate_tlbflush(
     bool *need_tlbflush, const struct page_info *page,
     uint32_t *tlbflush_timestamp) {}
 static inline void filtered_flush_tlb_mask(uint32_t tlbflush_timestamp) {}
+static inline void page_set_tlbflush_timestamp(struct page_info *page) {}
 
 #endif /* !CONFIG_HAS_TLB_CLOCK*/
 #endif /* XEN_TLB_CLOCK_H */
