@@ -83,6 +83,9 @@ config HAS_PMAP
 config HAS_SCHED_GRANULARITY
 	bool
 
+config HAS_TLB_CLOCK
+	bool
+
 config HAS_UBSAN
 	bool
 

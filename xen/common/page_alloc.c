@@ -137,6 +137,7 @@
 #include <xen/sections.h>
 #include <xen/softirq.h>
 #include <xen/spinlock.h>
+#include <xen/tlb-clock.h>
 #include <xen/vm_event.h>
 #include <xen/xvmalloc.h>
 

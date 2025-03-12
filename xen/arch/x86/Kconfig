@@ -28,6 +28,7 @@ config X86
 	select HAS_PCI_MSI
 	select HAS_PIRQ
 	select HAS_SCHED_GRANULARITY
+	select HAS_TLB_CLOCK
 	select HAS_UBSAN
 	select HAS_VMAP
 	select HAS_VPCI if HVM

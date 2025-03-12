@@ -24,6 +24,7 @@
 #include <xen/perfc.h>
 #include <xen/sched.h>
 #include <xen/sections.h>
+#include <xen/tlb-clock.h>
 #include <xen/trace.h>
 
 #include <asm/current.h>

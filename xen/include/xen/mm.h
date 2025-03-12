@@ -588,33 +588,6 @@ unsigned long get_upper_mfn_bound(void);
 
 #include <asm/flushtlb.h>
 
-static inline void accumulate_tlbflush(bool *need_tlbflush,
-                                       const struct page_info *page,
-                                       uint32_t *tlbflush_timestamp)
-{
-    if ( page->u.free.need_tlbflush &&
-         page->tlbflush_timestamp <= tlbflush_current_time() &&
-         (!*need_tlbflush ||
-          page->tlbflush_timestamp > *tlbflush_timestamp) )
-    {
-        *need_tlbflush = true;
-        *tlbflush_timestamp = page->tlbflush_timestamp;
-    }
-}
-
-static inline void filtered_flush_tlb_mask(uint32_t tlbflush_timestamp)
-{
-    cpumask_t mask;
-
-    cpumask_copy(&mask, &cpu_online_map);
-    tlbflush_filter(&mask, tlbflush_timestamp);
-    if ( !cpumask_empty(&mask) )
-    {
-        perfc_incr(need_flush_tlb_flush);
-        arch_flush_tlb_mask(&mask);
-    }
-}
-
 enum XENSHARE_flags {
     SHARE_rw,
     SHARE_ro,
