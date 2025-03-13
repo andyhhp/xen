@@ -336,7 +336,7 @@ int trace_will_trace_event(u32 event)
  * trace buffers.  The trace buffers are then available for debugging use, via
  * the %TRACE_xD macros exported in <xen/trace.h>.
  */
-void __init init_trace_bufs(void)
+static void __init __constructor init_trace_bufs(void)
 {
     cpumask_setall(&tb_cpu_mask);
     register_cpu_notifier(&cpu_nfb);
