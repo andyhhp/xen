@@ -2285,6 +2285,11 @@ static int cf_check hvmemul_read_cr(
         *val = current->arch.hvm.guest_cr[reg];
         TRACE(TRC_HVM_CR_READ64, reg, *val, *val >> 32);
         return X86EMUL_OKAY;
+
+    case 8:
+        *val = (vlapic_get_reg(vcpu_vlapic(current), APIC_TASKPRI) & 0xf0) >> 4;
+        return X86EMUL_OKAY;
+
     default:
         break;
     }
@@ -2323,6 +2328,11 @@ static int cf_check hvmemul_write_cr(
 
     case 4:
         rc = hvm_set_cr4(val, true);
+        break;
+
+    case 8:
+        vlapic_set_reg(vcpu_vlapic(current), APIC_TASKPRI, ((val & 0x0f) << 4));
+        rc = X86EMUL_OKAY;
         break;
 
     default:
