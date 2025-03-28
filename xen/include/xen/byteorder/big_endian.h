@@ -4,9 +4,6 @@
 #ifndef __BIG_ENDIAN
 #define __BIG_ENDIAN 4321
 #endif
-#ifndef __BIG_ENDIAN_BITFIELD
-#define __BIG_ENDIAN_BITFIELD
-#endif
 
 #include <xen/types.h>
 #include <xen/byteorder/swab.h>
