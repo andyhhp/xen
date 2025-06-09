@@ -5,4 +5,5 @@ Admin Guide
 
 .. toctree::
    introduction
+   uefi-secure-boot
    microcode-loading
