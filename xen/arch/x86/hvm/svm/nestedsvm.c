@@ -9,7 +9,6 @@
 #include <asm/hvm/svm/svm.h>
 #include <asm/hvm/svm/vmcb.h>
 #include <asm/hvm/nestedhvm.h>
-#include <asm/hvm/svm/svmdebug.h>
 #include <asm/paging.h> /* paging_mode_hap */
 #include <asm/event.h> /* for local_event_delivery_(en|dis)able */
 #include <asm/p2m.h> /* p2m_get_pagetable, p2m_get_nestedp2m */
@@ -20,6 +19,82 @@
 
 #define NSVM_ERROR_VVMCB        1
 #define NSVM_ERROR_VMENTRY      2
+
+static bool svm_vmcb_isvalid(
+    const char *from, const struct vmcb_struct *vmcb, const struct vcpu *v,
+    bool verbose)
+{
+    bool ret = false; /* ok */
+    unsigned long cr0 = vmcb_get_cr0(vmcb);
+    unsigned long cr3 = vmcb_get_cr3(vmcb);
+    unsigned long cr4 = vmcb_get_cr4(vmcb);
+    unsigned long valid;
+    uint64_t efer = vmcb_get_efer(vmcb);
+
+#define PRINTF(fmt, args...) do { \
+    if ( !verbose ) return true; \
+    ret = true; \
+    printk(XENLOG_GUEST "%pv[%s]: " fmt, v, from, ## args); \
+} while (0)
+
+    if ( !(efer & EFER_SVME) )
+        PRINTF("EFER: SVME bit not set (%#"PRIx64")\n", efer);
+
+    if ( !(cr0 & X86_CR0_CD) && (cr0 & X86_CR0_NW) )
+        PRINTF("CR0: CD bit is zero and NW bit set (%#"PRIx64")\n", cr0);
+
+    if ( cr0 >> 32 )
+        PRINTF("CR0: bits [63:32] are not zero (%#"PRIx64")\n", cr0);
+
+    if ( (cr0 & X86_CR0_PG) &&
+         ((cr3 & 7) ||
+          ((!(cr4 & X86_CR4_PAE) || (efer & EFER_LMA)) && (cr3 & 0xfe0)) ||
+          ((efer & EFER_LMA) &&
+           (cr3 >> v->domain->arch.cpuid->extd.maxphysaddr))) )
+        PRINTF("CR3: MBZ bits are set (%#"PRIx64")\n", cr3);
+
+    valid = hvm_cr4_guest_valid_bits(v->domain);
+    if ( cr4 & ~valid )
+        PRINTF("CR4: invalid value %#lx (valid %#lx, rejected %#lx)\n",
+               cr4, valid, cr4 & ~valid);
+
+    if ( vmcb_get_dr6(vmcb) >> 32 )
+        PRINTF("DR6: bits [63:32] are not zero (%#"PRIx64")\n",
+               vmcb_get_dr6(vmcb));
+
+    if ( vmcb_get_dr7(vmcb) >> 32 )
+        PRINTF("DR7: bits [63:32] are not zero (%#"PRIx64")\n",
+               vmcb_get_dr7(vmcb));
+
+    if ( efer & ~EFER_KNOWN_MASK )
+        PRINTF("EFER: unknown bits are not zero (%#"PRIx64")\n", efer);
+
+    if ( hvm_efer_valid(v, efer, -1) )
+        PRINTF("EFER: %s (%"PRIx64")\n", hvm_efer_valid(v, efer, -1), efer);
+
+    if ( (efer & EFER_LME) && (cr0 & X86_CR0_PG) )
+    {
+        if ( !(cr4 & X86_CR4_PAE) )
+            PRINTF("EFER_LME and CR0.PG are both set and CR4.PAE is zero\n");
+        if ( !(cr0 & X86_CR0_PE) )
+            PRINTF("EFER_LME and CR0.PG are both set and CR0.PE is zero\n");
+    }
+
+    if ( (efer & EFER_LME) && (cr0 & X86_CR0_PG) && (cr4 & X86_CR4_PAE) &&
+         vmcb->cs.l && vmcb->cs.db )
+        PRINTF("EFER_LME, CR0.PG, CR4.PAE, CS.L and CS.D are all non-zero\n");
+
+    if ( !(vmcb_get_general2_intercepts(vmcb) & GENERAL2_INTERCEPT_VMRUN) )
+        PRINTF("GENERAL2_INTERCEPT: VMRUN intercept bit is clear (%#"PRIx32")\n",
+               vmcb_get_general2_intercepts(vmcb));
+
+    if ( vmcb->event_inj.resvd1 )
+        PRINTF("eventinj: MBZ bits are set (%#"PRIx64")\n",
+               vmcb->event_inj.raw);
+
+#undef PRINTF
+    return ret;
+}
 
 static void
 nestedsvm_vcpu_clgi(struct vcpu *v)
