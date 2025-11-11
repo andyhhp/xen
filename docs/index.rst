@@ -54,6 +54,15 @@ kind of development environment.
    misc/ci
 
 
+Process documentation
+---------------------
+
+.. toctree::
+   :maxdepth: 2
+
+   process/index
+
+
 Unsorted documents
 ------------------
 
