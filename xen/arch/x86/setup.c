@@ -64,6 +64,107 @@
 #include <compat/xen.h>
 #endif
 
+#define l2e_to_l1e(x)              ((l1_pgentry_t *)__va(l2e_get_paddr(x)))
+#define l3e_to_l2e(x)              ((l2_pgentry_t *)__va(l3e_get_paddr(x)))
+#define l4e_to_l3e(x)              ((l3_pgentry_t *)__va(l4e_get_paddr(x)))
+
+static void decode_intpte(unsigned int level, unsigned int slot, intpte_t pte)
+{
+    static const char x86_mt_to_str[8][4] = {
+        [X86_MT_UC]      = "UC",
+        [X86_MT_WC]      = "WC",
+        [X86_MT_RSVD_2]  = "Rs2",
+        [X86_MT_RSVD_3]  = "Rs3",
+        [X86_MT_WT]      = "WT",
+        [X86_MT_WP]      = "WP",
+        [X86_MT_WB]      = "WB",
+        [X86_MT_UCM]     = "UC-",
+    };
+
+    unsigned int pat_idx = ((pte >> 3) & 3) |
+        ((pte >> ((level > 1 && (pte & _PAGE_PSE)) ? 10 : 5)) & 4);
+    unsigned int mem_type = (XEN_MSR_PAT >> (pat_idx << 3)) & 0xff;
+
+    printk("%*sL%u[%03u] %"PRIpte" %*s%s %s%s%s%s%s%s\n",
+           (4 - level) * 2, "",
+           level, slot, pte,
+           (level - 1) * 2, "",
+
+           x86_mt_to_str[mem_type],
+
+           pte & 0x8000000000000000ULL    ? " Nx" : "",
+           pte & _PAGE_GLOBAL             ? " G"  : "",
+           (level > 1 && pte & _PAGE_PSE) ? " +"  : "",
+           pte & _PAGE_USER               ? " U"  : "",
+           pte & _PAGE_RW                 ? " W"  : "",
+           pte & _PAGE_PRESENT            ? " P"  : "");
+}
+
+static void dump_l3t(l3_pgentry_t *l3t, bool decend)
+{
+    unsigned int l3i, l2i, l1i;
+    l2_pgentry_t *l2;
+    l1_pgentry_t *l1;
+
+    for ( l3i = 0; l3i < 512; ++l3i )
+    {
+        if ( !(l3t[l3i].l3 & _PAGE_PRESENT) )
+            continue;
+
+        decode_intpte(3, l3i, l3t[l3i].l3);
+
+        if ( l3t[l3i].l3 & _PAGE_PSE )
+            continue;
+
+        if ( !decend )
+            continue;
+
+        l2 = l3e_to_l2e(l3t[l3i]);
+        for ( l2i = 0; l2i < 512; ++l2i )
+        {
+            if ( !(l2[l2i].l2 & _PAGE_PRESENT) )
+                continue;
+
+            decode_intpte(2, l2i, l2[l2i].l2);
+
+            if ( l2[l2i].l2 & _PAGE_PSE )
+                continue;
+
+            l1 = l2e_to_l1e(l2[l2i]);
+            for ( l1i = 0; l1i < 512; ++l1i )
+            {
+                if ( !(l1[l1i].l1 & _PAGE_PRESENT) )
+                    continue;
+
+                decode_intpte(1, l1i, l1[l1i].l1);
+            }
+        }
+    }
+}
+
+static void dump_l4t(l4_pgentry_t *l4t, bool decend)
+{
+    unsigned int l4i;
+
+    for ( l4i = 0; l4i < /* 512 */ 4; ++l4i )
+    {
+        if ( !(l4t[l4i].l4 & _PAGE_PRESENT) )
+            continue;
+
+        decode_intpte(4, l4i, l4t[l4i].l4);
+
+        if ( decend &&
+             l4i != l4_table_offset(LINEAR_PT_VIRT_START) &&
+             l4i != l4_table_offset(SH_LINEAR_PT_VIRT_START) )
+            dump_l3t(l4e_to_l3e(l4t[l4i]), true);
+    }
+}
+
+static void dump_idle_low(void)
+{
+    dump_l4t(idle_pg_table, true);
+}
+
 /* opt_nosmp: If true, secondary processors are ignored. */
 static bool __initdata opt_nosmp;
 boolean_param("nosmp", opt_nosmp);
@@ -1331,13 +1432,22 @@ void asmlinkage __init noreturn __start_xen(void)
         set_pdx_range(xen_phys_start >> PAGE_SHIFT,
                       (xen_phys_start + BOOTSTRAP_MAP_BASE) >> PAGE_SHIFT);
 
+        printk("*** Before\n");
+        dump_idle_low();
+
         /* Clean up boot loader identity mappings. */
         destroy_xen_mappings(xen_phys_start,
                              xen_phys_start + BOOTSTRAP_MAP_BASE);
 
+        printk("*** Mid\n");
+        dump_idle_low();
+
         /* Make boot page tables match non-EFI boot. */
         l3_bootmap[l3_table_offset(BOOTSTRAP_MAP_BASE)] =
             l3e_from_paddr(__pa(l2_bootmap), __PAGE_HYPERVISOR);
+
+        printk("*** After\n");
+        dump_idle_low();
 
         memmap_type = bi->loader;
     }
