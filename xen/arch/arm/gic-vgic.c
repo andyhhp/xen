@@ -241,9 +241,7 @@ static void gic_update_one_lr(struct vcpu *v, int i)
 
 void vgic_sync_from_lrs(struct vcpu *v)
 {
-    int i = 0;
     unsigned long flags;
-    unsigned int nr_lrs = gic_get_nr_lrs();
 
     /* The idle domain has no LRs to be cleared. Since gic_restore_state
      * doesn't write any LR registers for the idle domain they could be
@@ -255,11 +253,8 @@ void vgic_sync_from_lrs(struct vcpu *v)
 
     spin_lock_irqsave(&v->arch.vgic.lock, flags);
 
-    while ((i = find_next_bit((const unsigned long *) &this_cpu(lr_mask),
-                              nr_lrs, i)) < nr_lrs ) {
+    for_each_set_bit ( i, this_cpu(lr_mask) )
         gic_update_one_lr(v, i);
-        i++;
-    }
 
     spin_unlock_irqrestore(&v->arch.vgic.lock, flags);
 }
