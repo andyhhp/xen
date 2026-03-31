@@ -305,13 +305,16 @@ static int32_t do_psci_1_0_features(uint32_t psci_func_id)
 #define PSCI_ARG32(reg, n) PSCI_ARG(reg, n)
 #endif
 
+#define PSCI_ARG_CONV(reg, n, conv_64) \
+    ((conv_64) ? PSCI_ARG(reg, n) : PSCI_ARG32(reg, n))
+
 /*
  * PSCI 0.1 calls. It will return false if the function ID is not
  * handled.
  */
 bool do_vpsci_0_1_call(struct cpu_user_regs *regs, uint32_t fid)
 {
-    switch ( (uint32_t)get_user_reg(regs, 0) )
+    switch ( fid )
     {
     case PSCI_cpu_off:
     {
@@ -346,6 +349,8 @@ bool do_vpsci_0_2_call(struct cpu_user_regs *regs, uint32_t fid)
      * adding/removing a function. SSSC_SMCCC_*_REVISION should be
      * updated once per release.
      */
+    bool is_conv_64 = smccc_is_conv_64(fid);
+
     switch ( fid )
     {
     case PSCI_0_2_FN32_PSCI_VERSION:
@@ -378,9 +383,9 @@ bool do_vpsci_0_2_call(struct cpu_user_regs *regs, uint32_t fid)
     case PSCI_0_2_FN32_CPU_ON:
     case PSCI_0_2_FN64_CPU_ON:
     {
-        register_t vcpuid = PSCI_ARG(regs, 1);
-        register_t epoint = PSCI_ARG(regs, 2);
-        register_t cid = PSCI_ARG(regs, 3);
+        register_t vcpuid = PSCI_ARG_CONV(regs, 1, is_conv_64);
+        register_t epoint = PSCI_ARG_CONV(regs, 2, is_conv_64);
+        register_t cid = PSCI_ARG_CONV(regs, 3, is_conv_64);
 
         perfc_incr(vpsci_cpu_on);
         PSCI_SET_RESULT(regs, do_psci_0_2_cpu_on(vcpuid, epoint, cid));
@@ -391,8 +396,8 @@ bool do_vpsci_0_2_call(struct cpu_user_regs *regs, uint32_t fid)
     case PSCI_0_2_FN64_CPU_SUSPEND:
     {
         uint32_t pstate = PSCI_ARG32(regs, 1);
-        register_t epoint = PSCI_ARG(regs, 2);
-        register_t cid = PSCI_ARG(regs, 3);
+        register_t epoint = PSCI_ARG_CONV(regs, 2, is_conv_64);
+        register_t cid = PSCI_ARG_CONV(regs, 3, is_conv_64);
 
         perfc_incr(vpsci_cpu_suspend);
         PSCI_SET_RESULT(regs, do_psci_0_2_cpu_suspend(pstate, epoint, cid));
@@ -402,7 +407,7 @@ bool do_vpsci_0_2_call(struct cpu_user_regs *regs, uint32_t fid)
     case PSCI_0_2_FN32_AFFINITY_INFO:
     case PSCI_0_2_FN64_AFFINITY_INFO:
     {
-        register_t taff = PSCI_ARG(regs, 1);
+        register_t taff = PSCI_ARG_CONV(regs, 1, is_conv_64);
         uint32_t laff = PSCI_ARG32(regs, 2);
 
         perfc_incr(vpsci_cpu_affinity_info);
@@ -422,14 +427,8 @@ bool do_vpsci_0_2_call(struct cpu_user_regs *regs, uint32_t fid)
     case PSCI_1_0_FN32_SYSTEM_SUSPEND:
     case PSCI_1_0_FN64_SYSTEM_SUSPEND:
     {
-        register_t epoint = PSCI_ARG(regs, 1);
-        register_t cid = PSCI_ARG(regs, 2);
-
-        if ( fid == PSCI_1_0_FN32_SYSTEM_SUSPEND )
-        {
-            epoint &= GENMASK(31, 0);
-            cid &= GENMASK(31, 0);
-        }
+        register_t epoint = PSCI_ARG_CONV(regs, 1, is_conv_64);
+        register_t cid = PSCI_ARG_CONV(regs, 2, is_conv_64);
 
         perfc_incr(vpsci_system_suspend);
         PSCI_SET_RESULT(regs, do_psci_1_0_system_suspend(epoint, cid));
