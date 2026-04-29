@@ -15,10 +15,28 @@ help:
 
 include yocto/yocto.inc
 
+# Find out if we are running Podman, if not is likely docker.
+is-docker = $(if $(filter Podman,$(shell $(DOCKER_CMD) version)),,1)
+
+# Find out the docker API version is at least 1.46. We exploit `sort -V` to
+# compare the versions at it can sort by version.
+docker-api-version = $(shell $(DOCKER_CMD) version -f '{{.Client.APIVersion}}')
+docker-min-version = $(firstword $(shell printf "1.46\n$(docker-api-version)" | sort -V))
+docker-have-push-platform = $(if $(filter 1.46,$(docker-min-version)),1)
+
+# check if we can use `X push --platform`.
+# `podman push` doesn't support --platform.
+# `docker` only have it on recent version.
+builder-have-push-platform = $(and $(is-docker),$(docker-have-push-platform))
+
 %: %.dockerfile ## Builds containers
-	$(DOCKER_CMD) build --pull -t $(REGISTRY)/$(@D):$(@F) -f $< $(<D)
-	@if [ ! -z $${PUSH+x} ]; then \
-		$(DOCKER_CMD) push $(REGISTRY)/$(@D):$(@F); \
+	set -xe; \
+	$(if $(builder-have-push-platform), \
+	    platform=$$(sed -n '/^FROM/{s/.*\(--platform=[^ ]*\) .*/\1/p;q}' $<); ) \
+	img="$(REGISTRY)/$(@D):$(@F)"; \
+	$(DOCKER_CMD) build --pull $$platform -t $$img -f $< $(<D); \
+	if [ ! -z $${PUSH+x} ]; then \
+		$(DOCKER_CMD) push $$platform $$img; \
 	fi
 
 .PHONY: all clean
