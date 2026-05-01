@@ -57,7 +57,7 @@ static inline paddr_t directmapoff_to_maddr(unsigned long offset)
     return offset;
 }
 
-#undef PDX_ASM_GOTO_SKIP
+#undef PDX_ASM_GOTO
 
 #endif /* X86_PDX_H */
 
