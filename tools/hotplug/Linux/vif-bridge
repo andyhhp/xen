@@ -78,7 +78,7 @@ fi
 
 case "$command" in
     add|online)
-        setup_virtual_bridge_port "$dev"
+        setup_bridge_port "$dev"
         set_mtu "$bridge" "$dev" "$type_if"
         add_to_bridge "$bridge" "$dev"
         ;;

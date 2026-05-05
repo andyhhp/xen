@@ -79,30 +79,20 @@ find_dhcpd_arg_file()
 }
 
 # configure interfaces which act as pure bridge ports:
-_setup_bridge_port() {
+setup_bridge_port() {
     local dev="$1"
-    local virtual="$2"
 
     # take interface down ...
     ip link set dev ${dev} down
 
-    if [ $virtual -ne 0 ] ; then
-        # Initialise a dummy MAC address. We choose the numerically
-        # largest non-broadcast address to prevent the address getting
-        # stolen by an Ethernet bridge for STP purposes.
-        # (FE:FF:FF:FF:FF:FF)
-        ip link set dev ${dev} address fe:ff:ff:ff:ff:ff || true
-    fi
+    # Initialise a dummy MAC address. We choose the numerically
+    # largest non-broadcast address to prevent the address getting
+    # stolen by an Ethernet bridge for STP purposes.
+    # (FE:FF:FF:FF:FF:FF)
+    ip link set dev ${dev} address fe:ff:ff:ff:ff:ff || true
 
     # ... and configure it
     ip address flush dev ${dev}
-}
-
-setup_physical_bridge_port() {
-    _setup_bridge_port $1 0
-}
-setup_virtual_bridge_port() {
-    _setup_bridge_port $1 1
 }
 
 # Usage: create_bridge bridge

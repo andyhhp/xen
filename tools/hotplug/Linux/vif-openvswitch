@@ -88,7 +88,7 @@ add_to_openvswitch () {
 case "$command" in
     add|online)
         check_tools
-        setup_virtual_bridge_port $dev
+        setup_bridge_port $dev
         add_to_openvswitch $dev
         ;;
 
