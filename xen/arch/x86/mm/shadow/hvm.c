@@ -1200,8 +1200,8 @@ int shadow_track_dirty_vram(struct domain *d,
         paging_unlock(d);
         rc = -EFAULT;
     }
-    vfree(dirty_bitmap);
     p2m_unlock(p2m_get_hostp2m(d));
+    vfree(dirty_bitmap);
     return rc;
 }
 
