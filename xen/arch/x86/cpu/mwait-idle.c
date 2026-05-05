@@ -58,7 +58,6 @@
 
 #include <acpi/cpufreq/cpufreq.h>
 
-#define MWAIT_IDLE_VERSION "0.4.1"
 #undef PREFIX
 #define PREFIX "mwait-idle: "
 
@@ -1635,9 +1634,6 @@ static int __init mwait_idle_probe(void)
 
 	if (boot_cpu_has(X86_FEATURE_XEN_ARAT))
 		lapic_timer_reliable_states = LAPIC_TIMER_ALWAYS_RELIABLE;
-
-	pr_debug(PREFIX "v" MWAIT_IDLE_VERSION " model %#x\n",
-		 boot_cpu_data.model);
 
 	pr_debug(PREFIX "lapic_timer_reliable_states %#x\n",
 		 lapic_timer_reliable_states);
