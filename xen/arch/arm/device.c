@@ -9,6 +9,7 @@
  */
 
 #include <xen/device_tree.h>
+#include <xen/dt-overlay.h>
 #include <xen/errno.h>
 #include <xen/iocap.h>
 #include <xen/lib.h>
@@ -16,8 +17,8 @@
 #include <asm/firmware/sci.h>
 #include <asm/setup.h>
 
-int map_irq_to_domain(struct domain *d, unsigned int irq,
-                      bool need_mapping, const char *devname)
+int __overlay_init map_irq_to_domain(struct domain *d, unsigned int irq,
+                                     bool need_mapping, const char *devname)
 {
     int res;
 
@@ -49,8 +50,8 @@ int map_irq_to_domain(struct domain *d, unsigned int irq,
     return 0;
 }
 
-int map_range_to_domain(const struct dt_device_node *dev,
-                        uint64_t addr, uint64_t len, void *data)
+int __overlay_init map_range_to_domain(const struct dt_device_node *dev,
+                                       uint64_t addr, uint64_t len, void *data)
 {
     struct map_range_data *mr_data = data;
     struct domain *d = mr_data->d;
@@ -124,10 +125,10 @@ int map_range_to_domain(const struct dt_device_node *dev,
  *   < 0 error
  *   0   success
  */
-int map_device_irqs_to_domain(struct domain *d,
-                              struct dt_device_node *dev,
-                              bool need_mapping,
-                              struct rangeset *irq_ranges)
+int __overlay_init map_device_irqs_to_domain(struct domain *d,
+                                             struct dt_device_node *dev,
+                                             bool need_mapping,
+                                             struct rangeset *irq_ranges)
 {
     unsigned int i, nirq;
     int res, irq;
@@ -180,9 +181,9 @@ int map_device_irqs_to_domain(struct domain *d,
     return 0;
 }
 
-static int map_dt_irq_to_domain(const struct dt_device_node *dev,
-                                const struct dt_irq *dt_irq,
-                                void *data)
+static int __overlay_init map_dt_irq_to_domain(const struct dt_device_node *dev,
+                                               const struct dt_irq *dt_irq,
+                                               void *data)
 {
     struct map_range_data *mr_data = data;
     struct domain *d = mr_data->d;
@@ -219,8 +220,8 @@ static int map_dt_irq_to_domain(const struct dt_device_node *dev,
  * then we may need to perform additional mappings in order to make
  * the child resources available to domain 0.
  */
-static int map_device_children(const struct dt_device_node *dev,
-                               struct map_range_data *mr_data)
+static int __overlay_init map_device_children(const struct dt_device_node *dev,
+                                              struct map_range_data *mr_data)
 {
     if ( dt_device_type_is_equal(dev, "pci") )
     {
@@ -250,8 +251,10 @@ static int map_device_children(const struct dt_device_node *dev,
  *  - Assign the device to the guest if it's protected by an IOMMU
  *  - Map the IRQs and iomem regions to DOM0
  */
-int handle_device(struct domain *d, struct dt_device_node *dev, p2m_type_t p2mt,
-                  struct rangeset *iomem_ranges, struct rangeset *irq_ranges)
+int __overlay_init handle_device(struct domain *d, struct dt_device_node *dev,
+                                 p2m_type_t p2mt,
+                                 struct rangeset *iomem_ranges,
+                                 struct rangeset *irq_ranges)
 {
     unsigned int naddr;
     unsigned int i;
