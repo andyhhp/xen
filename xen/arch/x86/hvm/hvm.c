@@ -4242,10 +4242,7 @@ static int hvm_set_param(struct domain *d, uint32_t index, uint64_t value)
          * capabilities.  Short circuit the pause if possible.
          */
         if ( paging_mode_shadow(d) || !using_vmx() )
-        {
-            d->arch.hvm.params[index] = value;
             break;
-        }
 
         /*
          * Update GUEST_CR3 in each VMCS to point at identity map.
