@@ -517,7 +517,7 @@ static int64_t __init cf_check init_hpet(struct platform_timesource *pts)
     bool disable_hpet = false;
 
     if ( hpet_address && strcmp(opt_clocksource, pts->id) &&
-         cpuidle_using_deep_cstate() )
+         cpuidle_usable_deep_cstate() )
     {
         if ( pci_conf_read16(PCI_SBDF(0, 0, 0x1f, 0),
                              PCI_VENDOR_ID) == PCI_VENDOR_ID_INTEL )
@@ -2663,7 +2663,7 @@ static int _disable_pit_irq(bool init)
      * XXX dom0 may rely on RTC interrupt delivery, so only enable
      * hpet_broadcast if FSB mode available or if force_hpet_broadcast.
      */
-    if ( cpuidle_using_deep_cstate() && !boot_cpu_has(X86_FEATURE_XEN_ARAT) )
+    if ( cpuidle_usable_deep_cstate() && !boot_cpu_has(X86_FEATURE_XEN_ARAT) )
     {
         init ? hpet_broadcast_init() : hpet_broadcast_resume();
         if ( !hpet_broadcast_is_available() )
@@ -2713,11 +2713,6 @@ void cf_check pit_broadcast_exit(void)
 
     if ( cpumask_test_and_clear_cpu(cpu, &pit_broadcast_mask) )
         reprogram_timer(this_cpu(timer_deadline));
-}
-
-int pit_broadcast_is_available(void)
-{
-    return cpuidle_using_deep_cstate();
 }
 
 void send_timer_event(struct vcpu *v)
@@ -3007,7 +3002,7 @@ static void cf_check dump_softtsc(unsigned char key)
     else if ( boot_cpu_has(X86_FEATURE_CONSTANT_TSC ) )
     {
         printk("TSC has constant rate, ");
-        if ( max_cstate <= ACPI_STATE_C2 && tsc_max_warp == 0 )
+        if ( max_usable_cstate <= ACPI_STATE_C2 && tsc_max_warp == 0 )
             printk("no deep Cstates, passed warp test, deemed reliable, ");
         else
             printk("deep Cstates possible, so not reliable, ");
