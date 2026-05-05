@@ -11,6 +11,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
 ### Added
  - Support for per-domain Xenstore quota in C xenstored (includes
    xenstore-stubdom), libxl and xl.
+ - Support for Xenstore watch depth feature in C xenstored (includes
+   xenstore-stubdom).
  - On x86:
    - Support for Bus Lock Threshold on AMD Zen5 and later CPUs, used by Xen to
      mitigate (by rate-limiting) the system wide impact of an HVM guest
