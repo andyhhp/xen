@@ -93,15 +93,15 @@ disconnects it from the internal of the libxc.
 
 1. Foreign mapping of the store ring
 
-   This is obsolete since :xen-cs:`6a2de353a9` (2012) which allocated grant
+   This is obsolete since `6a2de353a9` (2012) which allocated grant
    entries instead, to allow xenstored to function as a stub-domain without dom0
-   permissions.  :xen-cs:`38eeb3864d` dropped foreign mapping for cxenstored.
+   permissions.  `38eeb3864d` dropped foreign mapping for cxenstored.
    However, there are no OCaml bindings for libxengnttab.
 
    Work Items:
 
    * Minimal ``tools/ocaml/libs/xg/`` binding for ``tools/libs/gnttab/``.
-   * Replicate :xen-cs:`38eeb3864d` for oxenstored as well.
+   * Replicate `38eeb3864d` for oxenstored as well.
 
 2. Figuring out which domain(s) have gone away
 
